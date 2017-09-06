@@ -1,0 +1,26 @@
+@c elispfls.texi, , Top, Top
+@c This file is part of the GWDG iRODS/Handle Interface Manual.
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c * (1) Emacs-Lisp files
+
+@node Emacs-Lisp files, FDL, Shellscripts and Utilities, Top
+@chapter Emacs-Lisp files
+
+
+
+@c ** (2)
+
+@c * (1)
+
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c End:

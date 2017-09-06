@@ -1,0 +1,367 @@
+@c rspnstp.texi
+@c /home/lfinsto/irods_proj/irods_master/Finston/gwrdifpk/doc/rspnstp.texi
+
+@c Created by Laurence D. Finston (LDF) Wed Mar 13 14:37:13 CET 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) class Response_Type
+
+@node class Response_Type, class User_Info_Type, class Scan_Parse_Parameter_Type, Top
+@chapter class Response_Type
+
+@tindex class Response_Type
+@tindex Response_Type, class 
+@cindex peers (client and server)
+@cindex parser actions
+@cindex actions, parser
+@cindex server action
+@cindex action, server
+@cindex client action
+@cindex action, client
+@c
+@tindex deque
+@tindex deque<Response_Type>
+@c
+@code{class Response_Type} is used to store information needed for the communication 
+between the @dfn{peers} @command{gwirdsif} and @command{gwirdcli}.  
+Objects of this type are created in @dfn{parser actions}, i.e., 
+in the functions @code{yyparse} (on the server-side) and @code{zzparse} (on the client-side), 
+and in functions called from the parser actions.  
+@xref{Scanning and parsing}.  They are then pushed onto the 
+@code{deque<Response_Type> response_deque} data member belonging to 
+the @code{Scan_Parse_Parameter_Type} object that was passed as a parameter 
+to the parser function (i.e., @code{yyparse} or @code{zzparse}).
+@xref{Variables (Scan_Parse_Parameter_Type)}.  In the course of processing, 
+they are @dfn{popped} from the @code{deque} in the function @code{exchange_data_with_client} 
+(server-side) or @code{exchange_data_with_server} (client-side) and passed as parameters 
+to the appropriate @dfn{server action} or @dfn{client action} function.
+@xref{Server action functions}, and @ref{Client action functions}.
+
+
+@tindex class Response_Type
+@tindex Response_Type, class
+@c
+The following classes and functions are @code{friends} of @code{class Response_Type}:
+
+@table @code
+@item class Handle_Value_Type;
+@item class Irods_Object_Type
+@item class Scan_Parse_Parameter_Type
+@item class Dublin_Core_Metadata_Type
+@item client_sending_file_rule_func
+@item distinguished_name_rule_func
+@item exchange_data_with_client    
+@item exchange_data_with_server    
+@item int get_user_info_func
+@item yyparse
+@end table
+
+@menu
+* Response_Type Data Members::
+* Response_Type Member Functions::
+@end menu
+
+
+@c ** (2)
+
+@node Response_Type Data Members, Response_Type Member Functions, , class Response_Type
+@section Data Members
+
+@vindex Response_Type::command
+@vindex Response_Type::delay_value
+@vindex Response_Type::dirname
+@vindex Response_Type::flags
+@vindex Response_Type::handle
+@vindex Response_Type::hvt
+@vindex Response_Type::int_val
+@vindex Response_Type::local_filename
+@vindex Response_Type::metadata_options
+@vindex Response_Type::no_delay
+@vindex Response_Type::options  
+@vindex Response_Type::pid_institute_str
+@vindex Response_Type::pid_options
+@vindex Response_Type::pid_prefix_str
+@vindex Response_Type::pid_str             
+@vindex Response_Type::pid_suffix_str
+@vindex Response_Type::gpg_key_fingerprint
+@vindex Response_Type::remote_filename
+@vindex Response_Type::string_val
+@vindex Response_Type::string_vector
+@vindex Response_Type::int_vector
+@vindex Response_Type::temporary_filename
+@vindex Response_Type::type
+@c
+@deftypevr {Private variables} {unsigned int} type
+
+@deftypevrx {} string local_filename
+
+@deftypevrx {} string remote_filename
+
+@deftypevrx {} string temporary_filename
+
+@deftypevrx {} string dirname
+
+@deftypevrx {} string command
+
+@deftypevrx {} string flags
+
+@deftypevrx {} {unsigned int} options  
+
+@deftypevrx {} {unsigned int} metadata_options
+
+@deftypevrx {} {unsigned int} pid_options
+
+@deftypevrx {} string pid_str             
+
+@deftypevrx {} string pid_prefix_str
+
+@deftypevrx {} string pid_suffix_str
+
+@deftypevrx {} string pid_institute_str
+
+@deftypevrx {} string gpg_key_fingerprint
+
+@deftypevrx {} {Handle_Type*} handle
+
+@deftypevrx {} Handle_Value_Triple hvt
+
+@deftypevrx {} int int_val
+
+@deftypevrx {} string string_val
+
+@deftypevrx {} bool no_delay
+
+@deftypevrx {} {unsigned long int} delay_value
+
+@deftypevrx {} {vector<string>} string_vector
+
+@deftypevrx {} {vector<int>} int_vector
+@end deftypevr
+
+@vindex Response_Type::typename_map
+@c
+@deftypevr {static public variable} {map<unsigned int, string>} typename_map
+@end deftypevr
+
+
+@noindent 
+Public static @code{unsigned int} constants in @code{Response_Type}:
+
+@vindex NULL_RESPONSE_TYPE (Response_Type)
+@vindex COMMAND_ONLY_TYPE (Response_Type)
+@vindex SEND_FILE_TYPE (Response_Type)
+@vindex RECEIVE_PUT_FILE_TYPE (Response_Type)
+@vindex RECEIVE_METADATA_FILE_TYPE (Response_Type)
+@vindex SEND_HANDLE_TYPE (Response_Type)
+@vindex LS_TYPE (Response_Type)
+@vindex MV_TYPE (Response_Type)
+@vindex PWD_TYPE (Response_Type)
+@vindex CD_TYPE (Response_Type)
+@vindex MKDIR_TYPE (Response_Type)
+@vindex UNDELETE_FILE_TYPE (Response_Type)
+@vindex MARK_IRODS_OBJECTS_FOR_DELETION_TYPE (Response_Type)
+@vindex GET_TYPE (Response_Type)
+@vindex SEND_METADATA_TYPE (Response_Type)
+@vindex END_SERVER_TYPE (Response_Type)
+@vindex SLEEP_TYPE (Response_Type)
+@vindex SHOW_CERTIFICATE_TYPE (Response_Type)
+@vindex GET_METADATA_TYPE (Response_Type)
+@vindex GET_HANDLE_TYPE (Response_Type)
+@vindex SEND_TAN_LIST_TYPE (Response_Type)
+@vindex PROCESS_PENDING_TYPE (Response_Type)
+@vindex GET_USER_INFO_TYPE (Response_Type)
+@vindex CREATE_HANDLE_TYPE (Response_Type)
+@vindex ADD_HANDLE_VALUE_TYPE (Response_Type)
+@vindex DELETE_HANDLE_TYPE (Response_Type)
+@vindex UNDELETE_HANDLE_TYPE (Response_Type)
+@vindex DELETE_HANDLE_VALUE_TYPE (Response_Type)
+@vindex UNDELETE_HANDLE_VALUE_TYPE (Response_Type)
+@vindex DELETE_METADATA_TYPE (Response_Type)
+@vindex UNDELETE_METADATA_TYPE (Response_Type)
+@vindex FETCH_DC_METADATA_TYPE (Response_Type)
+@vindex GENERATE_CHECKSUM_TYPE (Response_Type)
+@vindex VERIFY_CHECKSUM_TYPE (Response_Type)
+@vindex STORE_PUBLIC_KEY_TYPE (Response_Type)
+@vindex SEND_PUBLIC_KEY_TYPE (Response_Type)
+@vindex MAX_RESPONSE_TYPE (Response_Type)
+@c
+@vindex Response_Type::NULL_RESPONSE_TYPE                     
+@vindex Response_Type::COMMAND_ONLY_TYPE                     
+@vindex Response_Type::SEND_FILE_TYPE                       
+@vindex Response_Type::RECEIVE_PUT_FILE_TYPE                
+@vindex Response_Type::RECEIVE_METADATA_FILE_TYPE           
+@vindex Response_Type::SEND_HANDLE_TYPE                     
+@vindex Response_Type::LS_TYPE                              
+@vindex Response_Type::MV_TYPE                              
+@vindex Response_Type::PWD_TYPE                             
+@vindex Response_Type::CD_TYPE                              
+@vindex Response_Type::MKDIR_TYPE                           
+@vindex Response_Type::UNDELETE_FILE_TYPE                     
+@vindex Response_Type::MARK_IRODS_OBJECTS_FOR_DELETION_TYPE 
+@vindex Response_Type::GET_TYPE                             
+@vindex Response_Type::SEND_METADATA_TYPE                   
+@vindex Response_Type::END_SERVER_TYPE                      
+@vindex Response_Type::SLEEP_TYPE                           
+@vindex Response_Type::SHOW_CERTIFICATE_TYPE                
+@vindex Response_Type::GET_METADATA_TYPE                    
+@vindex Response_Type::GET_HANDLE_TYPE                      
+@vindex Response_Type::SEND_TAN_LIST_TYPE                   
+@vindex Response_Type::PROCESS_PENDING_TYPE                 
+@vindex Response_Type::GET_USER_INFO_TYPE                   
+@vindex Response_Type::CREATE_HANDLE_TYPE                   
+@vindex Response_Type::ADD_HANDLE_VALUE_TYPE                
+@vindex Response_Type::DELETE_HANDLE_TYPE                   
+@vindex Response_Type::UNDELETE_HANDLE_TYPE                 
+@vindex Response_Type::DELETE_HANDLE_VALUE_TYPE             
+@vindex Response_Type::UNDELETE_HANDLE_VALUE_TYPE           
+@vindex Response_Type::DELETE_METADATA_TYPE             
+@vindex Response_Type::UNDELETE_METADATA_TYPE           
+@vindex Response_Type::FETCH_DC_METADATA_TYPE
+@vindex Response_Type::GENERATE_CHECKSUM_TYPE
+@vindex Response_Type::VERIFY_CHECKSUM_TYPE
+@vindex Response_Type::STORE_PUBLIC_KEY_TYPE
+@vindex Response_Type::SEND_PUBLIC_KEY_TYPE
+@vindex Response_Type::MAX_RESPONSE_TYPE                    
+@c
+@multitable {@code{MARK_IRODS_OBJECTS_FOR_DELETION_TYPE}} {00}
+@headitem Name @tab Value
+@item @code{NULL_RESPONSE_TYPE} @tab 0
+@c
+@item @code{COMMAND_ONLY_TYPE} @tab 1
+@c
+@item @code{SEND_FILE_TYPE} @tab 2
+@c
+@item @code{RECEIVE_PUT_FILE_TYPE} @tab 3
+@c
+@item @code{RECEIVE_METADATA_FILE_TYPE} @tab 4
+@c
+@item @code{SEND_HANDLE_TYPE} @tab 5
+@c
+@item @code{LS_TYPE} @tab 6
+@c
+@item @code{MV_TYPE} @tab 7
+@c
+@item @code{PWD_TYPE} @tab 8
+@c
+@item @code{CD_TYPE} @tab 9
+@c
+@item @code{MKDIR_TYPE} @tab 10
+@c
+@item @code{UNDELETE_FILE_TYPE} @tab 11
+@c
+@item @code{MARK_IRODS_OBJECTS_FOR_DELETION_TYPE} @tab 12
+@c
+@item @code{GET_TYPE} @tab 13
+@c
+@item @code{SEND_METADATA_TYPE} @tab 14
+@c
+@item @code{END_SERVER_TYPE} @tab 15
+@c
+@item @code{SLEEP_TYPE} @tab 16
+@c
+@item @code{SHOW_CERTIFICATE_TYPE} @tab 17
+@c
+@item @code{GET_METADATA_TYPE} @tab 18
+@c
+@item @code{GET_HANDLE_TYPE} @tab 19
+@c
+@item @code{SEND_TAN_LIST_TYPE} @tab 20
+@c
+@item @code{PROCESS_PENDING_TYPE} @tab 21
+@c
+@item @code{GET_USER_INFO_TYPE} @tab 22
+@c
+@item @code{CREATE_HANDLE_TYPE} @tab 23
+@c
+@item @code{ADD_HANDLE_VALUE_TYPE} @tab 24
+@c
+@item @code{DELETE_HANDLE_TYPE} @tab 25
+@c
+@item @code{UNDELETE_HANDLE_TYPE} @tab 26
+@c
+@item @code{DELETE_HANDLE_VALUE_TYPE} @tab 27
+@c
+@item @code{UNDELETE_HANDLE_VALUE_TYPE} @tab 28
+@c
+@item @code{DELETE_METADATA_TYPE} @tab 29
+@c
+@item @code{UNDELETE_METADATA_TYPE} @tab 30
+@c
+@item @code{FETCH_DC_METADATA_TYPE} @tab 31
+@c
+@item @code{GENERATE_CHECKSUM_TYPE} @tab 32
+@c
+@item @code{VERIFY_CHECKSUM_TYPE} @tab 33
+@c
+@item @code{STORE_PUBLIC_KEY_TYPE} @tab 34
+@c
+@item @code{SEND_PUBLIC_KEY_TYPE} @tab 35 
+@c
+@item @code{MAX_RESPONSE_TYPE} @tab 35
+@end multitable
+
+@sp 1
+@noindent 
+@code{MAX_RESPONSE_TYPE} should always have the highest value assigned
+to another |Response_Type| constant.
+
+@c ** (2)
+
+@node Response_Type Member Functions, , Response_Type Data Members, class Response_Type
+@section Member Functions
+
+@findex Response_Type::Response_Type
+@c
+@deftypefn {Default constructor} void Response_Type (@code{void})
+@end deftypefn
+
+@findex Response_Type::Response_Type
+@c
+@deftypefn {Copy constructor} void Response_Type (@code{const Response_Type &}@var{r})
+@end deftypefn
+
+@findex Response_Type::~Response_Type
+@c
+@deftypefn {Destructor} void {~Response_Type} (@code{void})
+@end deftypefn
+
+@findex Response_Type::operator=
+@deftypefn {Assignment operator} {const Response_Type&} operator= (@*@
+                                    @code{const Response_Type &}@var{r})
+@end deftypefn
+
+@findex Response_Type::initialize_maps
+@c
+@deftypefn {static function} int initialize_maps (@code{void})
+@end deftypefn
+
+@findex Response_Type::clear
+@c
+@deftypefun void clear (@code{void})
+@end deftypefun
+
+@findex Response_Type::show
+@c
+@deftypefn {@code{const} function} int show (@code{string} {@var{s} @code{= ""}}) 
+@end deftypefn
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

@@ -1,0 +1,33 @@
+@c proftest.texi
+@c [...]/gwrdifpk/doc/proftest.texi
+
+@c Created by Laurence D. Finston (LDF) Fri Oct 25 13:18:59 CEST 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) Profiling and testing
+
+@node Profiling and testing, Web application gwrdwbap, gwirdcli Database, Top
+@chapter Profiling and testing
+
+@c !! TODO:  LDF 2013.10.25.
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

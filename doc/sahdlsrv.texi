@@ -1,0 +1,382 @@
+@c sahdlsrv.texi
+@c [...]/doc/Texinfo/sahdlsrv.texi
+
+@c This file is part of the GWDG Archive Interface Manual (gwrdifpk)
+
+@c Copyright (C) 2012, 2013 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbh Goettingen
+
+@c All rights reserved
+
+@c * (1) Standalone handle service
+
+@node Standalone handle service, Getting Started, Installation, Top
+
+@chapter Standalone handle service
+
+@menu
+* Background (Standalone handle service)::
+* Setup (Standalone handle service)::
+* Database Entries (Standalone handle service)::
+@end menu
+
+@c ** (2) Background (Standalone handle service)
+
+@node Background (Standalone handle service),  Setup (Standalone handle service), , Standalone handle service
+
+@section Background
+
+@cindex CNRI (Corporation for National Research Initiatives)
+@cindex Corporation for National Research Initiatives (CNRI)
+@cindex handle resolution
+@cindex resolution, handle 
+@cindex handle service
+@cindex handle service, standalone
+@cindex handle client
+@cindex client, handle 
+@cindex service information
+@c
+Normally, a @dfn{handle service} is set up to use a prefix or prefixes registered with the
+Corporation for National Research Initiatives (CNRI) (@uref{http://www.cnri.reston.va.us/}).
+In this case, the normal procedure for @dfn{resolving a handle} is for the 
+@dfn{handle client} to first contact CNRI's @dfn{global handle service} in order to retrieve the 
+@dfn{service information} for a given prefix.  For example, to resolve the handle 
+@samp{11858/00-DEMO-0000-0000-0012-8}, the service information for the prefix @samp{11858}
+must first be retrieved from CNRI's @dfn{Global Handle Registry} (GHR).  This information is 
+stored in the handle @samp{0.NA/11858}.  The handle client can now contact this service to resolve
+the handle @samp{11858/00-DEMO-0000-0000-0012-8}.
+
+@cindex naming authority handle
+@cindex handle, naming authority 
+@cindex naming authority 
+@cindex authority, naming 
+@cindex handle
+@c
+However, it is possible to set up a @dfn{standalone handle service}, as described in the
+Handle System documentation (@i{HANDLE.NET (version 7.0) Technical Manual, Version 1.1}).
+
+@strong{Please note}:  A standalone handle service should @emph{only} be used for 
+testing purposes! For production use, only prefixes registered with CNRI should be used.  
+The author also strongly recommends against using a standalone handle service ``internally'':  
+For this purpose, it would be better to use some other form of identifier and not handles 
+because of the risk of confusion between ``internal'' and ``official'' handles.  
+
+
+The easiest way to set up a standalone handle service is to use an existing prefix 
+assigned by the Global Handle Registry (GHR).  
+The service information in the @dfn{naming authority handle} 
+(e.g., @samp{0.NA/11858}, as above) in the GHR 
+includes the IP address of the server responsible for
+resolving handles with that prefix.  If a test server with a different IP address is used,
+the handles maintained by that server will not be resolved upon requests to the GHR.  Nor 
+will they be resolved upon requests to other servers, unless these are also specially
+configured to find the test server, i.e., to use the service information for the test
+server and not to use the GHR for resolving handles with that prefix.  Otherwise, only
+requests to the test server itself will cause handles on that server to be resolved. 
+Please note that in this case authorization @emph{is} performed using global resolution.
+In other words, the authorization handle is stored in the GHR and not in the test handle
+server's local database.
+
+@c ** (2) Setup (Standalone handle service)
+@node Setup (Standalone handle service), Database Entries (Standalone handle service), Background (Standalone handle service), Standalone handle service
+
+@section Setup
+
+The normal procedure for setting up a handle server is described in the file 
+@file{INSTALL.txt}, which is included in the handle system distribution.  After running
+@samp{hdl-setup-server}, one is instructed to send the generated file @file{sitebndl.zip} 
+to the CNRI Handle System Administrator (@email{hdladmin@@cnri.reston.va.us}):
+
+@quotation
+   ``The Administrator will then create the prefix on the root service
+   (known as the Global Handle Registry(GHR)), and notify you when
+   this has been completed.  You will not be able to continue the
+   install until you receive further information concerning your
+   prefix.
+
+   ONCE YOU RECEIVE YOUR PREFIX INFORMATION FROM HDLADMIN THEN
+   PROCEED WITH THE FOLLOWING STEPS TO 'HOME' YOUR PREFIX TO YOUR
+   NEW SERVICE.''
+@end quotation
+
+Please note that it is necessary to follow the instructions 
+in Chapter 10 of the @i{HANDLE.NET Technical Manual} regarding the files @file{local_nas}
+and @file{resolver_site} in the user's home directory and the file @file{config.dct} in the
+directory containing the server configuration (e.g., @file{/home/my_account/hs/svr_1}).
+The user that is meant is the one under whose account Handle Service @emph{clients} are invoked, e.g., 
+@samp{hdl-admintool}, @samp{hdl-dbtool}, etc.  However, despite what is said in  
+the @i{HANDLE.NET Technical Manual}, a prefix of the form @samp{0.NA/<prefix>}, e.g., 
+@samp{0.NA/12345} can be used with local resolution;  it is not necessary to create
+a different handle for administration, e.g., @samp{12345/ADMIN}.
+
+@c ** (2) Database Entries (Standalone handle service)
+
+@node Database Entries (Standalone handle service), , Setup (Standalone handle service), Standalone handle service
+
+@section Database Entries
+
+The main difficulty in setting up a standalone handle server is
+creating the database entries for the @dfn{Naming Authority handle}.
+Normally, this is done by the CNRI Handle System Administrator and
+authentication is performed using @dfn{global resolution} via the
+@dfn{Global Handle Registry} (GHR).
+
+A standalone handle server, on the other hand, cannot use the GHR to
+resolve handles and therefore the local database must contain the
+entries for the naming authority handle of the standalone handle
+server.  It would, of course, be possible to create the database
+entries by hand using SQL commands, but this would require deeper
+knowledge of how the data must be formatted.  Practically speaking,
+this isn't possible for most people, especially when they are just
+starting out using the handle system in the first place.
+
+The easiest way to obtain this knowledge is to apply for a temporary
+prefix for testing.  In this case, one can use global resolution to
+display the database entries for the naming authority prefix stored at
+the Global Handle Registry @emph{and copy them} to the local database
+using @samp{hdl-admintool}!  Now, one may run a standalone handle
+server with local resolution using this prefix, and/or copy and modify
+the database entries in order to use them with any number of other
+prefixes.
+
+For example, if my prefix is 00001, I can use @samp{hdl-admintool} to
+view the handle @samp{0.NA/00001} containing the service information
+for my handle server.  I can then use the ``Copy Values'' and ``Create
+Handle'' buttons to create a new handle, e.g.,
+@samp{00001/00001-COPY}.  Please note that I must use @samp{00001} as
+the prefix, because I am only authorized to create handles under this
+prefix and in particular not under the global prefix @samp{0.NA}.
+
+Now, I can query my local database for the entries that were created.
+I assume the use of an SQL database rather than the ``built-in''
+database, as described in Chapter 7 of the 
+@i{HANDLE.NET Technical Manual}.
+Please note that the JAR file for the MySQL JDBC connector, or a symbolic link to it, must 
+be present in the @file{lib} directory of the handle server installation, e.g., 
+@file{/home/my_account/hs/hsj-7.1/lib}.  Otherwise, the handle server will not be able to 
+connect to the database.
+
+@example
+mysql> select * from handles where handle = '00001/00001-COPY'\G
+@result{} 
+*************************** 1. row ***************************
+     handle: 00001/00001-COPY
+        idx: 1
+       type: HS_SITE
+       data: [binary data]
+   ttl_type: 0
+        ttl: 86400
+  timestamp: 1346335399
+       refs: 
+ admin_read: 1
+admin_write: 1
+   pub_read: 1
+  pub_write: 0
+*************************** 2. row ***************************
+     handle: 00001/00001-COPY
+        idx: 2
+       type: EMAIL
+       data: laurence.finston@@gwdg.de
+[@dots{}]
+*************************** 3. row ***************************
+     handle: 00001/00001-COPY
+        idx: 3
+       type: DESC
+       data: Test prefix for GWDG - JHE - 8/28/12
+[@dots{}]
+*************************** 4. row ***************************
+     handle: 00001/00001-COPY
+        idx: 100
+       type: HS_ADMIN
+       data: [binary data]
+[@dots{}]
+*************************** 5. row ***************************
+     handle: 00001/00001-COPY
+        idx: 101
+       type: HS_ADMIN
+       data: [binary data]
+[@dots{}]
+*************************** 6. row ***************************
+     handle: 00001/00001-COPY
+        idx: 200
+       type: HS_VLIST
+       data: [binary data]
+[@dots{}]
+*************************** 7. row ***************************
+     handle: 00001/00001-COPY
+        idx: 300
+       type: HS_PUBKEY
+       data: [binary data]
+[@dots{}]
+7 rows in set (0.00 sec)
+@end example
+
+The next step is to add the files @file{local_nas} and
+@file{resolver_site} in the @file{.handle/} directory directly below
+the user's home directory, as mentioned above, in order to ``turn
+off'' global resolution.  Then, the value of the @samp{handle} field in
+these entries must be changed.  I could use @samp{00001} as my prefix,
+but I don't have to.  Let's say I want to use @samp{12345} instead,
+so I change the value of the @samp{handle} column in these entries 
+from @samp{00001/00001-COPY} to @samp{0.NA/12345}:
+
+@example
+mysql> update handles set handle = '0.NA/12345' 
+          where handle = '00001/00001-COPY';
+@result{} 
+Query OK, 7 rows affected (0.00 sec)
+Rows matched: 7  Changed: 7  Warnings: 0
+@end example
+
+@menu
+* Homing a Prefix::
+* Replacing and Modifying the Binary Data::
+@end menu
+
+@c *** (3) Homing a Prefix 
+
+@node Homing a Prefix, Replacing and Modifying the Binary Data, , Database Entries (Standalone handle service)
+@subsection Homing a Prefix 
+
+The explanation of homing a prefix in Chapter 10 of the @i{HANDLE.NET Technical Manual} 
+is unfortunately not very clear.  It explains that a server must be ``told'' that it's 
+responsible for resolving certain prefixes, but it doesn't explain
+exactly what this entails.  In fact, a prefix is ``homed'' if the
+database table @samp{nas} contains an entry for it:
+
+@example
+mysql> select * from nas;
+@result{} 
++------------+
+| na         |
++------------+
+| 0.NA/0.NA  |
+| 0.NA/00001 |
+| 0.NA/12345 |
+| 0.NA/55555 |
++------------+
+4 rows in set (0.00 sec)
+@end example
+
+Please note that the prefix @samp{0.NA/0.NA} is also homed.  This
+makes it possible to resolve the handles with the prefix @samp{0.NA},
+i.e., @samp{0.NA/00001}, @samp{0.NA/12345} and @samp{0.NA/55555}
+locally, i.e., without contacting the GHR.
+
+@c *** (3) Replacing and Modifying the Binary Data
+
+@node Replacing and Modifying the Binary Data, , Homing a Prefix, Database Entries (Standalone handle service)
+@subsection Replacing and Modifying the Binary Data
+
+Five of the seven database entries for our naming authority handle
+@samp{0.NA/12345} contain binary data, which may need to be modified:
+
+@example
+ idx: 1
+type: HS_SITE
+
+ idx: 100
+type: HS_ADMIN
+
+ idx: 101
+type: HS_ADMIN
+
+ idx: 200
+type: HS_VLIST
+
+ idx: 300
+type: HS_PUBKEY
+@end example
+
+The data for @samp{HS_SITE} is simply the contents of the file
+@file{siteinfo.bin} in the directory containing my server
+configuration.  For this example, there is therefore no need to change
+it.  However, for a different site, one just has to replace it with
+the contents of the appropriate @file{siteinfo.bin} file.  However, 
+the MySQL function @samp{load_file} requires (among other things) that
+the file be readable by all.  I therefore copy the contents to another
+file before calling @samp{update}, e.g.:
+
+@example
+cd 
+cp hs/svr_1/siteinfo.bin ttemp.txt
+chmod a+r ttemp.txt
+update handles set data = load_file('/home/my_account/ttemp.txt') 
+   where handle = '0.NA/12345' and type = 'HS_SITE';
+@end example
+
+Here, it does matter that @samp{load_file} adds a newline to the end 
+of the data from the file.
+
+The Handle Proxy made available by CNRI at @url{http://hdl.handle.net}
+displays the binary data for handle values with @samp{type}
+@samp{HS_ADMIN} and @samp{HS_VLIST} in a human-readable form.  The
+following are the values for the original handle @samp{0.NA/00001}, which we've copied:
+
+@verbatim
+Index   Type      Data
+100     HS_ADMIN handle=0.NA/0.NA; index=200; [create hdl,delete hdl,\
+                 read val,modify val,del val,add val,\
+                 modify admin,del admin,add admin]
+                 
+101     HS_ADMIN handle=0.NA/00001; index=200; \
+                 [create hdl,read val,modify val,add val,list]
+
+200     HS_VLIST 300:0.NA/00001
+@end verbatim
+
+We don't have to worry about the handle value with index @math{=} 100.  
+It refers to an administrator of the global handle system.
+
+When simply selecting the data fields from the database, they are (mostly) unreadable:
+
+@example
+mysql> select data from handles where handle = '00001/00001COPY' 
+         and (idx = 101 or idx = 200);
+@result{} 
+select data from handles where handle = '00001/00001COPY' 
+    and (idx = 101 or idx = 200);
++------------------------+
+| data                   |
++------------------------+
+| ^LQ   
+0.NA/00001   \310    |
+|    ^A   
+0.NA/00001  ^A, |
++------------------------+
+2 rows in set (0.00 sec)
+@end example
+
+@noindent 
+However, the name of the handle is obviously stored in plain-text.  It
+works to just replace it with the name we want:
+
+@example
+mysql> set @@a = (select replace ((select data from handles 
+                            where handle = '0.NA/12345' and idx = 101), 
+                           '00001', '12345'));
+mysql> update handles set data = @@a 
+          where handle = '0.NA/12345' and idx = 101;
+@end example
+
+It is necessary to use the user-defined variable @samp{@@a} to store
+the result of the call to the @samp{replace} function, because the
+target table of the @samp{update} command cannot appear in a subquery.
+
+Of course, this only works if one has authorization to copy an existing naming authority
+from the GHR in the first place.  
+
+Now, the handle server must be restarted and, with a bit of luck,
+you'll have a standalone handle server with local resolution!
+
+@c ** (2)
+
+@c * (1)
+
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c fill-column:90
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c End:

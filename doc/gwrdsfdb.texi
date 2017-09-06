@@ -1,0 +1,1041 @@
+@c gwrdsfdb.texi
+@c /home/lfinsto/irods_proj/irods_master/Finston/gwrdifpk/doc/gwrdsfdb.texi
+
+@c Created by Laurence D. Finston (LDF) Wed Mar 13 14:12:32 CET 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) gwirdsif Database 
+
+@node gwirdsif Database, gwirdcli Database, handlesystem and handlesystem_standalone Databases, Top
+@chapter gwirdsif Database
+
+@menu
+* Users database table::
+* User_Info database view::               
+* Certificates database table::
+* Groups database tables and views::
+* Institutes database table::
+* Prefixes database table::
+* Users_Prefixes database table::
+* Privileges database table::
+* Public_Keys database table::
+* Irods_Objects database tables::
+* Session_Data database table::
+* TANs database table::
+* Dublin Core database tables (gwirdsif)::
+* GPG_Key_Pair database tables (gwirdsif)::
+* Pull Request database table (gwirdsif)::
+
+@end menu
+
+@c ** (2) Users database table
+
+@node Users database table, User_Info database view, , gwirdsif Database
+@section Users 
+
+@table @code 
+@item user_id 
+@code{int primary key}
+@item username 
+@code{varchar(128) unique not null}
+@item irods_password_encrypted 
+@code{varchar(2048)}  (@math{2048 \equiv 2^{11}})
+@item irods_password_encrypted_timestamp 
+@code{timestamp default 0}
+@item Distinguished_Name 
+@code{varchar(256)}
+@item irods_homedir 
+@code{varchar(128)}
+@item irods_zone 
+@code{varchar(128)}
+@item irods_default_resource 
+@code{varchar(128)}
+@item handle_username varchar(128) 
+@code{default ''}
+@item handle_password_encrypted 
+@code{varchar(32) default ''}
+@item default_institute_id 
+@code{int references Institutes(institute_id)}
+@item default_prefix_id 
+@code{int references Prefixes(prefix_id)}
+@end table
+
+@c ** (2) User_Info database view
+
+@node User_Info database view, Certificates database table, Users database table, gwirdsif Database
+
+@section User_Info
+
+The view @code{User_Info} combines columns from several tables in order to be able to present
+information about users in a convenient way.  It is defined by the following SQL query:
+
+@example 
+create view User_Info as select 
+   U.user_id, U.username, 
+   C.certificate_id, C.serialNumber, C.commonName, C.organization,
+   C.organizationalUnitName,
+   P.superuser, P.delegate, P.show_user_info, P.show_groups,
+   P.show_certificates, P.show_distinguished_names,
+   P.show_privileges,
+   G.gpg_key_pair_id, G.fingerprint, 
+   G.created as 'GPG key pair created',
+   G.last_modified as 'GPG key pair last modified'
+from Users as U, Certificates as C, Privileges as P, GPG_Key_Pairs as G
+where U.user_id = C.user_id and U.user_id = P.user_id 
+   and U.user_id = G.user_id
+order by U.user_id, G.gpg_key_pair_id;
+@end example
+
+@need 2000
+Example:
+@example 
+select * from User_Info where user_id = 1\G
+
+@result{} 
+*************************** 1. row ***************************
+                   user_id: 1
+                  username: lfinsto
+            certificate_id: 2
+              serialNumber: 2
+                commonName: Laurence Finston
+              organization: GWDG
+    organizationalUnitName: gwrdifpk
+                 superuser: 1
+                  delegate: 1
+            show_user_info: 1
+               show_groups: 1
+         show_certificates: 1
+  show_distinguished_names: 1
+           show_privileges: 1
+           gpg_key_pair_id: 1
+               fingerprint: 41E4286D5DED32B80956D5429CBFF6B2CA0E93A2
+      GPG key pair created: 2014-01-16 13:32:42
+GPG key pair last modified: 0000-00-00 00:00:00
+1 row in set (0.00 sec)
+@end example
+
+@c ** (2) Certificates database table
+
+@node Certificates database table, Groups database tables and views, User_Info database view, gwirdsif Database
+
+@section Certificates
+
+@cindex X.509 certificate
+@cindex certificate, X.509
+@c
+The @code{Certificates} table stores information from @dfn{X.509 certificates}.  Its columns 
+correspond to the data members of @code{class X509_Certificate_Type}.  
+@xref{X.509 Certificates}, and @ref{X.509 Certificate Types}.
+
+@table @code 
+@item certificate_id 
+@code{int primary key}
+
+@item user_id 
+@code{int references Users(user_id)}
+
+@item issuer_cert_id 
+@code{int references Certificates(certificate_id)}
+
+@item is_ca 
+@code{boolean not null} (Is certification authority)
+
+@item is_proxy 
+@code{boolean not null} (Is proxy certificate)
+@end table
+
+@noindent 
+The following columns have names from the X.509 specification:
+
+@table @code 
+@item serialNumber 
+@code{bigint unsigned       }
+                                    
+@item organization 
+@code{varchar(64)}
+
+@item organizationalUnitName 
+@code{varchar(64)}
+
+@item commonName 
+@code{varchar(64)           }
+
+@item countryName 
+@code{char(2)          }
+
+@item localityName 
+@code{varchar(64)         }
+
+@item stateOrProvinceName 
+@code{varchar(64)}
+
+@item Validity_notBefore 
+@code{datetime }
+
+@item Validity_notAfter 
+@code{datetime}
+@end table
+
+@c ** (2) Groups database tables and views
+
+@node Groups database tables and views, Institutes database table, Certificates database table, gwirdsif Database
+
+@section Groups database tables and views
+
+See also @ref{class Group_Type}.
+
+@menu
+* Groups database table::                   
+* Groups_Users database table::             
+* Group_Info database view::               
+@end menu
+
+@c *** (3) Groups database table
+
+@node Groups database table, Groups_Users database table, , Groups database tables and views
+
+@subsection Groups
+
+@table @code 
+@item group_id 
+@code{int primary key unique not null}
+
+@item creator_id 
+@code{int not null references Users(user_id)}
+
+@item name 
+@code{varchar(64) unique not null}
+
+@item created 
+@code{datetime}
+@end table
+
+
+@c *** (3) Groups_Users database table
+
+@node Groups_Users database table, Group_Info database view, Groups database table, Groups database tables and views
+
+@subsection Groups_Users
+
+@table @code 
+@item group_id 
+@code{int not null references Groups(group_id)}
+
+@item user_id  
+@code{int not null references Users(user_id)}
+
+@item add_user_priv 
+@code{boolean not null default 0}
+
+@item delete_user_priv  
+@code{boolean not null default 0}
+
+@item delete_group_priv 
+@code{boolean not null default 0}
+@end table 
+
+@c *** (3) Group_Info database view
+
+@node Group_Info database view, , Groups_Users database table, Groups database tables and views
+
+@subsection Group_Info (view)
+
+The view @code{Group_Info} combines columns from the tables @code{Groups}, @code{Users} 
+and @code{Groups_Users} in order to be able to present information about groups in a convenient way.  
+It is defined by the following SQL query:
+
+@need 2000
+@example
+create view Group_Info as select 
+   GU.group_id, G.name as group_name, 
+   GU.user_id, U.username as 'username', 
+   GU.add_user_priv, GU.delete_user_priv, GU.delete_group_priv,
+   G.creator_id, UU.username as creator_name, G.created
+from Groups as G, Users as U, Groups_Users as GU, Users as UU
+where G.group_id = GU.group_id and U.user_id = GU.user_id
+and G.creator_id = UU.user_id
+order by G.group_id, GU.user_id;
+@end example
+
+Example:
+
+@example
+select * from Group_Info where group_id = 1\G
+
+@result{} 
+
+*************************** 1. row ***************************
+         group_id: 1
+       group_name: test_group_0
+          user_id: 1
+         username: lfinsto
+    add_user_priv: 1
+ delete_user_priv: 1
+delete_group_priv: 1
+       creator_id: 1
+     creator_name: lfinsto
+          created: 2013-06-05 14:05:54
+*************************** 2. row ***************************
+         group_id: 1
+       group_name: test_group_0
+          user_id: 2
+         username: jdoe
+    add_user_priv: 0
+ delete_user_priv: 0
+delete_group_priv: 0
+       creator_id: 1
+     creator_name: lfinsto
+          created: 2013-06-05 14:05:54
+2 rows in set (0.01 sec)
+@end example
+
+@c ** (2) Institutes database table
+
+@node Institutes database table, Prefixes database table, Groups database tables and views, gwirdsif Database
+@section Institutes 
+
+@c OK. LDF 2013.10.25.
+
+@table @code 
+@item institute_id 
+@code{int primary key}
+@item contact 
+@code{int references Users(user_id)}
+@item abbreviation 
+@code{char(4) unique not null}
+@item name 
+@code{varchar(128) unique not null}
+@item enabled 
+@code{boolean not null default 1}
+@end table 
+
+@c ** (2) Prefixes database table
+
+@node Prefixes database table, Users_Prefixes database table, Institutes database table, gwirdsif Database
+@section Prefixes
+
+@c OK. LDF 2013.10.29.
+
+@table @code 
+@item prefix_id 
+@code{int primary key}
+@item prefix 
+@code{varchar(16) unique not null}
+@item enabled 
+@code{boolean not null default 1}
+@end table 
+
+@c ** (2) Users_Prefixes database table
+
+@node Users_Prefixes database table, Privileges database table, Prefixes database table, gwirdsif Database
+@section Users_Prefixes 
+
+@c OK. LDF 2013.10.29.
+
+@table @code 
+@item user_id 
+@code{int references Users(user_id),}
+@item prefix_id 
+@code{int references Prefixes(prefix_id)}
+@end table 
+
+@c ** (2) Privileges database table
+
+@node Privileges database table, Public_Keys database table, Users_Prefixes database table, gwirdsif Database
+@section Privileges
+
+@c OK. LDF 2013.10.29.
+
+See also @ref{Privileges}.
+
+@table @code
+@item user_id 
+@code{int primary key unique not null references Users(user_id)}
+
+@item superuser 
+@code{boolean not null default 0}
+
+@item delegate 
+@code{boolean not null default 0}
+
+@item add_groups 
+@code{boolean not null default 0}
+
+@item delete_groups 
+@code{boolean not null default 0}
+
+@item delete_handles 
+@code{boolean not null default 0}
+
+@item delete_handle_values 
+@code{boolean not null default 0}
+
+@item delete_hs_admin_handle_values 
+@code{boolean not null default 0}
+
+@item delete_last_hs_admin_handle_value 
+@code{boolean not null default 0}
+
+@item undelete_handle_values 
+@code{boolean not null default 0}
+
+@item show_user_info 
+@code{boolean not null default 0}
+
+@item show_groups 
+@code{boolean not null default 0}
+
+@item show_certificates 
+@code{boolean not null default 0}
+
+@item show_distinguished_names 
+@code{boolean not null default 0}
+
+@item show_privileges 
+@code{boolean not null default 0}
+@end table 
+
+@c ** (2) Public_Keys database table
+
+@node Public_Keys database table, Irods_Objects database tables, Privileges database table, gwirdsif Database
+@section Public_Keys
+
+@c OK. LDF 2013.10.29.
+
+@table @code
+@item user_id 
+@code{int primary key references Users(user_id),}
+@item key_name 
+@code{varchar(256) not null,}
+@item key_id 
+@code{int unsigned not null}
+@end table
+
+@c ** (2) Irods_Objects database tables
+
+@node Irods_Objects database tables, Session_Data database table, Public_Keys database table, gwirdsif Database
+
+@section Irods_Objects database tables
+
+See also @ref{iRODS Types}.
+
+@menu
+* Irods_Objects database table::
+* Irods_AVUs database table::
+* Irods_Servers database table::
+* Irods_Objects_Handles database table::
+* Irods_Objects_Dublin_Core_Metadata database table::
+* Irods_Info database view::
+@end menu
+
+@c *** (3) Irods_Objects database table
+
+@node Irods_Objects database table, Irods_AVUs database table, , Irods_Objects database tables
+@subsection Irods_Objects
+
+See also @ref{class Irods_Object_Type}.
+
+@table @code
+@item irods_object_id 
+@code{bigint unsigned primary key not null}
+
+@item user_id 
+@code{int not null references Users(user_id)}
+
+@item irods_server_id 
+@code{int unsigned not null references Irods_Servers(irods_server_id)}
+
+@item irods_object_path 
+@code{varchar(1024) not null default ''}
+
+@item marked_for_deletion_from_archive 
+@code{boolean not null default 0}
+
+@item deleted_from_archive 
+@code{boolean not null default 0}
+
+@item delete_from_archive_timestamp 
+@code{timestamp not null default 0}
+
+@item marked_for_deletion_from_gwirdsif_db 
+@code{boolean not null default 0}
+
+@item delete_from_gwirdsif_db_timestamp 
+@code{timestamp not null default 0}
+
+@item created 
+@code{timestamp not null default 0}
+
+@item last_modified 
+@code{timestamp not null default 0}
+
+@item dublin_core_metadata_id 
+@code{bigint unsigned not null default 0 references Dublin_Core_Metadata(dublin_core_metadata_id)}
+
+@item dublin_core_metadata_irods_object_id 
+@code{bigint unsigned not null default 0 references Irods_Objects(irods_object_id)}
+
+@item irods_object_ref_id
+@code{bigint unsigned not null default 0 references Irods_Objects(irods_object_id)}
+
+@item encrypted 
+@code{boolean not null default 0}
+
+@item signed_gpg 
+@code{boolean not null default 0}
+
+@item detached_signature_irods_object_id 
+@code{bigint unsigned not null default 0 references Irods_Objects(irods_object_id)}
+
+@item gpg_key_pair_id_encrypt 
+@code{int unsigned not null default 0 references GPG_Key_Pairs(gpg_key_pair_id)}
+
+@item gpg_key_pair_id_sign 
+@code{int unsigned not null default 0 references GPG_Key_Pairs(gpg_key_pair_id)}
+
+@item gpg_key_fingerprint_encrypt 
+@code{varchar(64) not null default ''}
+
+@item gpg_key_fingerprint_sign 
+@code{varchar(64) not null default ''}
+
+@item compressed_tar_file 
+@code{boolean not null default 0}
+
+@item compressed_gzip 
+@code{boolean not null default 0}
+
+@item compressed_bzip2 
+@code{boolean not null default 0}
+@end table
+
+@c *** (3) Irods_AVUs database table
+
+@node Irods_AVUs database table, Irods_Servers database table, Irods_Objects database table, Irods_Objects database tables
+@subsection Irods_AVUs
+
+@c OK. LDF 2013.10.29.
+
+See also @ref{class Irods_AVU_Type}.
+
+@table @code 
+@item irods_avu_id 
+@code{bigint unsigned primary key not null}
+
+@item irods_object_id 
+@code{bigint unsigned references Irods_Objects(irods_object_id)}
+
+@item attribute 
+@code{varchar(512)}
+
+@item value 
+@code{varchar(512)}
+
+@item units 
+@code{varchar(16)}
+
+@item time_set 
+@code{timestamp default 0}
+@end table 
+
+@c *** (3) Irods_Servers database table
+
+@node Irods_Servers database table, Irods_Objects_Handles database table, Irods_AVUs database table, Irods_Objects database tables
+@subsection Irods_Servers
+
+@c OK. LDF 2013.10.29.
+
+@table @code 
+@item irods_server_id 
+@code{int unsigned primary key not null}
+
+@item irods_server_name 
+@code{varchar(1024) not null default ''}
+
+@item irods_server_ip_address 
+@code{varchar(1024)}
+
+@item irods_server_port 
+@code{int unsigned not null}
+
+@item irods_server_admin 
+@code{varchar(1024)}
+@end table 
+
+@c *** (3) Irods_Objects_Handles database table
+
+@node Irods_Objects_Handles database table, Irods_Objects_Dublin_Core_Metadata database table, Irods_Servers database table, Irods_Objects database tables
+@subsection Irods_Objects_Handles
+
+@table @code 
+@item irods_object_id 
+@code{bigint unsigned references Irods_Objects(irods_object_id)}
+
+@item handle_id 
+@code{bigint unsigned references handlesystem_standalone.handes(handle_id)}
+@end table 
+
+@c *** (3) Irods_Objects_Dublin_Core_Metadata database table
+
+@node Irods_Objects_Dublin_Core_Metadata database table, Irods_Info database view, Irods_Objects_Handles database table, Irods_Objects database tables
+@subsection Irods_Objects_Dublin_Core_Metadata
+
+@cindex association table (database)
+@cindex table, association (database)
+@c
+Association table.  This table makes it possible to associate multiple sets of Dublin Core metadata to 
+a given iRODS object.  It also makes it possible to associate multiple iRODS objects to a single set of
+Dublin Core metadata, if this should ever be desired.  At the present time, the author doesn't see any 
+need to do this.
+
+Please note that, strictly speaking, this table is not really needed, because the @code{irods_object_ref_id} 
+field in the @code{Dublin_Core_Metadata} table could be used to determine which rows in 
+@code{Dublin_Core_Metadata} correspond to ones in the @code{Irods_Objects} table.  However, the 
+@code{Irods_Objects_Dublin_Core_Metadata} simplifies this task.
+
+@table @code
+@item irods_object_id         
+@code{bigint unsigned not null default 0 references Irods_Objects(irods_object_id)}
+
+@item dublin_core_metadata_id 
+@code{bigint unsigned not null default 0 references Dublin_Core_Metadata(dublin_core_metadata_id)}
+@end table
+
+@c *** (3) Irods_Info database view
+
+@node Irods_Info database view, , Irods_Objects_Dublin_Core_Metadata database table, Irods_Objects database tables
+@subsection Irods_Info (view)
+
+@c OK. LDF 2013.10.29.
+
+The view @code{Irods_Info} combines columns from 
+the tables @code{Irods_Objects}  and @code{Irods_AVUs} in order to be display information about 
+iRODS objects together with information about all of their AVUs.
+It is defined by the following SQL query:
+
+@example
+create view Irods_Info as 
+select IO.irods_object_id, IA.irods_avu_id, IO.user_id, 
+IO.irods_object_path, IA.attribute, 
+IA.value, IA.units, IA.time_set as 'AVU timeset',
+IO.created as 'irods object created', 
+IO.last_modified as 'irods object last modified', 
+IO.marked_for_deletion_from_archive as 
+'irods_object_marked_for_deletion_from_archive',
+IO.marked_for_deletion_from_gwirdsif_db as 
+'irods_object_marked_for_deletion_from_gwirdsif_db',
+IO.deleted_from_archive as 'irods_object_deleted_from_archive',
+IO.delete_from_archive_timestamp as 
+'irods_object_delete_from_archive_timestamp',
+IO.delete_from_gwirdsif_db_timestamp as 
+'irods_object_delete_from_gwirdsif_db_timestamp'
+from Irods_Objects as IO, Irods_AVUs as IA
+where IO.irods_object_id = IA.irods_object_id
+and IO.irods_object_id > 0 and IA.irods_avu_id > 0
+order by IO.irods_object_id, IA.irods_avu_id;
+@end example
+
+Example:
+
+@smallexample
+select * from Irods_Info where irods_object_id = 1\G
+
+@result{}
+
+*************************** 1. row ***************************
+                                  irods_object_id: 1
+                                     irods_avu_id: 1
+                                          user_id: 1
+                                irods_object_path: /tempZone/home/lfinsto/abc.txt
+                                        attribute: PID
+                                            value: 12345/00001
+                                            units: 
+                                      AVU timeset: 2013-10-24 11:15:48
+                             irods object created: 2013-10-24 11:15:48
+                       irods object last modified: 0000-00-00 00:00:00
+    irods_object_marked_for_deletion_from_archive: 0
+irods_object_marked_for_deletion_from_gwirdsif_db: 0
+                irods_object_deleted_from_archive: 0
+       irods_object_delete_from_archive_timestamp: 0000-00-00 00:00:00
+   irods_object_delete_from_gwirdsif_db_timestamp: 0000-00-00 00:00:00
+*************************** 2. row ***************************
+                                  irods_object_id: 1
+                                     irods_avu_id: 2
+                                          user_id: 1
+                                irods_object_path: /tempZone/home/lfinsto/abc.txt
+                                        attribute: DC_METADATA_PID
+                                            value: 12345/00002
+                                            units: 
+                                      AVU timeset: 2013-10-24 11:15:54
+                             irods object created: 2013-10-24 11:15:48
+                       irods object last modified: 0000-00-00 00:00:00
+    irods_object_marked_for_deletion_from_archive: 0
+irods_object_marked_for_deletion_from_gwirdsif_db: 0
+                irods_object_deleted_from_archive: 0
+       irods_object_delete_from_archive_timestamp: 0000-00-00 00:00:00
+   irods_object_delete_from_gwirdsif_db_timestamp: 0000-00-00 00:00:00
+*************************** 3. row ***************************
+                                  irods_object_id: 1
+                                     irods_avu_id: 8
+                                          user_id: 1
+                                irods_object_path: /tempZone/home/lfinsto/abc.txt
+                                        attribute: DC_METADATA_IRODS_OBJECT_REF
+                                            value: \
+   /tempZone/home/lfinsto/metadata_sample_1.xml
+                                            units: 
+                                      AVU timeset: 2013-10-24 11:15:54
+                             irods object created: 2013-10-24 11:15:48
+                       irods object last modified: 0000-00-00 00:00:00
+    irods_object_marked_for_deletion_from_archive: 0
+irods_object_marked_for_deletion_from_gwirdsif_db: 0
+                irods_object_deleted_from_archive: 0
+       irods_object_delete_from_archive_timestamp: 0000-00-00 00:00:00
+   irods_object_delete_from_gwirdsif_db_timestamp: 0000-00-00 00:00:00
+*************************** 4. row ***************************
+                                  irods_object_id: 1
+                                     irods_avu_id: 9
+                                          user_id: 1
+                                irods_object_path: /tempZone/home/lfinsto/abc.txt
+                                        attribute: DC_METADATA_IRODS_OBJECT_PID
+                                            value: 12345/00003
+                                            units: 
+                                      AVU timeset: 2013-10-24 11:15:54
+                             irods object created: 2013-10-24 11:15:48
+                       irods object last modified: 0000-00-00 00:00:00
+    irods_object_marked_for_deletion_from_archive: 0
+irods_object_marked_for_deletion_from_gwirdsif_db: 0
+                irods_object_deleted_from_archive: 0
+       irods_object_delete_from_archive_timestamp: 0000-00-00 00:00:00
+   irods_object_delete_from_gwirdsif_db_timestamp: 0000-00-00 00:00:00
+4 rows in set (0.00 sec)
+@end smallexample
+
+
+@c ** (2) Session_Data database table
+
+@node Session_Data database table, TANs database table, Irods_Objects database tables, gwirdsif Database
+@section Session_Data
+
+@c OK. LDF 2013.10.29.
+
+@table @code 
+@item session_id 
+@code{varchar(256) not null}
+
+@item user_id 
+@code{int not null references Users(user_id)}
+
+@item effective_user_id 
+@code{int references Users(user_id)}
+
+@item user_name 
+@code{varchar(128) references Users(user_name)}
+
+@item effective_user_name 
+@code{varchar(128) references Users(user_name)}
+
+@item timestamp 
+@code{timestamp default 0}
+@end table 
+
+@c ** (2) TANs database table
+
+@node TANs database table, Dublin Core database tables (gwirdsif), Session_Data database table, gwirdsif Database
+@section TANs
+
+@c OK. LDF 2013.10.29.
+
+@table @code 
+@item user_id 
+@code{int default 0 references Users(user_id)}
+
+@item TAN 
+@code{varchar(64) primary key}
+
+@item expiration 
+@code{timestamp default 0}
+@end table
+
+@c ** (2) Dublin Core database tables (gwirdsif) 
+
+@node Dublin Core database tables (gwirdsif), GPG_Key_Pair database tables (gwirdsif), TANs database table, gwirdsif Database
+@section Dublin Core database tables
+
+See also @ref{Dublin Core Metadata Types}.
+
+@menu
+* Dublin_Core_Metadata Table::
+* Dublin_Core_Metadata_Sub Table::
+* Dublin_Core_Elements Table::
+* Dublin_Core_Terms Table::
+* Dublin_Core_Qualifiers Table::
+* Dublin_Core_Attributes Table::
+@end menu
+
+@c *** (3) Dublin_Core_Metadata Table 
+
+@node Dublin_Core_Metadata Table, Dublin_Core_Metadata_Sub Table, , Dublin Core database tables (gwirdsif)
+
+@subsection Dublin_Core_Metadata
+
+@c OK. LDF 2013.10.29.
+@c Added code for additional fields.  LDF 2013.12.04.
+
+@table @code 
+@item dublin_core_metadata_id 
+@code{bigint unsigned primary key not null}
+
+@item user_id 
+@code{int not null references Users(user_id)}
+
+@item irods_server_id
+@code{int unsigned references Irods_Servers(irods_server_id)}
+
+@item irods_object_path 
+@code{varchar(1024)}
+
+@item handle_id 
+@code{bigint references handlesystem_standalone(handle_id)}
+
+@item dc_metadata_irods_object_path 
+@code{varchar(1024)}
+
+@item created 
+@code{datetime not null default 0}
+
+@item last_modified 
+@code{datetime not null default 0}
+
+@item marked_for_deletion 
+@code{boolean not null default false}
+
+@item delete_file 
+@code{tinyint not null default 0}
+
+@item delete_from_database_timestamp 
+@code{timestamp default 0}
+
+@item irods_object_ref_id 
+@code{bigint unsigned not null default 0 references Irods_Objects(irods_object_id)}
+
+@item irods_object_self_id 
+@code{bigint unsigned not null default 0 references Irods_Objects(irods_object_id)}
+@end table
+
+
+@c *** (3) Dublin_Core_Metadata_Sub Table 
+
+@node Dublin_Core_Metadata_Sub Table, Dublin_Core_Elements Table, Dublin_Core_Metadata Table, Dublin Core database tables (gwirdsif)
+
+@subsection Dublin_Core_Metadata_Sub 
+
+@c OK. LDF 2013.10.29.
+
+@table @code 
+@item dublin_core_metadata_sub_id 
+@code{bigint unsigned primary key not null}
+
+@item dublin_core_metadata_id 
+@code{bigint unsigned not null references Dublin_Core_Metadata(dublin_core_metadata_id)}
+
+@item dublin_core_element_id 
+@code{int unsigned not null default 0 references Dublin_Core_Elements(dublin_core_element_id)}
+
+@item dublin_core_term_id 
+@code{int unsigned not null default 0 references Dublin_Core_Terms(dublin_core_term_id)}
+
+@item value 
+@code{varchar(1024) not null default ''}
+@end table
+
+@c *** (3) Dublin_Core_Elements Table 
+
+@node Dublin_Core_Elements Table, Dublin_Core_Terms Table, Dublin_Core_Metadata_Sub Table, Dublin Core database tables (gwirdsif)
+
+@subsection Dublin_Core_Elements 
+
+@c OK. LDF 2013.10.29.
+
+@table @code 
+@item dublin_core_element_id 
+@code{int unsigned primary key not null}
+
+@item element_name 
+@code{varchar(32) not null}
+@end table
+
+@c *** (3) Dublin_Core_Terms Table 
+
+@node Dublin_Core_Terms Table, Dublin_Core_Qualifiers Table, Dublin_Core_Elements Table, Dublin Core database tables (gwirdsif)
+
+@subsection Dublin_Core_Terms 
+
+@table @code 
+@item dublin_core_term_id 
+@code{int unsigned primary key not null}
+
+@item term_name 
+@code{varchar(64) not null}
+@end table
+
+@c *** (3) Dublin_Core_Qualifiers Table 
+
+@node Dublin_Core_Qualifiers Table, Dublin_Core_Attributes Table, Dublin_Core_Terms Table, Dublin Core database tables (gwirdsif)
+
+@subsection Dublin_Core_Qualifiers 
+
+@c OK. LDF 2013.10.29.
+
+@table @code 
+@item dublin_core_qualifier_id 
+@code{bigint unsigned primary key not null}
+
+@item dublin_core_metadata_id 
+@code{bigint unsigned references Dublin_Core_Metadata(dublin_core_metadata_id)}
+
+@item dublin_core_element_id 
+@code{bigint unsigned references Dublin_Core_Elements(dublin_core_element_id)}
+
+@item dublin_core_term_id 
+@code{bigint unsigned references Dublin_Core_Terms(dublin_core_term_id)}
+
+@item value 
+@code{varchar(512) not null default '' }
+@end table
+
+@c *** (3) Dublin_Core_Attributes Table 
+
+@node Dublin_Core_Attributes Table, , Dublin_Core_Qualifiers Table, Dublin Core database tables (gwirdsif)
+
+@subsection Dublin_Core_Attributes 
+
+@c OK. LDF 2013.10.29.
+
+@table @code 
+@item dublin_core_metadata_id 
+@code{bigint unsigned not null references Dublin_Core_Metadata(dublin_core_metadata_id)}
+
+@item dublin_core_metadata_sub_id 
+@code{bigint unsigned not null references Dublin_Core_Metadata_Sub(dublin_core_metadata_sub_id)}
+
+@item attribute 
+@code{varchar(128)}
+
+@item value 
+@code{varchar(256)}
+@end table
+
+@c *** (3)
+
+@c ** (2) GPG_Key_Pair database tables (gwirdsif)
+
+@node GPG_Key_Pair database tables (gwirdsif), , Dublin Core database tables (gwirdsif), gwirdsif Database
+@section GPG_Key_Pair database tables
+
+@menu
+* GPG_Key_Pairs (gwirdsif)::
+* Users_GPG_Key_Pairs (gwirdsif)::
+@end menu
+
+@c *** (3) GPG_Key_Pairs (gwirdsif)
+
+@node GPG_Key_Pairs (gwirdsif), Users_GPG_Key_Pairs (gwirdsif), , GPG_Key_Pair database tables (gwirdsif)
+
+@subsection GPG_Key_Pairs
+
+@table @code 
+@item gpg_key_pair_id 
+@code{int unsigned primary key not null default 0}
+
+@item user_id 
+@code{int not null default 0 references Users(user_id)}
+
+@item fingerprint 
+@code{varchar(64) not null default ''}
+
+@item public_key 
+@code{blob not null}
+
+@item created 
+@code{datetime not null default 0}
+
+@item last_modified 
+@code{datetime not null default 0}
+@end table
+
+@c *** (3) Users_GPG_Key_Pairs (gwirdsif)
+
+@node Users_GPG_Key_Pairs (gwirdsif), Pull Request database table (gwirdsif), GPG_Key_Pairs (gwirdsif), GPG_Key_Pair database tables (gwirdsif)
+
+@subsection Users_GPG_Key_Pairs
+
+@table @code
+@item user_id 
+@code{int not null default 0 references Users(user_id)}
+
+@item gpg_key_pair_id 
+@code{int unsigned not null default 0 references GPG_Key_Pairs(gpg_key_pair_id)}
+@end table
+
+@c ** (2) Pull Request database table (gwirdsif)
+
+@node Pull Request database table (gwirdsif), , Users_GPG_Key_Pairs (gwirdsif), gwirdsif Database
+@section Pull Request database table
+
+@table @code
+@item pull_request_id 
+@code{int primary key}
+
+@item user_id 
+@code{int not null default 0 references Users(user_id)}
+
+@item server_hostname 
+@code{varchar(128) not null default ''}
+
+@item server_ip_address 
+@code{varchar(64) not null default ''}
+
+@item client_hostname 
+@code{varchar(128) not null default ''}
+
+@item client_ip_address 
+@code{varchar(64) not null default ''}
+
+@item client_port 
+@code{int unsigned not null default 0}
+
+@item pull_interval 
+@code{int not null default 0}
+
+@item latest_pull 
+@code{datetime not null default 0}
+
+@item created 
+@code{datetime not null default 0}
+
+@item last_modified 
+@code{datetime not null default 0}
+@end table
+
+
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

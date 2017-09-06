@@ -1,0 +1,807 @@
+@c dblncrtp.texi
+@c [...]/gwrdifpk/doc/dblncrtp.texi
+
+@c Created by Laurence D. Finston (LDF) Wed Mar 13 14:40:51 CET 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) Dublin Core Metadata Types
+
+@node Dublin Core Metadata Types, class GPG_Key_Pair_Type, X.509 Certificate Types, Top
+@chapter Dublin Core Metadata Types
+
+@tindex class Dublin_Core_Metadata_Type
+@tindex class Dublin_Core_Metadata_Sub_Type
+@tindex Dublin_Core_Metadata_Type, class 
+@tindex Dublin_Core_Metadata_Sub_Type, class
+@c
+@cindex XML format 
+@cindex format, XML 
+@cindex Dublin Core metadata
+@cindex metadata, Dublin Core 
+@c
+@code{class Dublin_Core_Metadata_Type} and @code{class Dublin_Core_Metadata_Sub_Type}
+represent @dfn{metadata} in XML format corresponding to the @dfn{Dublin Core} standard.
+The data members of these classes correspond to the fields in the tables
+@code{Dublin_Core_Metadata} and @code{Dublin_Core_Metadata_Sub} in the @code{gwirdsif}
+database table.
+@xref{Dublin Core database tables (gwirdsif)}.
+
+@cindex XML format 
+@cindex format, XML 
+@cindex Dublin Core metadata
+@cindex metadata, Dublin Core 
+@cindex expat library (for processing XML data)
+@cindex library, expat (for processing XML data)
+@c
+The client program @command{gwirdcli} sends Dublin Core metadata to the server program @command{gwirdsif} 
+in the form of a file containing XML code.
+@xref{User commands for Dublin Core metadata}.  @command{gwirdsif} uses the @command{expat} library 
+to parse the XML data.  @xref{Prerequisites}. 
+
+@menu
+* class Dublin_Core_Metadata_Type::
+* class Dublin_Core_Metadata_Sub_Type::
+@end menu
+
+@c ** (2)
+
+@node class Dublin_Core_Metadata_Type, class Dublin_Core_Metadata_Sub_Type, , Dublin Core Metadata Types
+@section class Dublin_Core_Metadata_Type
+
+@tindex class Dublin_Core_Metadata_Type
+@tindex Dublin_Core_Metadata_Type, class 
+
+@findex exchange_data_with_server
+@findex exchange_data_with_client
+@findex yyparse
+@findex purge_dc_metadata
+@c
+@code{class Scan_Parse_Parameter_Type} and the functions @code{exchange_data_with_server},
+@code{exchange_data_with_client}, @code{yyparse} and @code{purge_dc_metadata} are 
+@code{friends} of @code{Dublin_Core_Metadata_Type}.  
+@xref{class Scan_Parse_Parameter_Type}, @ref{Exchanging data}, and @ref{Scanning and parsing}.
+
+@menu
+* Dublin_Core_Metadata_Type Data Members::
+* Dublin_Core_Metadata_Type Member Functions::
+@end menu
+
+@c *** (3)
+
+@node Dublin_Core_Metadata_Type Data Members, Dublin_Core_Metadata_Type Member Functions, , class Dublin_Core_Metadata_Type
+@subsection Data Members
+
+@vindex id                                 (Dublin_Core_Metadata_Type)
+@vindex user_id                            (Dublin_Core_Metadata_Type)
+@vindex irods_server_id                    (Dublin_Core_Metadata_Type)
+@vindex irods_object_path                  (Dublin_Core_Metadata_Type)
+@vindex dc_metadata_irods_object_path      (Dublin_Core_Metadata_Type)
+@vindex handle_id                          (Dublin_Core_Metadata_Type)
+@vindex irods_object_ref_id                (Dublin_Core_Metadata_Type)
+@vindex irods_object_self_id               (Dublin_Core_Metadata_Type)
+@vindex created_str                        (Dublin_Core_Metadata_Type)
+@vindex created                            (Dublin_Core_Metadata_Type)
+@vindex last_modified_str                  (Dublin_Core_Metadata_Type)
+@vindex last_modified                      (Dublin_Core_Metadata_Type)
+@vindex marked_for_deletion                (Dublin_Core_Metadata_Type)
+@vindex delete_file                        (Dublin_Core_Metadata_Type)
+@vindex delete_from_database_timestamp_str (Dublin_Core_Metadata_Type)
+@vindex delete_from_database_timestamp     (Dublin_Core_Metadata_Type)
+@vindex metadata_sub_map                   (Dublin_Core_Metadata_Type)
+@vindex metadata_sub_stack                 (Dublin_Core_Metadata_Type)
+@c
+@vindex Dublin_Core_Metadata_Type::id     
+@vindex Dublin_Core_Metadata_Type::user_id                            
+@vindex Dublin_Core_Metadata_Type::irods_server_id                    
+@vindex Dublin_Core_Metadata_Type::irods_object_path                  
+@vindex Dublin_Core_Metadata_Type::dc_metadata_irods_object_path      
+@vindex Dublin_Core_Metadata_Type::handle_id                          
+@vindex Dublin_Core_Metadata_Type::irods_object_ref_id                
+@vindex Dublin_Core_Metadata_Type::irods_object_self_id               
+@vindex Dublin_Core_Metadata_Type::created_str                        
+@vindex Dublin_Core_Metadata_Type::created                            
+@vindex Dublin_Core_Metadata_Type::last_modified_str                  
+@vindex Dublin_Core_Metadata_Type::last_modified                      
+@vindex Dublin_Core_Metadata_Type::marked_for_deletion                
+@vindex Dublin_Core_Metadata_Type::delete_file                        
+@vindex Dublin_Core_Metadata_Type::delete_from_database_timestamp_str 
+@vindex Dublin_Core_Metadata_Type::delete_from_database_timestamp     
+@vindex Dublin_Core_Metadata_Type::metadata_sub_map                   
+@vindex Dublin_Core_Metadata_Type::metadata_sub_stack                 
+@c
+@deftypevr {Private variables} {unsigned long int} id     
+@deftypevrx {} {unsigned int} user_id
+@deftypevrx {} {unsigned int} irods_server_id
+@deftypevrx {} string irods_object_path
+@deftypevrx {} string dc_metadata_irods_object_path
+@deftypevrx {} {unsigned long int} handle_id
+@deftypevrx {} {unsigned long int} irods_object_ref_id
+@deftypevrx {} {unsigned long int} irods_object_self_id
+@deftypevrx {} string created_str
+@deftypevrx {} time_t created
+@deftypevrx {} string last_modified_str
+@deftypevrx {} time_t last_modified
+@deftypevrx {} bool marked_for_deletion
+@deftypevrx {} int delete_file
+@deftypevrx {} string delete_from_database_timestamp_str
+@deftypevrx {} time_t delete_from_database_timestamp
+@deftypevrx {} {multimap<unsigned int, Dublin_Core_Metadata_Sub_Type>} metadata_sub_map
+@deftypevrx {} stack<Dublin_Core_Metadata_Sub_Type> metadata_sub_stack
+@end deftypevr
+
+@vindex element_ctr_map (Dublin_Core_Metadata_Type)
+@vindex element_map (Dublin_Core_Metadata_Type)
+@vindex qualifier_ctr_map (Dublin_Core_Metadata_Type)
+@vindex qualifier_map (Dublin_Core_Metadata_Type)
+@c
+@vindex Dublin_Core_Metadata_Type::element_ctr_map 
+@vindex Dublin_Core_Metadata_Type::element_map 
+@vindex Dublin_Core_Metadata_Type::qualifier_ctr_map 
+@vindex Dublin_Core_Metadata_Type::qualifier_map 
+@c
+@deftypevr {Public static variables} {map<unsigned int, string>} element_map
+@deftypevrx {} {map<string, unsigned int>} element_ctr_map
+@deftypevrx {} {map<unsigned int, string>} qualifier_map
+@deftypevrx {} {map<string, unsigned int>} qualifier_ctr_map
+@end deftypevr
+
+@c **** (4)
+@*
+@noindent 
+Public static unsigned int constants in @code{class Dublin_Core_Metadata_Type}:
+
+@vindex DUBLIN_CORE_ELEMENT_TYPE (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_NULL_TYPE (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_QUALIFIER_TYPE (Dublin_Core_Metadata_Type)
+@c
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_ELEMENT_TYPE
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_NULL_TYPE
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_QUALIFIER_TYPE
+@c
+@multitable {@code{DUBLIN_CORE_BIBLIOGRAPHICCITATION_TERM}} {00}
+@headitem Name @tab Value
+@item @code{DUBLIN_CORE_NULL_TYPE} @tab 0
+@c
+@item @code{DUBLIN_CORE_ELEMENT_TYPE} @tab 1
+@c
+@item @code{DUBLIN_CORE_QUALIFIER_TYPE} @tab 2
+@c
+@item @code{DUBLIN_CORE_ATTRIBUTE_TYPE} @tab 3
+@c
+@end multitable
+
+@c **** (4) Elements
+
+@*
+@noindent 
+Elements:
+
+@vindex DUBLIN_CORE_CONTRIBUTOR_ELEMENT           (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_COVERAGE_ELEMENT              (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_CREATOR_ELEMENT               (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_DATE_ELEMENT                  (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_DESCRIPTION_ELEMENT           (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_FORMAT_ELEMENT                (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_IDENTIFIER_ELEMENT            (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_LANGUAGE_ELEMENT              (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_NULL_ELEMENT                  (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_PUBLISHER_ELEMENT             (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_RELATION_ELEMENT              (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_RIGHTS_ELEMENT                (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_SOURCE_ELEMENT                (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_SUBJECT_ELEMENT               (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_TITLE_ELEMENT                 (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_TYPE_ELEMENT                  (Dublin_Core_Metadata_Type)
+@c
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_CONTRIBUTOR_ELEMENT          
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_COVERAGE_ELEMENT             
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_CREATOR_ELEMENT              
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_DATE_ELEMENT                 
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_DESCRIPTION_ELEMENT          
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_FORMAT_ELEMENT               
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_IDENTIFIER_ELEMENT           
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_LANGUAGE_ELEMENT             
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_NULL_ELEMENT                 
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_PUBLISHER_ELEMENT            
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_RELATION_ELEMENT             
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_RIGHTS_ELEMENT                
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_SOURCE_ELEMENT               
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_SUBJECT_ELEMENT              
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_TITLE_ELEMENT                
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_TYPE_ELEMENT                 
+@c
+@multitable {@code{DUBLIN_CORE_BIBLIOGRAPHICCITATION_TERM}} {00}
+@headitem Name @tab Value
+@item @code{DUBLIN_CORE_NULL_ELEMENT} @tab 0
+@c
+@item @code{DUBLIN_CORE_TITLE_ELEMENT} @tab 1
+@c
+@item @code{DUBLIN_CORE_CREATOR_ELEMENT} @tab 2
+@c
+@item @code{DUBLIN_CORE_SUBJECT_ELEMENT} @tab 3
+@c
+@item @code{DUBLIN_CORE_DESCRIPTION_ELEMENT} @tab 4
+@c
+@item @code{DUBLIN_CORE_PUBLISHER_ELEMENT} @tab 5
+@c
+@item @code{DUBLIN_CORE_CONTRIBUTOR_ELEMENT} @tab 6
+@c
+@item @code{DUBLIN_CORE_DATE_ELEMENT} @tab 7
+@c
+@item @code{DUBLIN_CORE_TYPE_ELEMENT} @tab 8
+@c
+@item @code{DUBLIN_CORE_FORMAT_ELEMENT} @tab 9
+@c
+@item @code{DUBLIN_CORE_IDENTIFIER_ELEMENT} @tab 10
+@c
+@item @code{DUBLIN_CORE_SOURCE_ELEMENT} @tab 11
+@c
+@item @code{DUBLIN_CORE_LANGUAGE_ELEMENT} @tab 12
+@c
+@item @code{DUBLIN_CORE_RELATION_ELEMENT} @tab 13
+@c
+@item @code{DUBLIN_CORE_COVERAGE_ELEMENT} @tab 14
+@c
+@item @code{DUBLIN_CORE_RIGHTS_ELEMENT} @tab 15 
+@end multitable
+
+@c **** (4) Terms
+
+@*
+@noindent 
+Terms:
+
+@vindex DUBLIN_CORE_ABSTRACT_TERM                 (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_ACCESSRIGHTS_TERM             (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_ACCRUALMETHOD_TERM            (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_ACCRUALPERIODICITY_TERM       (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_ACCRUALPOLICY_TERM            (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_ALTERNATIVE_TERM              (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_AUDIENCE_TERM                 (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_AVAILABLE_TERM                (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_BIBLIOGRAPHICCITATION_TERM    (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_CONFORMSTO_TERM               (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_CONTRIBUTOR_TERM              (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_COVERAGE_TERM                 (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_CREATED_TERM                  (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_CREATOR_TERM                  (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_DATEACCEPTED_TERM             (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_DATECOPYRIGHTED_TERM          (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_DATESUBMITTED_TERM            (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_DATE_TERM                     (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_DESCRIPTION_TERM              (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_EDUCATIONLEVEL_TERM           (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_EXTENT_TERM                   (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_FORMAT_TERM                   (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_HASFORMAT_TERM                (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_HASPART_TERM                  (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_HASVERSION_TERM               (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_IDENTIFIER_TERM               (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_INSTRUCTIONALMETHOD_TERM      (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_ISFORMATOF_TERM               (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_ISPARTOF_TERM                 (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_ISREFERENCEDBY_TERM           (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_ISREPLACEDBY_TERM             (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_ISREQUIREDBY_TERM             (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_ISSUED_TERM                   (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_ISVERSIONOF_TERM              (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_LANGUAGE_TERM                 (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_LICENSE_TERM                  (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_MEDIATOR_TERM                 (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_MEDIUM_TERM                   (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_MODIFIED_TERM                 (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_NULL_TERM                     (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_PROVENANCE_TERM               (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_PUBLISHER_TERM                (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_REFERENCES_TERM               (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_RELATION_TERM                 (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_REPLACES_TERM                 (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_REQUIRES_TERM                 (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_RIGHTSHOLDER_TERM             (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_RIGHTS_TERM                   (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_SOURCE_TERM                   (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_SPATIAL_TERM                  (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_SUBJECT_TERM                  (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_TABLEOFCONTENTS_TERM          (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_TEMPORAL_TERM                 (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_TITLE_TERM                    (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_TYPE_TERM                     (Dublin_Core_Metadata_Type)
+@vindex DUBLIN_CORE_VALID_TERM                    (Dublin_Core_Metadata_Type)
+@c
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_ABSTRACT_TERM                
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_ACCESSRIGHTS_TERM            
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_ACCRUALMETHOD_TERM           
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_ACCRUALPERIODICITY_TERM      
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_ACCRUALPOLICY_TERM           
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_ALTERNATIVE_TERM             
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_AUDIENCE_TERM                
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_AVAILABLE_TERM               
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_BIBLIOGRAPHICCITATION_TERM   
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_CONFORMSTO_TERM              
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_CONTRIBUTOR_TERM             
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_COVERAGE_TERM                
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_CREATED_TERM                 
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_CREATOR_TERM                 
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_DATEACCEPTED_TERM            
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_DATECOPYRIGHTED_TERM         
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_DATESUBMITTED_TERM           
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_DATE_TERM                    
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_DESCRIPTION_TERM             
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_EDUCATIONLEVEL_TERM          
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_EXTENT_TERM                  
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_FORMAT_TERM                  
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_HASFORMAT_TERM               
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_HASPART_TERM                 
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_HASVERSION_TERM              
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_IDENTIFIER_TERM              
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_INSTRUCTIONALMETHOD_TERM     
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_ISFORMATOF_TERM              
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_ISPARTOF_TERM                
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_ISREFERENCEDBY_TERM          
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_ISREPLACEDBY_TERM            
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_ISREQUIREDBY_TERM            
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_ISSUED_TERM                  
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_ISVERSIONOF_TERM             
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_LANGUAGE_TERM                
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_LICENSE_TERM                 
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_MEDIATOR_TERM                
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_MEDIUM_TERM                  
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_MODIFIED_TERM                
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_NULL_TERM                     
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_PROVENANCE_TERM              
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_PUBLISHER_TERM               
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_REFERENCES_TERM              
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_RELATION_TERM                
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_REPLACES_TERM                
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_REQUIRES_TERM                
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_RIGHTSHOLDER_TERM            
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_RIGHTS_TERM                  
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_SOURCE_TERM                  
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_SPATIAL_TERM                 
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_SUBJECT_TERM                  
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_TABLEOFCONTENTS_TERM         
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_TEMPORAL_TERM                
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_TITLE_TERM                   
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_TYPE_TERM                    
+@vindex Dublin_Core_Metadata_Type::DUBLIN_CORE_VALID_TERM                   
+@c
+@multitable {@code{DUBLIN_CORE_BIBLIOGRAPHICCITATION_TERM}} {000}
+@headitem Name @tab Value
+@item @code{DUBLIN_CORE_NULL_TERM} @tab 100 
+@c
+@item @code{DUBLIN_CORE_ABSTRACT_TERM} @tab 101
+@c
+@item @code{DUBLIN_CORE_ACCESSRIGHTS_TERM} @tab 102
+@c
+@item @code{DUBLIN_CORE_ACCRUALMETHOD_TERM} @tab 103
+@c
+@item @code{DUBLIN_CORE_ACCRUALPERIODICITY_TERM} @tab 104
+@c
+@item @code{DUBLIN_CORE_ACCRUALPOLICY_TERM} @tab 105
+@c
+@item @code{DUBLIN_CORE_ALTERNATIVE_TERM} @tab 106
+@c
+@item @code{DUBLIN_CORE_AUDIENCE_TERM} @tab 107
+@c
+@item @code{DUBLIN_CORE_AVAILABLE_TERM} @tab 108
+@c
+@item @code{DUBLIN_CORE_BIBLIOGRAPHICCITATION_TERM} @tab 109
+@c
+@item @code{DUBLIN_CORE_CONFORMSTO_TERM} @tab 110
+@c
+@item @code{DUBLIN_CORE_CONTRIBUTOR_TERM} @tab 111
+@c
+@item @code{DUBLIN_CORE_COVERAGE_TERM} @tab 112
+@c
+@item @code{DUBLIN_CORE_CREATED_TERM} @tab 113
+@c
+@item @code{DUBLIN_CORE_CREATOR_TERM} @tab 114
+@c
+@item @code{DUBLIN_CORE_DATE_TERM} @tab 115
+@c
+@item @code{DUBLIN_CORE_DATEACCEPTED_TERM} @tab 116
+@c
+@item @code{DUBLIN_CORE_DATECOPYRIGHTED_TERM} @tab 117
+@c
+@item @code{DUBLIN_CORE_DATESUBMITTED_TERM} @tab 118
+@c
+@item @code{DUBLIN_CORE_DESCRIPTION_TERM} @tab 119
+@c
+@item @code{DUBLIN_CORE_EDUCATIONLEVEL_TERM} @tab 120
+@c
+@item @code{DUBLIN_CORE_EXTENT_TERM} @tab 121
+@c
+@item @code{DUBLIN_CORE_FORMAT_TERM} @tab 122
+@c
+@item @code{DUBLIN_CORE_HASFORMAT_TERM} @tab 123
+@c
+@item @code{DUBLIN_CORE_HASPART_TERM} @tab 124
+@c
+@item @code{DUBLIN_CORE_HASVERSION_TERM} @tab 125
+@c
+@item @code{DUBLIN_CORE_IDENTIFIER_TERM} @tab 126
+@c
+@item @code{DUBLIN_CORE_INSTRUCTIONALMETHOD_TERM} @tab 127
+@c
+@item @code{DUBLIN_CORE_ISFORMATOF_TERM} @tab 128
+@c
+@item @code{DUBLIN_CORE_ISPARTOF_TERM} @tab 129
+@c
+@item @code{DUBLIN_CORE_ISREFERENCEDBY_TERM} @tab 130
+@c
+@item @code{DUBLIN_CORE_ISREPLACEDBY_TERM} @tab 131
+@c
+@item @code{DUBLIN_CORE_ISREQUIREDBY_TERM} @tab 132
+@c
+@item @code{DUBLIN_CORE_ISSUED_TERM} @tab 133
+@c
+@item @code{DUBLIN_CORE_ISVERSIONOF_TERM} @tab 134
+@c
+@item @code{DUBLIN_CORE_LANGUAGE_TERM} @tab 135
+@c
+@item @code{DUBLIN_CORE_LICENSE_TERM} @tab 136
+@c
+@item @code{DUBLIN_CORE_MEDIATOR_TERM} @tab 137
+@c
+@item @code{DUBLIN_CORE_MEDIUM_TERM} @tab 138
+@c
+@item @code{DUBLIN_CORE_MODIFIED_TERM} @tab 139
+@c
+@item @code{DUBLIN_CORE_PROVENANCE_TERM} @tab 140
+@c
+@item @code{DUBLIN_CORE_PUBLISHER_TERM} @tab 141
+@c
+@item @code{DUBLIN_CORE_REFERENCES_TERM} @tab 142
+@c
+@item @code{DUBLIN_CORE_RELATION_TERM} @tab 143
+@c
+@item @code{DUBLIN_CORE_REPLACES_TERM} @tab 144
+@c
+@item @code{DUBLIN_CORE_REQUIRES_TERM} @tab 145
+@c
+@item @code{DUBLIN_CORE_RIGHTS_TERM} @tab 146
+@c
+@item @code{DUBLIN_CORE_RIGHTSHOLDER_TERM} @tab 147
+@c
+@item @code{DUBLIN_CORE_SOURCE_TERM} @tab 148
+@c
+@item @code{DUBLIN_CORE_SPATIAL_TERM} @tab 149
+@c
+@item @code{DUBLIN_CORE_SUBJECT_TERM} @tab 150 
+@c
+@item @code{DUBLIN_CORE_TABLEOFCONTENTS_TERM} @tab 151
+@c
+@item @code{DUBLIN_CORE_TEMPORAL_TERM} @tab 152
+@c
+@item @code{DUBLIN_CORE_TITLE_TERM} @tab 153
+@c
+@item @code{DUBLIN_CORE_TYPE_TERM} @tab 154
+@c
+@item @code{DUBLIN_CORE_VALID_TERM} @tab 155
+@c
+@end multitable
+
+@c **** (4)
+
+@c *** (3)
+
+@node Dublin_Core_Metadata_Type Member Functions, , Dublin_Core_Metadata_Type Data Members, class Dublin_Core_Metadata_Type
+@subsection Member Functions
+
+@findex default constructor, Dublin_Core_Metadata_Type
+@findex constructor, default, Dublin_Core_Metadata_Type
+@findex Dublin_Core_Metadata_Type, default constructor
+@findex Dublin_Core_Metadata_Type, constructor, default
+@findex Dublin_Core_Metadata_Type::Dublin_Core_Metadata_Type (default constructor)
+@c
+@deftypefn {Default constructor} void Dublin_Core_Metadata_Type (@code{void})
+@end deftypefn
+
+@findex destructor, Dublin_Core_Metadata_Type
+@findex Dublin_Core_Metadata_Type destructor
+@findex Dublin_Core_Metadata_Type::~Dublin_Core_Metadata_Type (Destructor)
+@c
+@deftypefn {Destructor} void ~Dublin_Core_Metadata_Type (@code{void})
+@end deftypefn
+
+@findex equality operator, Dublin_Core_Metadata_Type
+@findex Dublin_Core_Metadata_Type equality operator
+@findex Dublin_Core_Metadata_Type::bool operator==
+@c
+@deftypefn {Equality operator (const)} bool operator== (@*@
+                                          @code{const Dublin_Core_Metadata_Type &}@var{d})
+@end deftypefn
+
+
+@findex Dublin_Core_Metadata_Type::initialize_maps
+@findex initialize_maps (Dublin_Core_Metadata_Type)
+@c
+@deftypefn {Static function} int initialize_maps (@code{void})
+@end deftypefn
+
+@findex Dublin_Core_Metadata_Type::set
+@findex set (Dublin_Core_Metadata_Type)
+@c
+@deftypefun int set (@code{unsigned long int} @var{iid}, @*@
+                     @code{unsigned long int} @var{uuser_id}, @*@
+                     @code{unsigned int} @var{iirods_server_id}, @*@
+                     @code{string} @var{iirods_object_path}, @*@
+                     @code{string} @var{ddc_metadata_irods_object_path}, @*@
+                     @code{unsigned long int} @var{hhandle_id}, @*@
+                     @code{unsigned long int} @var{iirods_object_ref_id}, @*@
+                     @code{unsigned long int} @var{iirods_object_self_id}, @*@
+                     @code{string} @var{ccreated_str}, @*@
+                     @code{time_t} @var{ccreated}, @*@
+                     @code{string} @var{llast_modified_str}, @*@
+                     @code{time_t} @var{llast_modified}, @*@
+                     @code{bool} @var{mmarked_for_deletion}, @*@
+                     @code{int} @var{ddelete_file}, @*@
+                     @code{string} @var{ddelete_from_database_timestamp_str}, @*@
+                     @code{time_t} @var{ddelete_from_database_timestamp})
+@end deftypefun
+
+
+
+
+
+@findex Dublin_Core_Metadata_Type::start
+@findex start (Dublin_Core_Metadata_Type)
+@c
+@deftypefn {Static function} {void XMLCALL} start (@code{void *}@var{data}, @*@
+                                                   @code{const char *}@var{el}, @*@
+                                                   @code{const char **}@var{attr})
+@end deftypefn
+
+@findex Dublin_Core_Metadata_Type::end
+@findex end (Dublin_Core_Metadata_Type)
+@c
+@deftypefn {Static function} {void XMLCALL} end (@code{void *}@var{data}, @code{const char *}@var{el})
+@end deftypefn
+
+@findex Dublin_Core_Metadata_Type::handle_data
+@findex handle_data (Dublin_Core_Metadata_Type)
+@c
+@deftypefn {Static function} void handle_data (@code{void *}@var{data}, @*@
+                                               @code{const char *}@var{content}, @*@
+                                               @code{int} @var{length})
+@end deftypefn
+
+@findex Dublin_Core_Metadata_Type::output
+@findex output (Dublin_Core_Metadata_Type)
+@c
+@deftypefn {const function} int output (@code{ofstream &}@var{out_strm}) 
+@end deftypefn
+
+@findex Dublin_Core_Metadata_Type::parse
+@findex parse (Dublin_Core_Metadata_Type)
+@c
+@deftypefn {Function} int parse (@code{char *}@var{buffer})
+@end deftypefn
+
+@findex Dublin_Core_Metadata_Type::clear
+@findex clear (Dublin_Core_Metadata_Type)
+@c
+@deftypefn {Function} void clear (@code{void})
+@end deftypefn
+
+@findex Dublin_Core_Metadata_Type::show
+@findex show (Dublin_Core_Metadata_Type)
+@c
+@deftypefn {const function} int show (@code{string} {@var{s} @code{= ""}}, @*@
+                                      @code{bool} {@var{show_sub_map} @code{= true}}, @*@
+                                      @code{ostream *}{@var{out_strm} @code{= &cerr}}) 
+@end deftypefn
+
+@findex Dublin_Core_Metadata_Type::write_dc_metadata_to_database
+@findex write_dc_metadata_to_database (Dublin_Core_Metadata_Type)
+@c
+@deftypefun int write_dc_metadata_to_database (@code{MYSQL *}@var{mysql_ptr}, @*@
+                                     @code{unsigned long int} {@var{irods_object_ref_id} @code{= 0UL}}, @*@
+                                     @code{bool} {@var{replace} @code{= false}}, @*@
+                                     @code{string} {@var{database} @code{= "gwirdsif"}}
+@end deftypefun
+
+@findex Dublin_Core_Metadata_Type::set_handle_id
+@findex set_handle_id (Dublin_Core_Metadata_Type)
+@c
+@deftypefun int set_handle_id (@code{MYSQL *}@var{mysql_ptr}, @*@
+                               @code{unsigned long int} @var{hhandle_id})
+@end deftypefun
+
+
+@findex Dublin_Core_Metadata_Type::mark_dc_metadata_for_deletion
+@findex mark_dc_metadata_for_deletion (Dublin_Core_Metadata_Type)
+@c
+@deftypefn {Static function} int mark_dc_metadata_for_deletion (@code{MYSQL *&}@var{mysql_ptr}, @*@
+                              @code{Response_Type &}@var{response}, @*@
+                              @code{deque<Response_Type> &}@var{response_deque}, @*@
+                              @code{string} @var{irods_current_dir}, @*@
+                              @code{int} @var{user_id}, @*@
+                              @code{unsigned int &}@var{errors_occurred}, @*@
+                              @code{unsigned int &}@var{warnings_occurred}, @*@
+                              @code{string} @var{thread_str})
+@end deftypefn
+
+@findex Dublin_Core_Metadata_Type::undelete_dc_metadata
+@findex undelete_dc_metadata (Dublin_Core_Metadata_Type)
+@c
+@deftypefn {Static function} int undelete_dc_metadata (@code{MYSQL *&}@var{mysql_ptr}, @*@
+                              @code{Response_Type &}@var{response}, @*@
+                              @code{deque<Response_Type> &}@var{response_deque}, @*@
+                              @code{string} @var{irods_current_dir}, @*@
+                              @code{int} @var{user_id}, @*@
+                              @code{unsigned int &}@var{errors_occurred}, @*@
+                              @code{unsigned int &}@var{warnings_occurred}, @*@
+                              @code{string} @var{thread_str})
+@end deftypefn
+
+@findex Dublin_Core_Metadata_Type::get_dc_metadata_from_database
+@findex get_dc_metadata_from_database (Dublin_Core_Metadata_Type)
+@c
+@deftypefn {Static function} int get_dc_metadata_from_database (@code{MYSQL *&}@var{mysql_ptr}, @*@
+                              @code{Response_Type &}@var{response}, @*@
+                              @code{map<unsigned long int, Dublin_Core_Metadata_Type> &}@var{dc_metadata_map}, @*@
+                              @code{vector<string> &}@var{irods_object_path_vector}, @*@
+                              @code{vector<unsigned int> &}@var{id_vector}, @*@
+                              @code{bool} @var{get_expired}, @*@
+                              @code{unsigned int} @var{limit}, @*@
+                              @code{string} {@var{database} @code{= "gwirdsif"}}, @*@
+                              @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefn
+
+
+
+@c ** (2) class Dublin_Core_Metadata_Sub_Type
+
+@node class Dublin_Core_Metadata_Sub_Type, , class Dublin_Core_Metadata_Type, Dublin Core Metadata Types
+@section class Dublin_Core_Metadata_Sub_Type
+
+@tindex class Dublin_Core_Metadata_Sub_Type
+@tindex Dublin_Core_Metadata_Sub_Type, class 
+                    
+The classes @code{Scan_Parse_Parameter_Type} and @code{Dublin_Core_Metadata_Type}
+and the the functions @code{yyparse}, @code{exchange_data_with_server} and 
+@code{exchange_data_with_client} are @code{friends} of 
+@code{class Dublin_Core_Metadata_Sub_Type}.
+@xref{class Scan_Parse_Parameter_Type}, @ref{class Dublin_Core_Metadata_Type},
+@ref{Scanning and parsing}, and @ref{Exchanging data}.
+
+@menu
+* Dublin_Core_Metadata_Sub_Type Data Members::
+* Dublin_Core_Metadata_Sub_Type Member Functions::
+@end menu
+
+@c *** (3) @> Dublin_Core_Metadata_Sub_Type Data Members
+
+@node Dublin_Core_Metadata_Sub_Type Data Members, Dublin_Core_Metadata_Sub_Type Member Functions, ,  class Dublin_Core_Metadata_Sub_Type
+
+@section Dublin_Core_Metadata_Sub_Type Data Members
+
+@vindex Dublin_Core_Metadata_Sub_Type::id              
+@vindex Dublin_Core_Metadata_Sub_Type::metadata_id     
+@vindex Dublin_Core_Metadata_Sub_Type::element_id      
+@vindex Dublin_Core_Metadata_Sub_Type::term_id      
+@vindex Dublin_Core_Metadata_Sub_Type::qualifier_id    
+@vindex Dublin_Core_Metadata_Sub_Type::value           
+@vindex Dublin_Core_Metadata_Sub_Type::attribute_map   
+@c
+@vindex id              (Dublin_Core_Metadata_Sub_Type)
+@vindex metadata_id     (Dublin_Core_Metadata_Sub_Type)
+@vindex element_id      (Dublin_Core_Metadata_Sub_Type)
+@vindex term_id         (Dublin_Core_Metadata_Sub_Type)
+@vindex qualifier_id    (Dublin_Core_Metadata_Sub_Type)
+@vindex value           (Dublin_Core_Metadata_Sub_Type)
+@vindex attribute_map   (Dublin_Core_Metadata_Sub_Type)
+@c
+@deftypevr  {Private data members} {unsigned long int}         id              
+@deftypevrx {}                     {unsigned long int}         metadata_id     
+@deftypevrx {}                     {unsigned int}              element_id      
+@deftypevrx {}                     {unsigned int}              term_id      
+@deftypevrx {}                     {unsigned int}              qualifier_id    
+@deftypevrx {}                     string                      value           
+@deftypevrx {}                     {multimap <string, string>} attribute_map   
+@end deftypevr
+
+@c *** (3) @> Dublin_Core_Metadata_Sub_Type Member Functions
+
+@node Dublin_Core_Metadata_Sub_Type Member Functions, , Dublin_Core_Metadata_Sub_Type Data Members,  class Dublin_Core_Metadata_Sub_Type
+
+@section Dublin_Core_Metadata_Sub_Type Functions
+
+@findex Dublin_Core_Metadata_Sub_Type, default constructor
+@findex Dublin_Core_Metadata_Sub_Type, constructor, default
+@findex default constructor, Dublin_Core_Metadata_Sub_Type 
+@findex constructor, default, Dublin_Core_Metadata_Sub_Type 
+@findex Dublin_Core_Metadata_Sub_Type::Dublin_Core_Metadata_Sub_Type (default constructor)
+@c
+@deftypefn {Default constructor} void Dublin_Core_Metadata_Sub_Type (@code{void}) 
+@end deftypefn
+
+@findex Dublin_Core_Metadata_Sub_Type destructor
+@findex destructor, Dublin_Core_Metadata_Sub_Type 
+@findex Dublin_Core_Metadata_Sub_Type::~Dublin_Core_Metadata_Sub_Type
+@c
+@deftypefn {Destructor} void ~Dublin_Core_Metadata_Sub_Type (@code{void}) 
+@end deftypefn
+
+@findex Dublin_Core_Metadata_Sub_Type equality operator
+@findex Dublin_Core_Metadata_Sub_Type, operator, equality
+@findex equality operator, Dublin_Core_Metadata_Sub_Type 
+@findex operator, equality, Dublin_Core_Metadata_Sub_Type 
+@findex Dublin_Core_Metadata_Sub_Type::operator==
+@findex operator== (Dublin_Core_Metadata_Sub_Type)
+@c
+@deftypefn {Equality operator (const)} bool operator== (@code{const Dublin_Core_Metadata_Sub_Type &}@var{d}) 
+@end deftypefn
+
+
+@findex Dublin_Core_Metadata_Sub_Type::set
+@findex set (Dublin_Core_Metadata_Sub_Type)
+@c
+@deftypefun int set (@code{unsigned long int}          @var{iid}, @*@
+                     @code{unsigned long int}          @var{mmetadata_id}, @*@
+                     @code{unsigned int}               @var{eelement_id}, @*@
+                     @code{unsigned int}               @var{qqualifier_id}, @*@
+                     @code{unsigned int}               @var{tterm_id}, @*@
+                     @code{string}                     @var{vvalue}, @*@
+                     @code{multimap <string, string> *}{@var{attribute_map_ptr} @code{= 0}}, @*@
+                     @code{string}                     {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+@findex Dublin_Core_Metadata_Sub_Type::set
+@findex set (Dublin_Core_Metadata_Sub_Type)
+@c
+@deftypefun  int set (@code{MYSQL *&}@var{mysql_ptr}, @*@
+                      @code{MYSQL_ROW &}@var{curr_row}, @*@
+                      @code{string} {@var{database} @code{= "gwirdsif"}}, @*@
+                      @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+
+
+
+
+@findex Dublin_Core_Metadata_Sub_Type inequality operator
+@findex Dublin_Core_Metadata_Sub_Type, operator, inequality
+@findex inequality operator, Dublin_Core_Metadata_Sub_Type 
+@findex operator, inequality, Dublin_Core_Metadata_Sub_Type 
+@findex Dublin_Core_Metadata_Sub_Type::operator==
+@findex operator!= (Dublin_Core_Metadata_Sub_Type)
+@c
+@c
+@deftypefn {Inequality operator (const)} bool operator!= @
+                                            (@code{const Dublin_Core_Metadata_Sub_Type &}@var{d}) 
+@end deftypefn
+
+@findex Dublin_Core_Metadata_Sub_Type::clear
+@findex clear (Dublin_Core_Metadata_Sub_Type)
+@c
+@deftypefn {Function} void clear (@code{void})
+@end deftypefn
+
+@findex Dublin_Core_Metadata_Sub_Type::show
+@findex show (Dublin_Core_Metadata_Sub_Type)
+@c
+@deftypefn {const function} int show (@code{string} {@var{s} @code{= ""}})
+@end deftypefn
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

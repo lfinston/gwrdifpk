@@ -1,0 +1,42 @@
+@c usrgrpmn.texi
+@c [...]/gwrdifpk/doc/usrgrpmn.texi
+
+@c Created by Laurence D. Finston (LDF) Mon Oct 28 16:55:24 CET 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) User and Group Management
+
+@node User and Group Management, Using gwirdsif, User commands for controlling the client, Top
+@chapter User and Group Management
+
+@menu
+* Privileges::
+@end menu
+
+
+@c ** (2) Privileges
+@node Privileges, , , User and Group Management
+
+@section Privileges
+
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

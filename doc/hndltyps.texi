@@ -1,0 +1,795 @@
+@c hndltyps.texi
+@c /home/lfinsto/irods_proj/irods_master/Finston/gwrdifpk/doc/hndltyps.texi
+
+@c Created by Laurence D. Finston (LDF) Wed Mar 13 14:46:53 CET 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) Handle Types
+
+@node Handle Types, X.509 Certificate Types, iRODS Types, Top
+@chapter Handle Types
+
+@tindex class Handle_Type
+@tindex class Handle_Value_Type
+@tindex struct Handle_Value_Triple
+@tindex Handle_Type, 
+@tindex Handle_Value_Type, class 
+@tindex Handle_Value_Triple, struct 
+@c
+@code{class Handle_Type} and @code{class Handle_Value_Type} represent @dfn{handles} 
+within the programs belonging to the @command{gwrdifpk} package.  
+The data members correspond to the fields of the 
+table @code{handles} in the @code{handlesystem} and @code{handlesystem_standalone}
+databases.
+@xref{handlesystem and handlesystem_standalone Databases}, and 
+@ref{Standalone handle service}.
+
+@code{struct Handle_Value_Triple} is used as a convenience;  it contains the data 
+from three fields of a row from the @code{handles} database table, namely @code{idx}, 
+@code{type} and @code{data}.  The latter is stored as a @cpp{} @code{string} 
+in the data member @code{data_str}.  @xref{struct Handle_Value_Triple}, below.
+
+@menu
+* class Handle_Type::
+* class Handle_Value_Type::
+* struct Handle_Value_Triple::
+@end menu
+
+@c ** (2) class Handle_Type
+
+@node class Handle_Type, class Handle_Value_Type, , Handle Types
+@section class Handle_Type
+
+@tindex class Handle_Type
+@tindex Handle_Type, class 
+@c
+@findex main 
+@findex exchange_data_with_client 
+@findex generate_pids
+@findex purge_dc_metadata
+@c
+@findex Irods_Object_Type::mark_for_deletion 
+@findex Irods_Object_Type::delete_from_archive 
+@findex Irods_Object_Type::delete_from_gwirdsif_db 
+@findex Irods_Object_Type::add_handle_value
+@c
+@findex mark_for_deletion (Irods_Object_Type)
+@findex delete_from_archive (Irods_Object_Type)
+@findex delete_from_gwirdsif_db (Irods_Object_Type)
+@findex add_handle_value (Irods_Object_Type)
+@c
+@code{class Scan_Parse_Parameter_Type} and the functions 
+@code{main}, 
+@code{exchange_data_with_client}, @code{generate_pids},
+@code{Irods_Object_Type::mark_for_deletion}, 
+@code{Irods_Object_Type::delete_from_archive}, 
+@code{Irods_Object_Type::delete_from_gwirdsif_db}, 
+@code{Irods_Object_Type::add_handle_value}
+and
+@code{purge_dc_metadata}
+are @code{friends} of 
+@code{class Handle_Type}.  
+@xref{class Scan_Parse_Parameter_Type}, 
+and @ref{Irods_Object_Type Member Functions}.
+
+@menu
+* Handle_Type Data Members::
+* Handle_Type Member Functions::
+@end menu
+
+@c *** (3) Handle_Type Data Members
+
+@node Handle_Type Data Members, Handle_Type Member Functions, , class Handle_Type
+@subsection Data Members
+
+@vindex handle (Handle_Type)          
+@vindex handle_id (Handle_Type)   
+@vindex handle_value_map (Handle_Type)
+@c
+@vindex Handle_Type::handle          
+@vindex Handle_Type::handle_id       
+@vindex Handle_Type::handle_value_map
+@c
+@deftypevr {Private variables} string                                      handle          
+@deftypevrx {}                 {unsigned long int}                         handle_id       
+@deftypevrx {}                 {map<unsigned long int, Handle_Value_Type>} handle_value_map
+@end deftypevr
+
+@c *** (3) Handle_Type Member Functions
+
+@node Handle_Type Member Functions, , Handle_Type Data Members, class Handle_Type
+@subsection Member Functions
+
+@findex Handle_Type::Handle_Type (default constructor)
+@findex Handle_Type, default constructor
+@findex Handle_Type constructor, default
+@findex constructor, default, Handle_Type 
+@findex default constructor, Handle_Type 
+@c
+@findex Handle_Type::Handle_Type (copy constructor)
+@findex Handle_Type copy constructor
+@findex Handle_Type constructor, copy
+@findex constructor, copy, Handle_Type 
+@findex copy constructor, Handle_Type 
+@c
+@deftypefn {Default constructor} void Handle_Type (@code{void})
+@deftypefnx {Copy constructor} void Handle_Type (@code{const Handle_Type &}@var{h})
+@end deftypefn
+
+@findex Handle_Type assignment operator
+@findex assignment operator, Handle_Type 
+@findex Handle_Type::operator=
+@findex operator= (Handle_Type)
+@c
+@deftypefn {Assignment operator} void operator= (@code{const Handle_Type &}@var{h})
+@end deftypefn
+
+@findex Handle_Type::clear
+@findex clear (Handle_Type)
+@c
+@deftypefn {Function} void clear (@code{void})
+@end deftypefn
+
+@findex add_value (Handle_Type)
+@findex Handle_Type::add_value 
+@findex add_values (Handle_Type)
+@findex Handle_Type::add_values 
+@c
+@deftypefn {Functions} int add_values (@code{MYSQL *}@var{mysql_ptr}, @*@
+                                       @code{vector<Handle_Value_Triple>} @var{hvt_vector}, @*@
+                                       @code{int} @var{user_id} @*@
+                               @code{vector<Handle_Value_Triple> *}{@var{return_hvt_vector} @code{}= 0}, @*@
+                                       @code{bool} {@var{lock_tables} @code{= true}})
+@c
+@deftypefnx {} int add_value (@code{MYSQL *}@var{mysql_ptr}, @*@
+                              @code{int} @var{iidx}, @*@
+                              @code{string} @var{ttype}, @*@
+                              @code{string} @var{ddata_str}, @*@
+                              @code{int} @var{user_id} @*@
+                              @code{Handle_Value_Triple *}{@var{return_hvt} @code{= 0}}, @*@
+                              @code{bool} {@var{lock_tables} @code{= true}})
+
+@end deftypefn
+
+@findex delete_from_database (Handle_Type)
+@findex Handle_Type::delete_from_database 
+@c
+@deftypefun int delete_from_database (@code{MYSQL *}@var{mysql_ptr}, @*@
+                                      @code{int} @var{user_id}, @*@
+                                      @code{unsigned int} @var{options}, @*@
+                                      @code{unsigned long int} {@var{delay_value} @code{= 0UL}}, @*@
+                                      @code{int *}{@var{handle_rows} @code{= 0}}, @*@
+                                      @code{int} {@var{thread_ctr} @code{= 0}})
+@end deftypefun
+
+@findex find (Handle_Type)
+@findex Handle_Type::find
+@c
+@deftypefun {const map<unsigned long int, Handle_Value_Type>::iterator} find (@code{string} @var{type})
+@end deftypefun
+
+@deftypefun int created_by_user_id  (@code{void})
+@end deftypefun
+
+@findex int fetch_handles_from_database (Handle_Type)
+@findex Handle_Type::int fetch_handles_from_database
+@c
+@deftypefn {Static functions} int fetch_handles_from_database (@code{MYSQL *&}@var{mysql_ptr}, @*@
+                                                               @code{vector<.*> &}@var{handle_id_vector}, @*@
+                                                               @code{vector<.*> &}@var{handle_vector}, @*@
+                                                               @code{string} {@var{type} @code{@code{= ""}}}, @*@
+                                                               @code{string} thread_str @code{= ""})
+
+@findex fetch_handle_from_database (Handle_Type)
+@findex Handle_Type::fetch_handle_from_database
+@c
+@deftypefnx {} int fetch_handle_from_database (@code{MYSQL *&}@var{mysql_ptr}, @*@
+                                               @code{unsigned long int} @var{handle_id}, @*@
+                                               @code{Handle_Type} &@var{handle}, @*@
+                                               @code{string} type @code{= ""}, @*@
+                                               @code{string} thread_str @code{= ""})
+@end deftypefn
+
+
+
+@findex delete_handle_values (Handle_Type)
+@findex Handle_Type::delete_handle_values
+@c
+@deftypefn {Static function} int delete_handle_values (@code{std::set<unsigned long int> &}@var{handle_id_set}, @*@
+                                                       @code{vector<.*> &}@var{handle_value_type_vector}, @*@
+                                                       @code{MYSQL *&}@var{mysql_ptr}, @*@
+                                                       @code{string} thread_str @code{= ""}, @*@
+                                                       @code{bool} {@var{lock_table} @code{= true}})
+@end deftypefn
+
+
+@findex delete_handle_values (Handle_Type)
+@findex Handle_Type::delete_handle_values
+@c
+@deftypefun int delete_handle_values (@code{vector<.*> &}@var{handle_value_type_vector}, @*@
+                                      @code{MYSQL *&}@var{mysql_ptr}, @*@
+                                      @code{string} thread_str @code{= ""}, @*@
+                                      @code{bool} {@var{lock_table} @code{= true}})
+@end deftypefun
+
+
+
+@findex unmark_handle_for_deletion (Handle_Type)
+@findex Handle_Type::unmark_handle_for_deletion
+@c
+@deftypefun int unmark_handle_for_deletion (@code{MYSQL *&}@var{mysql_ptr}, @*@
+                                            @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+
+@findex show (Handle_Type)
+@findex Handle_Type::show
+@c
+@deftypefn {const function} void show @*@
+            (@code{string} {@var{s} @code{= "Handle_Type:"}}, @code{stringstream *} {@var{strm} @code{= 0}}) 
+@end deftypefn
+
+@c ** (2) class Handle_Value_Type
+
+@node class Handle_Value_Type, struct Handle_Value_Triple, class Handle_Type, Handle Types
+@section class Handle_Value_Type
+
+@tindex class Handle_Value_Type
+@tindex Handle_Value_Type, class 
+@c
+@code{class Handle_Value_Type} is declared in @file{hndlvltp.web}.
+
+@tindex class Handle_Value_Type
+@tindex Handle_Value_Type, class 
+@c
+@findex main
+@findex exchange_data_with_client
+@findex zzparse
+@findex generate_pids
+@findex purge_dc_metadata
+@c
+The classes @code{Scan_Parse_Parameter_Type}, @code{Irods_Object_Type}, and @code{Handle_Type}
+and the functions @code{main}, @code{exchange_data_with_client}, @code{zzparse}, @code{generate_pids}
+and @code{purge_dc_metadata}
+are @code{friends} of @code{class Handle_Value_Type}.  
+@xref{class Scan_Parse_Parameter_Type}, @ref{class Irods_Object_Type}, @ref{class Handle_Type},
+@ref{Exchanging data}, @ref{Scanning and parsing}, and @ref{Generating PIDs}. 
+
+@menu
+* Handle_Value_Type Data Members::
+* Handle_Value_Type Member Functions::
+@end menu
+
+@c *** (3)
+
+@node Handle_Value_Type Data Members, Handle_Value_Type Member Functions, , class Handle_Value_Type
+@subsection Data Members
+
+@vindex admin_read (Handle_Value_Type)
+@vindex admin_write (Handle_Value_Type)
+@vindex created (Handle_Value_Type)
+@vindex created_by_user_id (Handle_Value_Type)
+@vindex created_by_user_name   (Handle_Value_Type)
+@vindex created_str (Handle_Value_Type)
+@vindex data (Handle_Value_Type)
+@vindex data_length (Handle_Value_Type)
+@vindex delete_from_database_timestamp (Handle_Value_Type)
+@vindex delete_from_database_timestamp_str (Handle_Value_Type)
+@vindex filename (Handle_Value_Type)
+@vindex handle (Handle_Value_Type)
+@vindex handle_id (Handle_Value_Type)
+@vindex handle_value_id (Handle_Value_Type)
+@vindex idx (Handle_Value_Type)
+@vindex irods_object_id (Handle_Value_Type)
+@vindex last_modified (Handle_Value_Type)
+@vindex last_modified_str (Handle_Value_Type)
+@vindex marked_for_deletion (Handle_Value_Type)
+@vindex pub_read (Handle_Value_Type)
+@vindex pub_write (Handle_Value_Type)
+@vindex refs (Handle_Value_Type)
+@vindex refs_length (Handle_Value_Type)
+@vindex timestamp (Handle_Value_Type)
+@vindex ttl (Handle_Value_Type)
+@vindex ttl_type (Handle_Value_Type)
+@vindex type (Handle_Value_Type)
+@c
+@vindex Handle_Value_Type::admin_read
+@vindex Handle_Value_Type::admin_write
+@vindex Handle_Value_Type::created
+@vindex Handle_Value_Type::created_by_user_id
+@vindex Handle_Value_Type::created_by_user_name  
+@vindex Handle_Value_Type::created_str
+@vindex Handle_Value_Type::data
+@vindex Handle_Value_Type::data_length
+@vindex Handle_Value_Type::delete_from_database_timestamp
+@vindex Handle_Value_Type::delete_from_database_timestamp_str
+@vindex Handle_Value_Type::filename
+@vindex Handle_Value_Type::handle
+@vindex Handle_Value_Type::handle_id
+@vindex Handle_Value_Type::handle_value_id
+@vindex Handle_Value_Type::idx
+@vindex Handle_Value_Type::irods_object_id
+@vindex Handle_Value_Type::last_modified
+@vindex Handle_Value_Type::last_modified_str
+@vindex Handle_Value_Type::marked_for_deletion
+@vindex Handle_Value_Type::pub_read
+@vindex Handle_Value_Type::pub_write
+@vindex Handle_Value_Type::refs
+@vindex Handle_Value_Type::refs_length
+@vindex Handle_Value_Type::timestamp
+@vindex Handle_Value_Type::ttl
+@vindex Handle_Value_Type::ttl_type
+@vindex Handle_Value_Type::type
+@c
+@deftypevr {Private variables} string filename
+@deftypevrx {} string handle
+@deftypevrx {} int idx
+@deftypevrx {} string type
+@deftypevrx {} {char*} data
+@deftypevrx {} {unsigned int} data_length
+@deftypevrx {} int ttl_type
+@deftypevrx {} int ttl
+@deftypevrx {} time_t timestamp
+@deftypevrx {} {char*} refs
+@deftypevrx {} {unsigned int} refs_length
+@deftypevrx {} bool admin_read
+@deftypevrx {} bool admin_write
+@deftypevrx {} bool pub_read
+@deftypevrx {} bool pub_write
+@deftypevrx {} {unsigned long int} handle_id
+@deftypevrx {} {unsigned long int} handle_value_id
+@deftypevrx {} int created_by_user_id
+@deftypevrx {} string created_by_user_name  
+@deftypevrx {} time_t created
+@deftypevrx {} time_t last_modified
+@deftypevrx {} string created_str
+@deftypevrx {} string last_modified_str
+@deftypevrx {} bool marked_for_deletion
+@deftypevrx {} time_t delete_from_database_timestamp
+@deftypevrx {} string delete_from_database_timestamp_str
+@deftypevrx {} {unsigned long int} irods_object_id
+@end deftypevr
+
+@*
+@noindent 
+Public static @code{unsigned int} constants in @code{Handle_Value_Type}:
+@c
+@vindex Handle_Value_Type::NULL_HANDLE_VALUE_TYPE_INDEX
+@vindex Handle_Value_Type::IRODS_OBJECT_INDEX
+@vindex Handle_Value_Type::IRODS_OBJECT_PID_INDEX
+@vindex Handle_Value_Type::IRODS_OBJECT_REF_INDEX
+@vindex Handle_Value_Type::IRODS_OBJECT_REF_PID_INDEX
+@vindex Handle_Value_Type::IRODS_OBJECT_DELETED_FROM_ARCHIVE_INDEX
+@vindex Handle_Value_Type::IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB_INDEX
+@vindex Handle_Value_Type::IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE_INDEX
+@vindex Handle_Value_Type::IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB_INDEX
+@vindex Handle_Value_Type::IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE_INDEX
+@vindex Handle_Value_Type::IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB_INDEX
+@vindex Handle_Value_Type::DC_METADATA_INDEX
+@vindex Handle_Value_Type::DC_METADATA_PID_INDEX
+@vindex Handle_Value_Type::DC_METADATA_REF_INDEX
+@vindex Handle_Value_Type::DC_METADATA_DELETED_INDEX
+@vindex Handle_Value_Type::DC_METADATA_DELETED_PID_INDEX
+@vindex Handle_Value_Type::DC_METADATA_IRODS_OBJECT_INDEX
+@vindex Handle_Value_Type::DC_METADATA_IRODS_OBJECT_PID_INDEX
+@vindex Handle_Value_Type::DC_METADATA_IRODS_OBJECT_REF_INDEX
+@vindex Handle_Value_Type::DC_METADATA_IRODS_OBJECT_DELETED_FROM_ARCHIVE_INDEX
+@vindex Handle_Value_Type::DC_METADATA_IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB_INDEX
+@vindex Handle_Value_Type::DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE_INDEX
+@vindex Handle_Value_Type::DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB_INDEX
+@vindex Handle_Value_Type::DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE_INDEX
+@vindex Handle_Value_Type::DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB_INDEX 
+@vindex Handle_Value_Type::CREATOR_INDEX
+@vindex Handle_Value_Type::OWNER_INDEX
+@vindex Handle_Value_Type::HANDLE_MARKED_FOR_DELETION_INDEX
+@vindex Handle_Value_Type::CHECKSUM_MD5_INDEX                      
+@vindex Handle_Value_Type::CHECKSUM_SHA1_INDEX                     
+@vindex Handle_Value_Type::CHECKSUM_SHA224_INDEX                   
+@vindex Handle_Value_Type::CHECKSUM_SHA256_INDEX                   
+@vindex Handle_Value_Type::CHECKSUM_SHA384_INDEX                   
+@vindex Handle_Value_Type::CHECKSUM_SHA512_INDEX                   
+@vindex Handle_Value_Type::ENCRYPTED_INDEX                         
+@vindex Handle_Value_Type::SIGNED_INDEX                            
+@vindex Handle_Value_Type::CLEARSIGNED_INDEX                       
+@vindex Handle_Value_Type::VERIFIED_INDEX                          
+@vindex Handle_Value_Type::GPG_KEY_FINGERPRINT_INDEX               
+@vindex Handle_Value_Type::DETACHED_SIGNATURE_INDEX                
+@vindex Handle_Value_Type::DETACHED_SIGNATURE_REF_INDEX            
+@vindex Handle_Value_Type::DETACHED_SIGNATURE_PID_INDEX            
+@vindex Handle_Value_Type::COMPRESSED_TAR_FILE_INDEX               
+@vindex Handle_Value_Type::COMPRESSED_GZIP_INDEX                     
+@vindex Handle_Value_Type::COMPRESSED_BZIP2_INDEX                  
+@vindex Handle_Value_Type::RESERVED_0_INDEX
+@vindex Handle_Value_Type::RESERVED_1_INDEX
+@vindex Handle_Value_Type::RESERVED_2_INDEX
+@vindex Handle_Value_Type::OTHER_HANDLE_VALUE_TYPE_INDEX
+@c
+@vindex NULL_HANDLE_VALUE_TYPE_INDEX (Handle_Value_Type)
+@vindex IRODS_OBJECT_INDEX (Handle_Value_Type)
+@vindex IRODS_OBJECT_PID_INDEX (Handle_Value_Type)
+@vindex IRODS_OBJECT_REF_INDEX (Handle_Value_Type)
+@vindex IRODS_OBJECT_REF_PID_INDEX (Handle_Value_Type)
+@vindex IRODS_OBJECT_DELETED_FROM_ARCHIVE_INDEX (Handle_Value_Type)
+@vindex IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB_INDEX (Handle_Value_Type)
+@vindex IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE_INDEX (Handle_Value_Type)
+@vindex IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB_INDEX (Handle_Value_Type)
+@vindex IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE_INDEX (Handle_Value_Type)
+@vindex IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB_INDEX (Handle_Value_Type)
+@vindex DC_METADATA_INDEX (Handle_Value_Type)
+@vindex DC_METADATA_PID_INDEX (Handle_Value_Type)
+@vindex DC_METADATA_REF_INDEX (Handle_Value_Type)
+@vindex DC_METADATA_DELETED_INDEX (Handle_Value_Type)
+@vindex DC_METADATA_DELETED_PID_INDEX (Handle_Value_Type)
+@vindex DC_METADATA_IRODS_OBJECT_INDEX (Handle_Value_Type)
+@vindex DC_METADATA_IRODS_OBJECT_PID_INDEX (Handle_Value_Type)
+@vindex DC_METADATA_IRODS_OBJECT_REF_INDEX (Handle_Value_Type)
+@vindex DC_METADATA_IRODS_OBJECT_DELETED_FROM_ARCHIVE_INDEX (Handle_Value_Type)
+@vindex DC_METADATA_IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB_INDEX (Handle_Value_Type)
+@vindex DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE_INDEX (Handle_Value_Type)
+@vindex DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB_INDEX (Handle_Value_Type)
+@vindex DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE_INDEX (Handle_Value_Type)
+@vindex DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB_INDEX  (Handle_Value_Type)
+@vindex CREATOR_INDEX (Handle_Value_Type)
+@vindex OWNER_INDEX (Handle_Value_Type)
+@vindex HANDLE_MARKED_FOR_DELETION_INDEX (Handle_Value_Type)
+@vindex CHECKSUM_MD5_INDEX (Handle_Value_Type)
+@vindex CHECKSUM_SHA1_INDEX (Handle_Value_Type)
+@vindex CHECKSUM_SHA224_INDEX (Handle_Value_Type)
+@vindex CHECKSUM_SHA256_INDEX (Handle_Value_Type)
+@vindex CHECKSUM_SHA384_INDEX (Handle_Value_Type)
+@vindex CHECKSUM_SHA512_INDEX (Handle_Value_Type)
+@vindex ENCRYPTED_INDEX (Handle_Value_Type)
+@vindex SIGNED_INDEX (Handle_Value_Type)
+@vindex CLEARSIGNED_INDEX (Handle_Value_Type)
+@vindex VERIFIED_INDEX (Handle_Value_Type)
+@vindex GPG_KEY_FINGERPRINT_INDEX (Handle_Value_Type)
+@vindex DETACHED_SIGNATURE_INDEX (Handle_Value_Type)
+@vindex DETACHED_SIGNATURE_REF_INDEX (Handle_Value_Type)
+@vindex DETACHED_SIGNATURE_PID_INDEX (Handle_Value_Type)
+@vindex COMPRESSED_TAR_FILE_INDEX (Handle_Value_Type)
+@vindex COMPRESSED_GZIP_INDEX (Handle_Value_Type)
+@vindex COMPRESSED_BZIP2_INDEX (Handle_Value_Type)
+@vindex RESERVED_0_INDEX (Handle_Value_Type)
+@vindex RESERVED_1_INDEX (Handle_Value_Type)
+@vindex RESERVED_2_INDEX (Handle_Value_Type)
+@vindex OTHER_HANDLE_VALUE_TYPE_INDEX (Handle_Value_Type)
+@c
+@c
+@multitable {@code{DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB_INDEX}} {000}
+@headitem Name @tab Value
+@item @code{NULL_HANDLE_VALUE_TYPE_INDEX} @tab 0  
+
+@item @code{IRODS_OBJECT_INDEX} @tab 1
+
+@item @code{IRODS_OBJECT_PID_INDEX} @tab 11
+
+@item @code{IRODS_OBJECT_REF_INDEX} @tab 21
+
+@item @code{IRODS_OBJECT_REF_PID_INDEX} @tab 22
+
+@item @code{IRODS_OBJECT_DELETED_FROM_ARCHIVE_INDEX} @tab 31
+
+@item @code{IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB_INDEX} @tab 41
+
+@item @code{IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE_INDEX} @tab 51
+
+@item @code{IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB_INDEX} @tab 61
+
+@item @code{IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE_INDEX} @tab 71
+
+@item @code{IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB_INDEX} @tab 81
+
+@item @code{DC_METADATA_INDEX} @tab 91 
+
+@item @code{DC_METADATA_PID_INDEX} @tab 101
+
+@item @code{DC_METADATA_REF_INDEX} @tab 111
+
+@item @code{DC_METADATA_DELETED_INDEX} @tab 115
+
+@item @code{DC_METADATA_DELETED_PID_INDEX} @tab 118
+
+@item @code{DC_METADATA_IRODS_OBJECT_INDEX} @tab 121
+
+@item @code{DC_METADATA_IRODS_OBJECT_PID_INDEX} @tab 131
+
+@item @code{DC_METADATA_IRODS_OBJECT_REF_INDEX} @tab 141
+
+@item @code{DC_METADATA_IRODS_OBJECT_DELETED_FROM_ARCHIVE_INDEX} @tab 151
+
+@item @code{DC_METADATA_IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB_INDEX} @tab 161
+
+@item @code{DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE_INDEX} @tab 171
+
+@item @code{DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB_INDEX} @tab 181
+
+@item @code{DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE_INDEX} @tab 191
+
+@item @code{DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB_INDEX} @tab 201
+
+@item @code{CREATOR_INDEX} @tab 211
+
+@item @code{OWNER_INDEX} @tab 221
+
+@item @code{HANDLE_MARKED_FOR_DELETION_INDEX} @tab 231
+
+@item @code{CHECKSUM_MD5_INDEX} @tab 301
+
+@item @code{CHECKSUM_SHA1_INDEX} @tab 302
+
+@item @code{CHECKSUM_SHA224_INDEX} @tab 303
+
+@item @code{CHECKSUM_SHA256_INDEX} @tab 304
+
+@item @code{CHECKSUM_SHA384_INDEX} @tab 305
+
+@item @code{CHECKSUM_SHA512_INDEX} @tab 306
+
+@item @code{ENCRYPTED_INDEX} @tab 401
+
+@item @code{SIGNED_INDEX} @tab 402
+
+@item @code{CLEARSIGNED_INDEX} @tab 403
+
+@item @code{VERIFIED_INDEX} @tab 404
+
+@item @code{GPG_KEY_FINGERPRINT_INDEX} @tab 405
+
+@item @code{DETACHED_SIGNATURE_INDEX} @tab 406
+
+@item @code{DETACHED_SIGNATURE_REF_INDEX} @tab 407
+
+@item @code{DETACHED_SIGNATURE_PID_INDEX} @tab 408
+
+@item @code{COMPRESSED_TAR_FILE_INDEX} @tab 501
+
+@item @code{COMPRESSED_GZIP_INDEX} @tab 502
+
+@item @code{COMPRESSED_BZIP2_INDEX} @tab 503
+
+@item @code{RESERVED_0_INDEX} @tab 601
+
+@item @code{RESERVED_1_INDEX} @tab 701
+
+@item @code{RESERVED_2_INDEX} @tab 801
+
+@item @code{OTHER_HANDLE_VALUE_TYPE_INDEX} @tab 901
+@end multitable
+
+@vindex idx_type_map (Handle_Value_Type)
+@vindex type_idx_map (Handle_Value_Type)
+@c
+@vindex Handle_Value_Type::idx_type_map
+@vindex Handle_Value_Type::type_idx_map
+@c
+@deftypevr {Public static variables} {map<int, string>} idx_type_map
+@deftypevrx {} {map<string, unsigned int>} type_idx_map
+@end deftypevr
+
+@c *** (3) Handle_Value_Type Member Functions
+
+@node Handle_Value_Type Member Functions, , Handle_Value_Type Data Members, class Handle_Value_Type
+@subsection Member Functions
+
+@findex Handle_Value_Type constructor
+@findex constructor, Handle_Value_Type 
+@c
+@deftypefn {Default constructor} void Handle_Value_Type (@code{void})
+@deftypefnx {Copy constructor} void Handle_Value_Type (@code{const Handle_Value_Type &}@var{h})
+@end deftypefn
+
+@findex Handle_Value_Type destructor
+@findex destructor, Handle_Value_Type 
+@c
+@deftypefn {Destructor} void ~Handle_Value_Type (@code{void})
+@end deftypefn
+
+@findex Handle_Value_Type assignment operator
+@findex assignment operator, Handle_Value_Type 
+@findex operator= (Handle_Value_Type)
+@findex Handle_Value_Type::operator=
+@c
+@deftypefn {Assignment operator} void operator= (@code{const Handle_Value_Type &}@var{h})
+@end deftypefn
+
+
+@findex Handle_Value_Type::initialize_maps
+@findex initialize_maps (Handle_Value_Type)
+@c
+@deftypefn {Static function} int initialize_maps (@code{void})
+@end deftypefn
+
+@findex Handle_Value_Type::set
+@c
+@deftypefn {Functions} int set (@code{MYSQL_ROW &}@var{curr_row},          @*@
+                                @code{unsigned int} @var{field_ctr},       @*@
+                                @code{string} {@var{hhandle} @code{= ""}}, @*@
+                                @code{int} {@var{thread_ctr} @code{= -1}})
+@deftypefnx {} int set (@code{string} @var{hhandle},                          @*@
+                        @code{int} @var{iidx},                                @*@
+                        @code{string} @var{ttype},                            @*@
+                        @code{char *}@var{ddata},                             @*@
+                        @code{unsigned int} @var{ddata_length},               @*@
+                        @code{int} @var{tttl_type},                           @*@
+                        @code{int} @var{tttl},                                @*@
+                        @code{time_t} @var{ttimestamp},                       @*@
+                        @code{char *}@var{rrefs},                             @*@
+                        @code{unsigned int} @var{rrefs_length},               @*@
+                        @code{bool} @var{aadmin_read},                        @*@
+                        @code{bool} @var{aadmin_write},                       @*@
+                        @code{bool} @var{ppub_read},                          @*@
+                        @code{bool} @var{ppub_write},                         @*@
+                        @code{long int} @var{ccreated_by_user_id},            @*@
+                        @code{unsigned long int} @var{hhandle_id},            @*@
+                        @code{unsigned long int} @var{hhandle_value_id},      @*@
+                        @code{bool} @var{mmarked_for_deletion},               @*@
+                        @code{time_t} @var{ccreated},                         @*@
+                        @code{time_t} @var{llast_modified},                   @*@
+                        @code{string} {@var{ccreated_str} @code{= ""}},       @*@
+                        @code{string} {@var{llast_modified_str} @code{= ""}}, @*@
+                       @code{string} {@var{ffilename} @code{= ""}})      
+@end deftypefn
+
+@findex Handle_Value_Type::delete_handle_value
+@findex delete_handle_value (Handle_Value_Type)
+@c
+@deftypefn {Static Function} int delete_handle_value (@code{MYSQL *&}@var{mysql_ptr}, @*@
+                                                      @code{string} @var{hv_str}, @*@
+                                                      @code{deque<Response_Type> &}@var{response_deque}, @*@
+                                                      @code{int} @var{user_id}, @*@
+                                                      @code{string} @var{username}, @*@
+                                                      @code{unsigned} @var{int privileges}, @*@
+                                                      @code{unsigned int} {@var{options} @code{= 0U}}, @*@
+                                                      @code{unsigned long int} {@var{delay_value} @code{= 0}}, @*@
+                                                      @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefn
+
+@findex Handle_Value_Type::unmark_handle_value_for_deletion
+@findex unmark_handle_value_for_deletion (Handle_Value_Type)
+@c
+@deftypefn {Static Function} int unmark_handle_value_for_deletion (@*@
+                                 @code{MYSQL *&}@var{mysql_ptr}, @*@
+                                 @code{string} @var{hv_str}, @*@
+                                 @code{deque<Response_Type> &}@var{response_deque}, @*@
+                                 @code{int} @var{user_id}, @*@
+                                 @code{string} @var{username}, @*@
+                                 @code{unsigned int} @var{privileges}, @*@
+                                 @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefn
+
+@findex Handle_Value_Type::extract
+@findex extract (Handle_Value_Type)
+@c
+@deftypefn {Static Function} int extract (@code{string} @var{hv_str},  @*@
+        @code{string &}@var{prefix},  @*@
+        @code{string &}@var{sub_handle},  @*@
+        @code{string &}@var{handle}, @*@
+        @code{int &}@var{index},  @*@
+        @code{string &}@var{type},  @*@
+        @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefn
+
+@findex Handle_Value_Type::write_to_database
+@findex write_to_database (Handle_Value_Type)
+@c
+@deftypefun int write_to_database (@code{MYSQL *}@var{mysql_ptr}, @*@
+                                   @code{string} @var{database}, @*@
+                                   @code{bool} {@var{replace} @code{= false}})
+@end deftypefun
+
+
+@findex Handle_Value_Type::clear
+@findex clear (Handle_Value_Type)
+@c
+@deftypefn {Function} void clear (@code{void})
+@end deftypefn
+
+@findex Handle_Value_Type::show
+@findex show (Handle_Value_Type)
+@c
+@deftypefn {const Function} void show (@code{string} {@var{s} @code{= "Handle_Value_Type:"}}, @*@
+                                        @code{stringstream *}{@var{strm} @code{= 0}})
+@end deftypefn
+
+@c ** (2) struct Handle_Value_Triple
+
+@node struct Handle_Value_Triple, , class Handle_Value_Type, Handle Types
+@section struct Handle_Value_Triple
+
+@tindex struct Handle_Value_Triple
+@tindex Handle_Value_Triple, struct
+
+@menu
+* Handle_Value_Triple Data Members::
+* Handle_Value_Triple Member Functions::
+@end menu
+
+@c *** (3)
+
+@node Handle_Value_Triple Data Members, Handle_Value_Triple Member Functions, , struct Handle_Value_Triple
+@subsection Data Members
+
+@vindex Handle_Value_Triple::idx
+@vindex Handle_Value_Triple::type
+@vindex Handle_Value_Triple::data_str
+@c
+@vindex idx (Handle_Value_Triple)
+@vindex type (Handle_Value_Triple)
+@vindex data_str (Handle_Value_Triple)
+@c
+@deftypevr {Public variables} int idx
+@deftypevrx {} string type
+@deftypevrx {} string data_str
+@end deftypevr
+
+@c *** (3)
+
+@node Handle_Value_Triple Member Functions, , Handle_Value_Triple Data Members, struct Handle_Value_Triple
+@subsection Member Functions
+
+@findex Handle_Value_Triple, default constructor
+@findex Handle_Value_Triple, constructor, default
+@c
+@findex default constructor, Handle_Value_Triple 
+@findex constructor, default, Handle_Value_Triple 
+@findex Handle_Value_Triple::Handle_Value_Triple
+@c
+@deftypefn {Default constructor} void Handle_Value_Triple (@code{void})
+@end deftypefn
+
+@findex Handle_Value_Triple, constructor
+@c
+@findex constructor, Handle_Value_Triple 
+@findex Handle_Value_Triple::Handle_Value_Triple
+@c 
+@deftypefn {Constructor} void Handle_Value_Triple (@code{int} @var{iidx}, @*@
+                                                   @code{string} @var{ttype}, @*@
+                                                   @code{string} {@var{ddata_str} @code{= ""}})
+@end deftypefn
+
+@findex Handle_Value_Triple, assignment operator
+@findex Handle_Value_Triple, operator, assignment
+@findex assignment operator, Handle_Value_Triple
+@findex operator, assignment, Handle_Value_Triple
+@c
+@findex Handle_Value_Triple::operator=
+@c
+@findex operator= (Handle_Value_Triple)
+@c
+@deftypefn {Assignment operator} {const Handle_Value_Triple&} operator= (@*@
+                                     @code{const Handle_Value_Triple &}@var{hvt})
+@end deftypefn
+
+@findex Handle_Value_Triple::clear
+@findex clear (Handle_Value_Triple)
+@c
+@deftypefun void clear (@code{void}) 
+@end deftypefun
+
+@findex Handle_Value_Triple::show
+@findex show (Handle_Value_Triple)
+@c
+@deftypefun int show (@code{string} {@var{s} @code{= ""}}) 
+@end deftypefun
+
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

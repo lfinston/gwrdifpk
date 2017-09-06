@@ -1,0 +1,504 @@
+@c nnclsfnc.texi
+@c /home/lfinsto/irods_proj/irods_master/Finston/gwrdifpk/doc/nnclsfnc.texi
+
+@c Created by Laurence D. Finston (LDF) Thu Mar 14 10:20:02 CET 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) Non-class Functions
+
+@node Non-class Functions, handlesystem and handlesystem_standalone Databases, Miscellaneous Types, Top
+@chapter Non-class Functions
+
+@menu
+* Main (and similar) functions::
+* Process command-line options::
+* Listen and connect functions::
+* X.509 certificate functions::
+* Exchanging data::
+* Scanning and parsing::
+* Parser rule functions::
+* Generating PIDs::
+* Cryptographic operations::
+* Deleting and rotating files::
+* Signal handlers::
+* Exit handlers::
+* Time functions::
+* Pull functions::
+* Other functions::
+@end menu
+
+@c *** (3) Main (and similar) functions
+
+@node Main (and similar) functions, Process command-line options, , Non-class Functions 
+@section Main (and similar) functions
+
+@deftypefn {Main functions} int main (@code{int} @var{argc}, @code{char *}{@var{argv}@code{[]}})
+@end deftypefn
+
+@deftypefn {Client function} int client_func (@code{Scan_Parse_Parameter_Type &}@var{param})
+@end deftypefn
+
+@c *** (3) Process command-line options
+@node Process command-line options, Listen and connect functions, Main (and similar) functions, Non-class Functions 
+
+@section Process command-line options
+
+@deftypefun int process_command_line_options (@code{int} @var{argc}, @code{char *}{@var{argv}@code{[]}})
+
+@cindex global variables
+@cindex variables, global
+@c
+@command{gwirdsif} and @command{gwirdcli} both call this function to process
+their respective command-line arguments.  This implies that they share the same
+options.  This is done in order to help ensure consistency between the two
+programs.  Some options have no meaning in one or the other of the programs,
+while others may be interpreted differently.
+@end deftypefun
+
+@c *** (3) Listen and connect functions
+@node Listen and connect functions, X.509 certificate functions, Process command-line options, Non-class Functions 
+@section Listen and connect functions
+
+@deftypefn {Connection function} {void*} connect_func (@code{void *}@var{v})
+@end deftypefn
+
+@deftypefn  {Listen functions} {void*} listen_remote_anon (@code{void *}@var{v})
+@deftypefnx {}         {void*} void* listen_remote_X_509(@code{void *}@var{v})
+@end deftypefn
+
+@deftypefn {Functions} gnutls_session_t initialize_tls_session (@code{void})
+@deftypefnx {}         int              generate_dh_params     (@code{void})
+@end deftypefn
+
+@c *** (3) X.509 certificate functions
+
+@node X.509 certificate functions, Exchanging data, Listen and connect functions, Non-class Functions 
+
+@section X.509 certificates
+
+@deftypefun int extract_dn_fields (@code{gnutls_x509_crt_t &}@var{cert}, @*@
+                                   @code{X509_Cert_Type *}{@var{x509_cert} @code{= 0}}, @*@
+                                   @code{bool} {@var{subject} @code{= true}}, @*@
+                                   @code{Scan_Parse_Parameter_Type *}{@var{param} @code{= 0}})
+Defined in @file{gntlsfnc.web}.
+@end deftypefun
+
+@deftypefun int verify_certificate (@code{gnutls_session_t} @var{session}, @*@
+                                    @code{X509_Cert_Type *}{@var{x509_cert_ptr} @code{= 0}}, @*@
+                                    @code{const char *}{@var{hostname} @code{= 0}})
+Defined in @file{ex_rfc2818.web}.
+@end deftypefun
+
+
+@c *** (3) Exchanging data
+
+@node Exchanging data, Scanning and parsing, X.509 certificate functions, Non-class Functions
+@section Exchanging data
+
+@deftypefn {Function} int exchange_data_with_client (@code{Scan_Parse_Parameter_Type &}@var{param})
+Defined in @file{[...]/Finston/gwrdifpk/src/exchncli.web}.
+@end deftypefn
+
+@deftypefn {Function} int exchange_data_with_server (@code{Scan_Parse_Parameter_Type &}@var{param})
+Defined in @file{[...]/Finston/gwrdifpk/src/exchnsrv.web}.
+@end deftypefn
+
+@cindex peers, communication between
+@cindex communication between peers
+@cindex endless loop
+@cindex loop, endless
+@c
+These are two of the most important functions in @command{gwrdifpk}.  They are responsible for the 
+communication between the two @dfn{peers}, i.e., the server program @command{gwirdsif} and 
+the client program @command{gwirdcli}.  Each contains an @dfn{endless loop}.  At the beginning, 
+@code{gnutls_record_recv} or @code{recv} (depending on the kind of connection) is called 
+in order to receive any data sent from the peer.  If there is any, it's passed to the 
+@dfn{parser function}, @code{yyparse} on the server-side or @code{zzparse} on the client-side.
+@xref{Scanning and parsing}.  After parsing, the variable 
+@code{Scan_Parse_Parameter_Type::response_deque} belonging to the @code{Scan_Parse_Parameter_Type} 
+object used for the current connection is examined.  
+If it contains any @dfn{responses}, i.e., 
+objects of type @code{Response_Type}, the latter are processed.  These may cause result in data 
+being sent to the peer.  Then the process is repeated, i.e., the loop repeats.
+(@xref{class Scan_Parse_Parameter_Type}, and @ref{class Response_Type}.)
+
+
+In both the client and the server, the variables @code{bool client_finished} 
+and @code{bool server_finished} are defined.  Communication ends when both of 
+these variables have the value @code{true}.  Either peer may break off the 
+connection.
+
+@c *** (3) Scanning and parsing
+
+@node Scanning and parsing, Parser rule functions, Exchanging data, Non-class Functions
+@section Scanning and parsing
+
+@deftypefn {Parser functions} int yyparse (@code{yyscan_t} @var{parameter})
+@deftypefnx {} int zzparse (@code{yyscan_t} @var{parameter})  
+@deftypefnx {} int xxparse (@code{yyscan_t} @var{parameter})  
+@cindex GNU Bison
+@cindex Bison, GNU 
+@c
+These functions are generated by GNU Bison from the input files 
+@file{gwrdifpk-1.0/src/parser.web}, @file{gwrdifpk-1.0/src/prsrclnt.web}
+and @file{gwrdifpk-1.0/src/prsrcln2.web}, respectively.  
+@xref{Prerequisites}.
+
+@code{yyparse} implements the grammar of the commands ``understood'' by the 
+server while @code{zzparse} serves the same purpose for the client.  Please note that the 
+user commands are sent by the client to the server and interpreted by the latter.  
+@code{zzparse} only ever interprets commands sent back to the client from the server, 
+so users never pass these commands to the client.
+
+@code{xxparse} implements the grammar of the commands used to control the client.
+@end deftypefn
+
+@deftypefn {Scanner functions} int yylex (@code{YYSTYPE *}@var{lvalp}, @
+                                          @code{yyscan_t} @var{parameter})
+@deftypefnx {} int zzlex (@code{YYSTYPE *}@var{lvalp}, @code{yyscan_t} @var{parameter})
+@deftypefnx {} int xxlex (@code{YYSTYPE *}@var{lvalp}, @code{yyscan_t} @var{parameter})
+@cindex Flex
+@cindex token
+@cindex tokenize, input
+@cindex input, tokenize
+@cindex lexical scanner
+@cindex scanner, lexical
+@cindex scanner function 
+@cindex function, scanner 
+@c
+These functions are generated by Flex from the input files @code{gwrdifpk-1.0/src/scanner.web},
+@code{gwrdifpk-1.0/src/scnrclnt.web} and @code{gwrdifpk-1.0/src/scnrcln2.web}, respectively.  
+@xref{Prerequisites}.
+
+@code{yylex} implements the server-side 
+@dfn{lexical scanner}, while @code{zzlex} and @code{xxlex} implement the two client-side scanners.
+They are called by the @dfn{parser functions} @code{yyparse}, @code{zzparse} 
+and @code{xxparse}, respectively.  See above.
+
+The server and client each receive input in the form of a stream of bytes (characters).
+The @dfn{parser function}, i.e., @code{yyparse} for the server and @code{zzparse} for the client,
+calls the scanner function, i.e., @code{yylex} or @code{zzlex}, repeatedly.
+The latter converts the stream of bytes successively into @dfn{tokens} according to rules 
+defined in the Flex input files.  The tokens, along with their @dfn{semantic values}, if any, are 
+passed back to the scanner function.
+@end deftypefn
+
+@deftypefn {Additional functions for parsers} int yywrap (@code{void})
+@deftypefnx {}                                int zzwrap (@code{void})
+@deftypefnx {}                                int xxwrap (@code{void})
+@deftypefnx {}                                int yyerror (@code{void *}@var{v}, @code{char const *}@var{s})
+@deftypefnx {}                                int zzerror (@code{void *}@var{v}, @code{char const *}@var{s})
+@deftypefnx {}                                int xxerror (@code{void *}@var{v}, @code{char const *}@var{s})
+@end deftypefn
+
+@c *** (3) Parser rule functions
+
+@node Parser rule functions, Generating PIDs, Scanning and parsing, Non-class Functions
+@section Parser rule functions
+
+@cindex parser rules
+@cindex rules, parser 
+@c
+These functions are defined in @file{prsrfncs.web} and are called in @code{yyparse}.  
+@xref{Scanning and parsing}, above. 
+That is, they are called in the @dfn{parser rules} defined in @file{parser.web}.
+
+It can be advantageous to put the code for complicated actions into a separate function, 
+rather than to include it in a parser rule, in order to decrease compilation time.
+
+Of course, it would be possible to define functions that are called in rules for the 
+client-side parser @code{yyparse}.  However, at the present time, no such functions 
+are defined in @command{gwrdifpk}.
+
+@deftypefun int client_sending_file_rule_func (@code{Scan_Parse_Parameter_Type*} @var{param}, @*@
+@code{string} @var{filename}, @code{int} @var{reference})
+@end deftypefun
+
+@deftypefun int distinguished_name_rule_func (@code{Scan_Parse_Parameter_Type*} @var{param}, @
+                                              {@code{const char*}} @var{distinguished_name_str})
+@end deftypefun
+
+@deftypefun int get_user_info_func (@code{Scan_Parse_Parameter_Type*} @var{param}, @
+                                    @code{const char*} {@var{curr_username} = 0})
+@end deftypefun
+
+@c *** (3) Generating PIDs
+
+@node Generating PIDs, Cryptographic operations, Parser rule functions, Non-class Functions
+@section Generating PIDs
+
+@deftypefun int generate_pids (@code{MYSQL *}@var{ysql_ptr}m, @*@
+                               @code{string} @var{prefix_str}, @*@
+                               @code{string} @var{&pid_str}, @*@
+                               @code{vector<string> *}{@var{pid_vector_ptr} @code{= 0}}, @*@
+                               @code{unsigned int} {@var{number_of_pids} @code{= 1}}, @*@
+                               @code{vector<unsigned long int> *}{@var{handle_id_vector_ptr} @code{= 0}}, @*@
+                               @code{vector<unsigned long int> *}{@var{handle_value_id_vector_ptr} @code{= 0}}, @*@
+                               @code{bool} {@var{standalone_hs} @code{= true}}, @*@
+                               @code{string} {@var{institute_str} @code{= ""}}, @*@
+                               @code{string} {@var{suffix_str} @code{= ""}}, @*@
+                               @code{vector<Handle_Type> *}{@var{handle_vector} @code{= 0}}, @*@
+                               @code{string} {@var{fifo_pathname} @code{= ""}}, @*@
+                               @code{long int }{@var{user_id} @code{= 0}}, @*@
+                               @code{string} {@var{username} @code{= ""}})
+Defined in @file{pidfncs.web}.
+@end deftypefun
+
+@deftypefun int check_prefix (@code{MYSQL *}@var{mysql_ptr}, @*@
+                              @code{string} @var{prefix_str}, @*@
+                              @code{unsigned int &}@var{prefix_id})
+Defined in @file{pidfncs.web}.
+@end deftypefun
+
+
+
+@c *** (3) Cryptographic operations
+
+@node Cryptographic operations, Deleting and rotating files, Generating PIDs, Non-class Functions
+
+@section Cryptographic operations
+
+@deftypefun int decrypt (@code{string} @var{encrypted_text},@*@
+                         @code{bool} @var{is_file},@*@
+                         @code{char *}@var{plain_text},@*@
+                         @code{size_t} @var{plain_text_length},@*@
+                         @code{string} {@var{output_filename} @code{= ""}},@*@
+                         @code{char *}{@var{passphrase} @code{= 0}},@*@
+                         @code{char} {@var{end_char} @code{= '\n'}},@*@
+                         @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+@deftypefun int verify_gpg_signature (@code{MYSQL *}@var{mysql_ptr},@*@
+                                      @code{string} @var{base_str},@*@
+                                      @code{string} {@var{base_filename}                   @code{= ""}},@*@
+                                      @code{string} {@var{detached_signature_str}          @code{= ""}},@*@
+                                      @code{string} {@var{detached_signature_filename}     @code{= ""}},@*@
+                                      @code{string} {@var{gpg_key_fingerprint}             @code{= ""}},@*@
+                                      @code{GPG_Key_Pair_Type *}{@var{return_gpg_key_pair} @code{= 0}},@*@
+                                      @code{bool} {@var{store_signature}                   @code{= false}},@*@
+                                      @code{string *}{@var{store_signature_filename}       @code{= 0}},@*@
+                                      @code{bool} {@var{overwrite}                         @code{= false}},@*@
+                                      @code{string} {@var{thread_str}                      @code{= ""}})
+@end deftypefun
+
+
+
+@c *** (3) Deleting and rotating files
+
+@node Deleting and rotating files, Signal handlers, Cryptographic operations, Non-class Functions
+@section Deleting and rotating files
+
+@deftypefn {Thread function} {void*} purge_server_logs (@code{void *}@var{v})
+Deletes old temporary files, rotates log files,
+and deletes expired database entries.
+
+Old temporary files that are no longer needed may ``pile up'' in the @file{/tmp/} directory
+if the server program @command{gwirdsif} is invoked with the @option{--save-temp-files} option
+(@pxref{Invoking gwirdsif/gwirdcli}) or if the program is killed by a signal.
+
+Defined in @file{gwrdifpk-1.0/src/purgfncs.web}.  
+@end deftypefn
+
+@deftypefn {Function} int rotate_log_file (@code{string &}@var{filename}, @*@
+                                           @code{time_t} @var{now}, @*@
+                                           @code{time_t} @var{limit}, @*@
+                                           @code{pthread_mutex_t &}{@var{mutex} @code{= 0}}, @*@
+                                           @code{ostream *}{@var{out_strm} @code{= 0}})
+Called by @code{purge_server}.
+
+Defined in @file{gwrdifpk-1.0/src/purgfncs.web}.  
+@end deftypefn
+
+@deftypefn {Thread function} @code{void*} purge_irods_archive 
+
+Defined in @file{gwrdifpk-1.0/src/purgarch.web}.  
+@end deftypefn
+
+@deftypefn {Thread function} @code{void*} purge_server_database (@code{void *}@var{v})
+
+Defined in @file{gwrdifpk-1.0/src/purgdtbs.web}.  
+@end deftypefn
+
+@deftypefn {Thread function} @code{void*} purge_dc_metadata (@code{void *}@var{v})
+Defined in @file{gwrdifpk-1.0/src/purgdcmd.web}.  
+A conservative approach is taken to modifying the handles:
+Neither the handles nor the handle values of type @code{DC_METADATA}
+or @code{DC_METADATA_PID} are deleted!  Instead, handle values of
+type @code{DC_METADATA_DELETED} and/or @code{DC_METADATA_DELETED_PID} are added
+to the existing handles.
+
+@cindex handle values, deleting
+@cindex deleting, handle values
+@cindex values, handle, deleting
+@c
+Since handles are supposed to be ``persistent identifiers'', they should normally not
+be deleted.  However, there is no reason not to delete @emph{handle values}, if the
+information they contain becomes out-of-date.  However, at this time, I think it's
+better to leave the old handle values and add new ones rather than replacing the old ones.
+They may be useful for searching.  This may change at some future date.
+@end deftypefn
+
+
+@c *** (3) Signal handlers
+
+@node Signal handlers, Exit handlers, Deleting and rotating files, Non-class Functions 
+@section Signal handlers
+
+@deftypefn {Signal handler} void signal_handler (@code{int} @var{sig})
+Defined in @file{sgnlhndl.web}.  The main function of the server program @command{gwirdsif} 
+sets this function to handle the signals @samp{SIGINT} (``Interrupt'') and @samp{SIGTERM} 
+(``Terminate'').  See also @ref{Signal handling gwirdsif, Signal handling gwirdsif, Signal handling}.
+@end deftypefn
+
+@deftypefun void initialize_signal_maps (@code{void})
+@end deftypefun
+
+@c *** (3) Exit handlers
+
+@node Exit handlers, Time functions, Signal handlers, Non-class Functions 
+@section Exit handlers
+
+@deftypefn {Exit handler} void finish_gwirdsif (@code{void})
+Defined in @file{gwirdsif.web}.
+@end deftypefn
+
+@deftypefn {Exit handler} void finish_gwirdcli (@code{void})
+Defined in @file{gwirdcli.web}.
+@end deftypefn
+ 
+
+@c *** (3) Time functions
+
+@node Time functions, Pull functions, Exit handlers, Non-class Functions 
+@section Time functions
+
+@deftypefun string convert_seconds (@code{time_t} @var{seconds})
+@end deftypefun
+
+@deftypefun {unsigned long int} convert_time_spec (@code{string} @var{time_spec})
+@end deftypefun
+
+@deftypefun int get_seconds_since_epoch (@code{const char *}@var{timestamp},@*@
+                        @code{time_t &}@var{sse},@*@
+                        @code{string} {@var{format_str} @code{= "%Y-%m-%d %H:%M:%S"}})
+@end deftypefun
+
+
+@deftypefun string get_datestamp (@code{int} {@var{hour_offset} @code{= 0}}, @*@
+                                             @code{int} {@var{min_offset} @code{= 0}},  @*@
+                                             @code{time_t *}{@var{seconds} @code{= 0}})
+@end deftypefun
+
+
+@c *** (3) Pull functions
+
+@node Pull functions, Other functions, Time functions, Non-class Functions 
+@section Pull functions
+
+@deftypefn {Thread function} {void*} pull_request (@code{void *}@var{v})
+@end deftypefn
+
+@deftypefun int pull_client_func (@code{Scan_Parse_Parameter_Type &}@var{param}, @
+                                  @code{string} @var{distinguished_name_str})
+@end deftypefun
+
+@c *** (3) Other functions
+
+@node Other functions, , Pull functions, Non-class Functions 
+@section Other functions
+
+@deftypefn {Functions}  void lock_cerr_mutex (@code{void})
+@deftypefnx {} void unlock_cerr_mutex (@code{void})
+@end deftypefn
+
+@deftypefn {Function} int submit_mysql_query (@code{string} @var{query}, @*@
+                   @code{MYSQL_RES *&}@var{result},                      @*@
+                   @code{MYSQL *}@var{mysql_ptr},                        @*@
+                   @code{unsigned int *}{@var{row_ctr} @code{= 0}},      @*@
+                   @code{unsigned int *}{@var{field_ctr} @code{= 0}},    @*@
+                   @code{long *}{@var{affected_rows} @code{= 0}},        @*@
+                   @code{string } {@var{thread_ctr_str} @code{= ""}})
+@end deftypefn
+
+
+
+@deftypefn  {Function} int init_gw_code_map (@code{void})
+Defined in @file{gwrdifpk-1.0/src/rspercds}.  This function initializes 
+the global variable @code{map<int, string> gw_code_map}.
+@xref{Global variables}, and @ref{Response and error codes}.
+@end deftypefn
+
+@deftypefn  {Function} string gwstrerror (@code{int} @var{code}, @code{bool} @var{suppress_if_unknown})
+Returns a @code{string} with a human-readable message for the response or error code
+@var{code}.  The messages are stored in the global variable @code{map<int, string> gw_code_map}.
+@xref{Global variables}.
+
+If @var{code} is unknown, a message to this effect is returned instead, unless 
+@var{suppress_if_unknown} = @code{true}, in which case the empty string is returned.
+
+This function is defined in @file{gwrdifpk-1.0/src/rspercds}.  
+@xref{Response and error codes}. 
+@end deftypefn
+
+@deftypefun int set_debug_level (@code{bool &}@var{DEBUG},@*@
+                                 @code{int} {@var{turn_on_value} @code{= 0}},@*@
+                                 @code{int} {@var{turn_off_value} @code{= 0}})
+@end deftypefun
+
+@deftypefun int hexl_encode (@code{const char *}@var{buffer},@*@
+                             @code{unsigned int} @var{buffer_size},@*@
+                             @code{string &}@var{result},@*@
+                             @code{int} {@var{delimiter} @code{= -1}},@*@
+                             @code{int} {@var{delimiter_1} @code{= -1}})
+@end deftypefun
+
+             
+@deftypefun int hexl_decode (@code{string &}@var{source},@*@
+                             @code{string &}@var{dest},@*@ 
+                             @code{unsigned int &}@var{dest_length})
+@end deftypefun
+
+
+@deftypefun int check_irods_server (@code{int &}@var{pid}, @code{int} {@var{thread_ctr} @code{= -1}})
+@end deftypefun
+
+@deftypefun int set_password (@code{string} @var{filename},@*@
+                              @code{char *&}@var{password},@*@
+                              @code{size_t} @var{password_length},@*@
+                              @code{string} @var{default_filename},@*@
+                              @code{char *}{@var{passphrase} @code{= 0}},@*@
+                              @code{string} {@var{directory} @code{= ""}},@*@
+                              @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+
+@deftypefun int write_to_fifo (@code{char *}@var{buffer},@*@
+                               @code{size_t} @var{buffer_length},@*@
+                               @code{int} @var{fd},@*@
+                               @code{bool} {@var{write_string_length} @code{= true}},@*@
+                               @code{bool} {@var{append_newline} @code{= true}},@*@
+                               @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

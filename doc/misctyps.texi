@@ -1,0 +1,200 @@
+@c misctyps.texi
+@c /home/lfinsto/irods_proj/irods_master/Finston/gwrdifpk/doc/misctyps.texi
+
+@c Created by Laurence D. Finston (LDF) Wed Mar 13 15:00:44 CET 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) Miscellaneous Types
+
+@node Miscellaneous Types, Non-class Functions, class Pull_Response_Type, Top
+@chapter Miscellaneous Types
+
+@menu
+* struct Initialize_Exception_Type::
+* class Cookie_Type::
+@end menu
+
+@c ** (2) struct Initialize_Exception_Type
+
+@node struct Initialize_Exception_Type, class Cookie_Type, , Miscellaneous Types
+@section struct Initialize_Exception_Type
+
+@cindex exceptions
+@cindex constructors, @cpp{}
+@cindex C++ constructors
+@c
+@code{struct Initialize_Exception_Type} has an ``empty'' declaration.
+That is, it has neither data members nor explicitly defined member
+functions.  It is @dfn{thrown} by constructors if an error occurs that
+prevents the object from being constructed properly.  Normally in the
+@command{gwrdifpk} package, functions communicate that an error has
+occurred to their callers by means of their return values.  However,
+in @cpp{}, constructors don't have return values, so that
+exceptions or some other means must be used.
+
+@c ** (2) class Cookie_Type
+
+@node class Cookie_Type, , struct Initialize_Exception_Type, Miscellaneous Types
+@section class Cookie_Type
+
+The function @code{main} is a @code{friend} of @code{class Cookie_Type}.  
+@code{class Cookie_Type} is only used in the web application 
+@samp{gwrdwbap}.
+
+@menu
+* Global variables for class Cookie_Type::
+* Cookie_Type Data Members::
+* Cookie_Type Member Functions::
+@end menu
+
+@c *** (3) Global variables for class Cookie_Type
+
+@node Global variables for class Cookie_Type, Cookie_Type Data Members, , class Cookie_Type
+@section Global variables
+
+@deftypevr {Global variables} pthread_mutex_t cookie_vector_mutex
+@deftypevrx {}                {vector <Cookie_Type>} cookie_vector
+@end deftypevr
+
+
+@c *** (3) Cookie_Type Data Members
+
+@node Cookie_Type Data Members, Cookie_Type Member Functions, Global variables for class Cookie_Type, class Cookie_Type
+@subsection Cookie_Type Data Members
+
+@vindex Cookie_Type::name            
+@vindex Cookie_Type::value           
+@vindex Cookie_Type::domain          
+@vindex Cookie_Type::path            
+@vindex Cookie_Type::expires_str     
+@vindex Cookie_Type::expires         
+@vindex Cookie_Type::param        
+@vindex Cookie_Type::name_value_pairs
+@c
+@vindex name             (Cookie_Type)
+@vindex value            (Cookie_Type)
+@vindex domain           (Cookie_Type)
+@vindex path             (Cookie_Type)
+@vindex expires_str      (Cookie_Type)
+@vindex expires          (Cookie_Type)
+@vindex param            (Cookie_Type)
+@vindex name_value_pairs (Cookie_Type)
+@c
+@deftypevr  {Private variables}    string                          name                    
+@deftypevrx {}                     string                          value           
+@deftypevrx {}                     string                          domain          
+@deftypevrx {}                     string                          path            
+@deftypevrx {}                     string                          expires_str     
+@deftypevrx {}                     time_t                          expires         
+@deftypevrx {}                     {Scan_Parse_Parameter_Type*}    param        
+@deftypevrx {}                     {vector<pair<string, string> >} name_value_pairs
+@end deftypevr
+
+@c *** (3) Cookie_Type Member Functions
+
+@node Cookie_Type Member Functions, , Cookie_Type Data Members, class Cookie_Type
+@subsection Cookie_Type Member Functions
+
+@findex Cookie_Type, default constructor
+@findex Cookie_Type, constructor, default
+@findex default constructor, Cookie_Type 
+@findex constructor, default, Cookie_Type 
+@findex Cookie_Type::Cookie_Type (default constructor)
+@c
+@deftypefn {Default constructor} void Cookie_Type (@code{void})
+@end deftypefn
+
+@findex Cookie_Type copy constructor
+@findex Cookie_Type constructor, copy
+@findex copy constructor, Cookie_Type 
+@findex constructor, copy, Cookie_Type 
+@findex Cookie_Type::Cookie_Type (copy constructor)
+@c
+@deftypefn {Copy constructor} void Cookie_Type (@code{const Cookie_Type &}@var{c})
+@end deftypefn
+
+
+@findex assignment operator, Cookie_Type
+@findex operator, assignment, Cookie_Type
+@findex Cookie_Type, assignment operator
+@findex Cookie_Type, operator, assignment
+@findex Cookie_Type::operator= (assignment operator)
+@c
+@deftypefn {Assignment operator} void operator= (@code{const Cookie_Type &}@var{c})
+@end deftypefn
+
+@findex equality operator, Cookie_Type
+@findex operator, equality, Cookie_Type
+@findex Cookie_Type, equality operator
+@findex Cookie_Type, operator, equality
+@findex Cookie_Type::operator== (equality operator)
+@c
+@deftypefn {Equality operator (const)} int operator== (@code{const Cookie_Type &}@var{c})
+@end deftypefn
+
+@findex less-than operator, Cookie_Type
+@findex operator, less-than, Cookie_Type
+@findex Cookie_Type, less-than operator
+@findex Cookie_Type, operator, less-than 
+@findex Cookie_Type::operator< (less-than operator)
+@c
+@deftypefn {Less-than operator (const)} bool operator< (@code{const Cookie_Type &}@var{c}) 
+@end deftypefn
+
+@findex clear (Cookie_Type)
+@findex Cookie_Type::clear
+@c
+@deftypefn {Function} void clear (@code{void})
+@end deftypefn
+
+@findex show (Cookie_Type)
+@findex Cookie_Type::show
+@c
+@deftypefn {const function} void show (@code{string} {@var{s} @code{= "Cookie_Type:"}}, @
+                                       @code{stringstream *}{@var{t} @code{= 0}}) 
+@end deftypefn
+
+@findex parse_cookies (Cookie_Type)
+@findex Cookie_Type::parse_cookies
+@c
+@deftypefn {static function} int parse_cookies (@code{const char *}@var{http_cookie_str}, @
+                                                @code{string &}@var{session_id},         @
+                                                @code{stringstream &}@var{out_strm})
+@end deftypefn
+
+@findex generate_session_id (Cookie_Type)
+@findex Cookie_Type::generate_session_id
+@c
+@deftypefn {static function} int generate_session_id (@code{string&} @var{session_id}, @ 
+                                                      @code{stringstream &}@var{out_strm})
+@end deftypefn
+
+@findex delete_expired_cookies (Cookie_Type) 
+@findex Cookie_Type::delete_expired_cookies 
+@cindex thread functions
+@c
+@deftypefn {static thread function} {void*} delete_expired_cookies (@code{void *}@var{v})
+@dfn{Thread function}.  Called in @code{main} of the web application @samp{gwrdwbap}.
+@end deftypefn
+
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

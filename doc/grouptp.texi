@@ -1,0 +1,155 @@
+@c grouptp.texi
+@c [...]/gwrdifpk/doc/grouptp.texi
+
+@c Created by Laurence D. Finston (LDF) Mon Oct 28 15:11:04 CET 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) class Group_Type
+
+@node class Group_Type, iRODS Types, class User_Info_Type, Top
+@chapter class Group_Type
+
+@cindex group management
+@cindex management, group
+@c
+@code{class Group_Type} represents @dfn{groups} within @command{gwrdifpk}.  
+As of 2013.10.28., @dfn{group management} has only been implemented in a 
+rudimentary way.  @xref{User and Group Management}, 
+and @ref{Groups database tables and views}.
+
+@menu
+* Group_Type data members::
+* Group_Type member functions::
+@end menu
+
+@c *** (3) Group_Type data members
+
+@node Group_Type data members, Group_Type member functions, , class Group_Type
+
+@section Data members 
+
+@code{class Scan_Parse_Parameter_Type} and the function @code{yyparse} are @code{friends} 
+of @code{Group_Type}.
+@xref{class Scan_Parse_Parameter_Type}, and @ref{Scanning and parsing}.
+
+@vindex Group_Type::group_id     
+@vindex Group_Type::group_name
+@vindex Group_Type::member_id_map
+@vindex Group_Type::creator_id
+@vindex Group_Type::creator_username
+@vindex Group_Type::created
+@c
+@vindex group_id (Group_Type)
+@vindex group_name (Group_Type)
+@vindex member_id_map (Group_Type)
+@vindex creator_id (Group_Type)
+@vindex creator_username (Group_Type)
+@vindex created (Group_Type)
+@c
+@deftypevr  {Private variables} int group_id     
+@deftypevrx {}                  string group_name
+@deftypevrx {}                  {map<int, pair<string, unsigned int> >} member_id_map
+@deftypevrx {}                  int creator_id
+@deftypevrx {}                  string creator_username
+@deftypevrx {}                  time_t created
+@end deftypevr
+
+@vindex Group_Type::NULL_PRIVILEGE        
+@vindex Group_Type::ADD_USER_PRIVILEGE    
+@vindex Group_Type::DELETE_USER_PRIVILEGE 
+@vindex Group_Type::DELETE_GROUP_PRIVILEGE
+@c
+@vindex NULL_PRIVILEGE (Group_Type)        
+@vindex ADD_USER_PRIVILEGE (Group_Type)    
+@vindex DELETE_USER_PRIVILEGE (Group_Type) 
+@vindex DELETE_GROUP_PRIVILEGE (Group_Type)
+@c
+@deftypevr  {Public static constants} {unsigned int} NULL_PRIVILEGE        
+@deftypevrx {}                        {unsigned int} ADD_USER_PRIVILEGE    
+@deftypevrx {}                        {unsigned int} DELETE_USER_PRIVILEGE 
+@deftypevrx {}                        {unsigned int} DELETE_GROUP_PRIVILEGE
+@c
+@cindex bit field
+@cindex field, bit
+@c
+Numbered @code{0U}, @code{1U}, @code{2U}, @code{4U}, i.e., 
+consecutive powers of two.  For use in @dfn{bit fields}. 
+@end deftypevr
+
+
+@c *** (3) Group_Type member functions
+
+@node Group_Type member functions, , Group_Type data members, class Group_Type
+
+@section Member functions 
+
+@findex Group_Type default constructor
+@findex Group_Type constructor, default
+@findex default constructor, Group_Type 
+@findex constructor, default, Group_Type 
+@findex Group_Type::Group_Type
+@c
+@deftypefn {Default constructor} void Group_Type (@code{void})
+@end deftypefn
+
+@findex Group_Type destructor
+@findex destructor, Group_Type 
+@findex Group_Type::~Group_Type
+@c
+@deftypefn {Destructor} void ~Group_Type (@code{void})
+@end deftypefn
+
+@findex Group_Type::set
+@c
+@deftypefun int set (@code{MYSQL_ROW &}@var{curr_row}, @code{string} {@var{thread_str}@code{ = ""}})
+@end deftypefun
+
+@findex Group_Type::clear
+@c
+@deftypefun int clear (@code{void})
+@end deftypefun
+
+@findex Group_Type::show
+@c
+@deftypefn {const function} int show (@code{string} {@var{s} @code{ = ""}}, @
+                                      @code{stringstream *}{@var{strm} @code{= 0}})
+@end deftypefn
+
+@findex Group_Type::get_from_database
+@c
+@deftypefun int get_from_database (@code{MYSQL} @var{*mysql_ptr}, @code{string} @var{ggroup_name})
+@end deftypefun
+
+
+@findex Group_Type::write_to_database
+@c
+@deftypefun int write_to_database (@code{MYSQL *} @var{mysql_ptr})
+@end deftypefun
+
+@findex Group_Type::get_all_groups
+@c
+@deftypefn {static function} int get_all_groups (@code{MYSQL *}@var{mysql_ptr}, @*@
+                                                 @code{vector<Group_Type> &}@var{group_vector}, @*@
+                                                 @code{int} {@var{thread_ctr} @code{= 0}})
+@end deftypefn
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

@@ -1,0 +1,53 @@
+@c usingsif.texi
+@c /home/lfinsto/irods_proj/irods_master/Finston/gwrdifpk/doc/usingsif.texi
+
+@c Created by Laurence D. Finston (LDF) Wed Apr 10 09:30:10 CEST 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) Using gwirdsif
+
+@node Using gwirdsif, Using gwirdcli, User and Group Management, Top
+@chapter Using gwirdsif
+
+@menu
+* Socket and log directories::
+* Purging gwirdsif::
+* Signal handling gwirdsif::
+@end menu
+
+@c ** (2)
+@node Socket and log directories
+@section Socket and log directories
+
+
+@c ** (2)
+@node Purging gwirdsif
+@section Purging
+
+See also @ref{Purging options}.
+
+@c ** (2)
+@node Signal handling gwirdsif
+@section Signal handling 
+
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

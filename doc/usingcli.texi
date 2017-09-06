@@ -1,0 +1,41 @@
+@c usingcli.texi
+@c /home/lfinsto/irods_proj/irods_master/Finston/gwrdifpk/doc/usingcli.texi
+
+@c Created by Laurence D. Finston (LDF) Wed Apr 10 09:42:58 CEST 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) Using gwirdcli
+
+@node Using gwirdcli, Global constants and variables, Using gwirdsif, Top
+@chapter Using gwirdcli
+
+@menu
+* Purging gwirdcli::
+@end menu
+
+@c ** (2)
+@node Purging gwirdcli
+@section Purging
+
+See also @ref{Purging options}.
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

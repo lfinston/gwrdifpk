@@ -1,0 +1,1741 @@
+@c usrcmnds.texi
+@c [...]/gwrdifpk/doc/usrcmnds.texi
+
+@c Created by Laurence D. Finston (LDF) Thu Mar 21 15:14:04 CET 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) User commands
+
+@node User commands, User commands for controlling the client, Pull archiving, Top
+@chapter User commands
+
+@menu
+* Conventions user commands::
+* Common options::
+* User commands based on icommands::
+* User commands for iRODS objects::
+* User commands for handles::
+* User commands for Dublin Core metadata::
+* User commands for retrieving information::
+* User commands for testing gwirdsif:: 
+* User commands for raising signals:: 
+* User commands for TANs:: 
+* User commands for cryptographic operations:: 
+* User commands for pull requests:: 
+* Other user commands::
+@end menu
+
+@c ** (2)
+@node Conventions user commands, Common options, , User commands
+@section Conventions
+
+@table @w
+@item @code{keyword}
+@cindex keyword
+@c
+@dfn{Keywords} are formatted in a typewriter face.  They may be the command names, 
+such as @code{put} and @code{get}, or modifiers (a.k.a.@: @dfn{option keywords}, 
+@pxref{Common options}, below), such as @code{remote_filename} 
+or @code{generate}.  Keywords may be typed in all lowercase or all uppercase letters, e.g., 
+@w{@code{add_metadata}} or @code{ADD_METADATA}, but not @code{Add_Metadata} or 
+@code{Add_MetaData}.
+
+@item @var{FLAGS}
+@cindex flag
+@c
+A single hyphen followed by a single letter or two hyphens followed by at least one letter, e.g., 
+@samp{-f}, @samp{--force}, @samp{-h} or @samp{--help}.  
+For user commands based on icommands, @var{FLAGS} are usually options for the icommand and 
+are passed to it without processing by @command{gwirdsif}.  In some cases, options for icommands may
+not make sense when using @command{gwrdifpk}.
+@xref{User commands based on icommands}.
+
+For other commands, @var{FLAGS} may have nothing to do with icommands or iRODS.
+
+@item <@dots{}> 
+@cindex delimited string
+@cindex undelimited string
+@cindex string, delimited
+@cindex string, undelimited
+@c
+String.  Strings may be @dfn{delimited} by quotation marks (@code{"@dots{}"}) 
+or @dfn{undelimited}.  
+
+@cindex delimited string
+@cindex undelimited string
+@cindex string, delimited
+@cindex string, undelimited
+@cindex scanner rule
+@cindex rule, scanner
+@cindex time specification
+@cindex specification, time
+@c
+An undelimited string may contain alphanumerical characters and various
+punctuation and special characters.  
+The first character must be an alphanumerical character or one of the following
+characters: @code{./;~@@()+\?$}.  It may be
+followed by zero or more characters, which must either be alphanumerical or one
+of the following characters: 
+@code{./;-_~+@@()\?~$}.  That is, @samp{-} and @samp{_} may occur in the
+string, but not as the first character.
+@strong{Please note} that @samp{:} may not occur as the first character 
+in an undelimited string!  A @dfn{time specification} may begin with a leading colon.
+@xref{Delay}, below.@footnote{It would be possible to distinguish between an 
+undelimited string with a leading colon and a time specification, as long as the 
+former doesn't only contain digits and colons, but the author sees no need to implement 
+this at the present time.}  
+
+@cindex empty string
+@cindex string, empty
+@c
+These rules imply that a delimited string may be empty, i.e., @code{""}, 
+whereas an undelimited string may not.
+
+@cindex scanner rule
+@cindex rule, scanner
+@c
+These are the rules as of 2013.10.23.  They are subject to change.  
+See the corresponding @dfn{scanner rule} in @file{scanner.web} for the current 
+definition.
+
+@item [@dots{}] 
+Optional item.
+@end table
+
+@deffn Command SAMPLE_COMMAND_NAME [FLAGS] <filename> [<remote filename>] 
+@end deffn
+
+@c ** (2) Common options
+
+@node Common options, User commands based on icommands, Conventions user commands, User commands
+@section Common options
+
+@cindex option keywords
+@cindex keywords, option
+@c
+@dfn{Option keywords} may be typed in all lowercase or all uppercase, e.g., @samp{delay} or @samp{DELAY}, 
+but not @samp{Delay} or @samp{DeLay}.  Spaces preceding or following an equals sign (@samp{=}) are optional, 
+e.g., @samp{delay=21} and @samp{delay = 21} are equivalent.
+
+@menu
+* Delay::
+@end menu
+
+@c *** (3) Delay
+
+@node Delay, , , Common options
+@subsection Delay
+
+@table @code
+@item no_delay
+The command is executed immediately, before any other commands from the input are read.
+
+@item delay
+@itemx delay @code{INTEGER}
+@itemx delay = @code{INTEGER}
+@itemx delay <time specification>
+@itemx delay = <time specification>
+The command is processed in the normal way, after any commands preceding it in the input.  If a delay is specified, 
+either with an @code{INTEGER} (for the number of seconds) or a <time specification>, then execution @emph{may} 
+be delayed by this additional amount.  @strong{Please note}:  For some commands, the additional delay may not 
+have been implemented.  In some cases, it may not make sense and will not be implemented in the future, either.
+@end table
+
+@cindex time specification
+@cindex specification, time
+@c
+A <time specification> consists of integers separated by colons, whereby there must be at least one and no more than four 
+integers, colons may appear next to each other (i.e., an integer may be missing), and there may be a trailing colon.
+For example, the following are valid time specifications:
+
+@table @code
+@item 1:2:3:4
+1 day, 2 hours, 3 minutes, 4 seconds.
+
+@item 1:2:3:4:
+As above.
+
+@item ::2
+Two hours.
+
+@item ::2::3
+@itemx ::2::3:
+Two hours, 3 seconds.
+
+@item ::::10
+Ten seconds.
+@end table
+
+
+@c ** (2) User commands based on icommands
+@node User commands based on icommands, User commands for iRODS objects, Common options, User commands
+
+@section User commands based on icommands
+
+
+@c *** (3) directory user commands
+
+@c **** (4) pwd user command
+
+@deffn Command pwd
+The server sends the current server-side iRODS directory to the
+client.  For example:
+
+@example
+@r{(Client output:)}
+pwd -->
+/tempZone/home/lfinsto
+@end example
+@end deffn
+
+@c **** (4) cd user command
+
+@deffn Command cd [<directory name>]
+@cindex home directory
+@cindex directory, home
+@cindex working directory
+@cindex  directory, working
+@c
+Change the @dfn{current working directory}.  
+If @var{<directory name>} is omitted, change to the user's @dfn{home directory}.
+@end deffn
+
+@c **** (4) mkdir user command
+
+@deffn Command mkdir [FLAGS @dots{}] DIRECTORY-NAME [@dots{}]
+@cindex iRODS collection
+@cindex collection, iRODS
+@c
+Create a directory (i.e., an @dfn{iRODS collection}).
+@end deffn
+
+@c **** (4) ls user command
+
+@deffn Command ls [FLAG @dots{}] [PATH @dots{}] [delay option]
+@var{FLAG} may be any flag valid for the @samp{ils} icommand.
+@var{PATH} may refer to an iRODS data object or a collection.
+@c
+@cindex BUG (iRODS)
+@c
+@strong{Please note}:  An error occurs if multiple data objects are specified together with the @samp{-l} or 
+@samp{-L} flags.  This appears to be a bug in the implementation of the icommand.  
+This error doesn't occur when multiple collections are specified, or multiple collections with a single
+data object (as long as all of the objects exist).
+
+<delay option>:  If a delay is specified, commands following this command in the input are executed first.  
+This may be useful if @code{put} commands, or other commands that result in a dialogue between the client and the server, 
+@emph{precede} this command in the input.  Specifying a delay ensures that any such dialogues complete before the @code{ls}
+command is executed.  @xref{Delay}.
+
+See also @ref{Scan_Parse_Parameter_Type Member Functions}.
+@end deffn
+
+@c **** (4) mv user command
+
+@deffn Command mv [FLAG @dots{}] <old filename or path> <new filename or path> 
+@var{FLAG} may be any flag valid for the @samp{imv} icommand.
+<new filename or path> may refer to an iRODS data object or a collection.
+
+See also @ref{Scan_Parse_Parameter_Type Member Functions}.
+@end deffn
+
+@c **** (4) put file user command
+
+@deffn Command put [FLAGS] [(PID option | cryptographic option | compression option ) @dots{}] @*@
+   <local filename> [@code{remote_filename} <path>]
+@cindex tar
+@cindex gzip
+@cindex bzip2
+@c
+Transfer @var{local filename} to the server and store it in the server-side iRODS system.
+
+If @var{local filename} is a directory, a @var{compression option} must be used.
+In this case, @command{tar} is used to store the contents of the directory in an archive, 
+which is then compressed using either @command{gzip} (the default) or @command{bzip2}.
+If @var{local filename} is a directory and no compression option is specified, 
+an error message is issued and @var{local filename} is not sent to the server.
+
+@var{FLAGS}:
+
+@table @asis
+@item @code{-f}, @code{--force}
+Transfer and store the file, overwriting any existing server-side iRODS object 
+of the same name and path.
+@end table
+
+@command{gwirdsif} simply passes any other flags to the icommand @command{iput}.
+
+@noindent 
+PID options:
+@table @asis
+@item @code{pid} [<@var{string}>]
+@cindex handle
+@cindex PID (persistent identifier)
+Generate a PID (@dfn{persistent identifier}), a.k.a.@: @dfn{handle}.
+If <@var{string}> is provided, it should be used as the handle.  
+It must be a valid handle and not already exist.  Otherwise, the server sends an error 
+message to the client.
+
+@item @code{generate}
+Generate a handle.  In this case, the server program chooses a name 
+for the handle.  Handles created in this way are numbered consecutively.
+
+@item @code{prefix} <@var{string}>
+Use the prefix <@var{string}> for the handle.  It must be a prefix for which 
+the server-side handle service is responsible.  If not specified, the 
+@dfn{default prefix} for the user is used.
+@xref{Variables (Scan_Parse_Parameter_Type)}.
+
+@item @code{suffix} <@var{string}>
+<@var{string}> is appended to the handle.
+
+@item @code{institute} <@var{string}>
+<@var{string}> is included within the handle, before the suffix, if any.
+@end table
+
+@noindent 
+@xref{Handles}.  
+
+@noindent 
+Cryptographic options:
+@table @code
+@item encrypt
+Encrypt the file before sending it to the server.
+
+@item sign
+Sign the file.  This option only takes effect if the @code{encrypt} 
+is also specified.
+
+@item clearsign
+Clearsign the file.  This option implies that the file is @emph{not} encrypted.
+
+@item detached
+Create a detached signature.  It will be sent to the server 
+and stored in an iRODS object.
+
+@item verify
+Verify the signature on the server-side.  In this case, the user's @dfn{public key} 
+must have been stored on the server-side.
+@end table
+
+@noindent 
+@xref{Cryptographic operations on iRODS objects}. 
+@end deffn
+
+@noindent
+Compression options:
+@table @code
+@item  compress
+@itemx compress gzip
+Use @command{gzip} to compress @var{local filename} or, 
+if @var{local filename} is a directory, the archive file created 
+from it using @command{tar}.  The compressed file is then sent to the server.
+
+@item compress bzip2
+As above, except that @command{bzip2} is used for compression instead of 
+@command{gzip}.
+@end table
+
+@noindent 
+Example:
+@example
+put -f +pid +gen "abc.txt" remote_filename "subdir_1/" 
+
+@r{Client output:} 
+
+put -->
+Filename:     /tempZone/home/lfinsto/subdir_1/abc.txt
+Exit status:  0
+Response:     `iput' command succeeded, returning 0
+
+put -->
+Filename:     /tempZone/home/lfinsto/subdir_1/abc.txt
+Exit status:  0
+Response:     Success:  Generated PID `12345/00002'
+
+put -->
+Filename:     /tempZone/home/lfinsto/subdir_1/abc.txt
+Exit status:  0
+Response:     Added handle values with type == `IRODS_OBJECT' \
+                 and type == `CREATOR_INDEX' successfully
+
+put -->
+Filename:     /tempZone/home/lfinsto/subdir_1/abc.txt
+Exit status:  0
+Response:     Success:  Stored PID `12345/00002' in iRODS object \
+                 metadata
+@end example
+
+@c *** (3) get file user command
+
+@deffn Command get <filename> [FLAGS] [OPTION @dots{}][@code{local_filename} <filename>]
+The only @var{FLAG} processed specially by @command{gwirdsif} is @samp{-f} for 
+``force''.  If used, the client-side file @var{<filename>} will be overwritten, 
+if it exists.@footnote{Please note that the @samp{-f} option is always used when
+the icommand @samp{iget} is called on the server-side.  
+This is because the iRODS object is written to a temporary file, which must be created 
+before the call to @samp{iget}.}
+@c   
+Other flags are passed to @samp{iget} unexamined and may not make sense when accessing 
+the iRODS server remotely via @command{gwrdifpk}.
+
+@need 2000
+@noindent 
+Options:
+@table @code
+@item decrypt
+If @var{filename} is encrypted, decrypt it.  
+Decryption occurs on the client-side.
+
+@item verify
+@cindex GPG (GNU Privacy Guard)
+@cindex GNU Privacy Guard (GPG)
+@c
+If @var{filename} is signed, verify the signature.
+Verification occurs on the client-side.  
+Please note that if the signature is @emph{not} detached, @var{filename} 
+GPG must decrypt it in order to verify the signature.  
+The private key needed for decryption and its passphrase must therefore be
+available on the client-side.  However, the decrypted text will only be 
+stored in a file if the @code{decrypt} option is also specified.  
+If, however, @var{filename} has been @dfn{clearsigned} or it has @emph{not} 
+been encrypted and the signature is detached, it may be verified using the 
+public key from the key pair used for signing.
+
+@item store-signature
+If @var{filename} is signed with a detached signature, 
+store the latter in a file.
+
+@item expand
+@cindex tar
+@c
+If @var{filename} has been compressed, expand it.  
+If it is a compressed tar file, the contents will be extracted.  
+@end table
+
+@noindent
+@xref{Cryptographic operations on iRODS objects}.
+
+@end deffn
+
+@noindent 
+Examples:
+@example
+get "abc.txt"
+
+@r{Client output:}
+
+get -->
+Local filename:  abc.txt
+Response code:   2
+Response:        Success.  Queuing "SEND FILE" command.
+
+get -->
+Remote filename: /tempZone/home/lfinsto/abc.txt
+Local filename:  abc.txt
+Exit status:     0
+Overwrite:       False
+
+Received remote file `/tempZone/home/lfinsto/abc.txt'.
+Stored in local file `abc.txt'.
+@end example
+
+If the file @file{abc.txt} already exists in the current working directory on the
+client-side, the server will retrieve the iRODS object from the iRODS server and send it
+to the client, but storing it on the client-side will fail.  However, the client will 
+create a temporary file for the contents of the iRODS object and issue a message with 
+the path of the temporary file:
+
+@example
+get "abc.txt"
+
+@r{Client output:}
+
+get -->
+Local filename:  abc.txt
+Response code:   2
+Response:        Success.  Queuing "SEND FILE" command.
+
+get -->
+Remote filename: /tempZone/home/lfinsto/abc.txt
+Local filename:  abc.txt
+Exit status:     0
+Overwrite:       False
+
+[Thread 0] WARNING!  In `Scan_Parse_Parameter_Type::receive_file':
+File `/home/lfinsto/abc.txt' already exists and `overwrite' == `false'.
+Setting `discard' == `true'.
+[Thread 0] In `Scan_Parse_Parameter_Type::receive_file':
+`discard' == 1
+`gen_temp_file' == 0
+Wrote file contents sent from server to temporary file \
+`/tmp/gwirdcli.u0EypV'.
+Exiting function unsuccessfully with return value 2.
+[Thread 0] ERROR!  In `zzparse', rule
+`statement: GET_ZZ FILE_ZZ RESPONSE_ZZ STRING_ZZ INTEGER_ZZ STRING_ZZ':
+`Scan_Parse_Parameter_Type::receive_file' failed, returning 2.
+Failed to receive file `/tempZone/home/lfinsto/abc.txt' \
+or store it in `abc.txt'.
+Local file already exists and `overwrite' == false'
+Stored file contents in file:  /tmp/gwirdcli.u0EypV
+Will try to continue.
+@end example
+
+Using the @samp{-f} (``force'') flag solves this problem:
+
+@example
+get -f "abc.txt"
+
+@r{Client output:}
+
+get -->
+Local filename:  abc.txt
+Response code:   2
+Response:        Success.  Queuing "SEND FILE" command.
+
+get -->
+Remote filename: /tempZone/home/lfinsto/abc.txt
+Local filename:  abc.txt
+Exit status:     0
+Overwrite:       True
+
+Received remote file `/tempZone/home/lfinsto/abc.txt'.
+Stored in local file `abc.txt'.
+@end example
+
+@c *** (3) rm file or directory user command
+
+@c RM flags_optional rm_option_list filename_list
+
+@deffn Command rm [FLAGS] [options] <PATH> [@dots{}]
+Delete the iRODS objects specified by the @var{PATH}(s).
+
+Options:
+@cindex iRODS object, deleting
+@cindex deleting, iRODS object
+@c
+@table @asis
+@item @code{database}
+Delete data pertaining to the @var{PATH}(s) from the various databases in addition to deleting
+the iRODS object itself.
+
+@item @code{database_only}
+Delete only data pertaining to the @var{PATH}(s) from the various databases without deleting
+the iRODS object itself.
+
+@item @var{delay option}
+By default, the iRODs object is deleted immediately.  If a delay is specified, 
+the iRODS object will instead be @dfn{marked for deletion} and be deleted 
+@emph{at the earliest} at the end of the period specified. 
+@xref{Delay}, and @ref{Purging gwirdsif, Purging gwirdsif, Purging}.
+@end table
+ 
+@end deffn
+
+@c *** (3)
+
+@c ** (2) User commands for iRODS objects
+@node User commands for iRODS objects, User commands for handles, User commands based on icommands, User commands
+
+@section iRODS objects
+
+@deffn {Command} undelete [OPTIONS @dots{}] <filename> @dots{} 
+@c
+@cindex marking and unmarking for deletion, iRODS object
+@cindex deletion, marking and unmarking for, iRODS object
+@cindex iRODS object, marking and unmarking for deletion
+@c
+Unmark the iRODS object or objects named by the <@var{filename}> argument or 
+arguments for deletion.  For this to work, they must have been @dfn{marked for deletion} 
+by using the @code{rm} command with the @option{delay} option.  
+@xref{User commands based on icommands}.
+
+@cindex standard error output
+@c
+If a <@var{filename}> does not exist or has not been marked for deletion, 
+the client prints an error message on the standard error output.
+
+Options:
+@table @code 
+@item database
+Entries in the @code{gwirdsif} database containing information pertaining to 
+the iRODS object or objects will be @dfn{unmarked for deletion}. 
+
+@item database_only
+Only entries in the @code{gwirdsif} database containing information pertaining to 
+the iRODS object or objects will be @dfn{unmarked for deletion},
+the iRODS object or objects will @emph{not} be unmarked for deletion.
+@end table 
+@end deffn
+
+@c ** (2) User commands for handles
+
+@node User commands for handles, User commands for Dublin Core metadata, User commands for iRODS objects, User commands
+
+@section Handles
+
+@c *** (3)
+
+@deffn {Command} {create handle} [ARGUMENT @dots{}]
+@cindex handle 
+@cindex PID (persistent identifier)
+@cindex persistent identifier (PID) 
+@cindex identifier, persistent (PID) 
+@c
+Create a @dfn{handle}, a.k.a.@: @dfn{persistent identifier} or @dfn{PID}.
+
+With no arguments, a handle is created with a name chosen by @command{gwirdsif}.  
+Such names consist of the user's default prefix followed by at least 
+five hexadecimal digits and are created in numerical order, e.g., @samp{12345/00001} would 
+be the first handle created in such a way, followed by @samp{12345/00002}, @samp{12345/00003}
+@dots{} @samp{12345/0000A}, @samp{12345/0000B}, and so on.  
+
+@dfn{Arguments} may be used to specify another name for the handle as well as the contents 
+of the @code{idx}, @code{type} and @code{data} fields:
+
+@table @asis
+@item <@var{string}>
+@itemx @code{pid} <@var{string}>
+@c
+@cindex syntactic sugar
+@cindex sugar, syntactic
+@c
+<@var{string}> specifies the ``name'' of the handle.
+These arguments are equivalent, that is, the keyword `@code{pid}' is ``syntactic sugar''.
+
+@item @code{idx} <@var{integer}>
+Specify the index of the handle.
+
+@item @code{type} <@var{string}>
+Specify the type of the handle.
+
+@item @code{data} <@var{string}>
+Specify the contents of the @code{data} field of the handle.
+@end table 
+@end deffn
+
+
+@c *** (3) delete handle
+
+@need 1500
+@deffn {Command} {delete handle} [OPTION @dots{}] <string>
+Mark the handle named @var{string} for deletion.
+
+Options:
+@table @asis
+@item @code{immediate}
+Mark the handle for immediate deletion.  @xref{Purging gwirdsif}.
+
+@item <@var{delay option}>
+The handle will be marked for deletion with the delay specified.
+@xref{Delay}.
+@end table 
+@end deffn
+ 
+@c *** (3) undelete handle
+
+@deffn {Command} {undelete handle} <string>
+@end deffn
+
+@c *** (3) get handle pid
+
+@deffn {Command} {get handle} @code{pid} <string> [OPTION @dots{}]
+Retrieve the handle values for the PID <@var{string}>.
+
+Options:
+@table @asis
+@item @code{no-store}
+Don't store the handle values in the client-side @code{gwirdcli.handles} 
+database table.
+@end table
+
+@noindent 
+Example:
+@example
+get handle pid "12345/00001"
+
+@r{Client output:}
+
+get handle -->
+Response code:   0
+filename:        /tempZone/home/lfinsto/abc.txt
+handle:          12345/00001
+idx:             1
+type:            IRODS_OBJECT
+data_length:     30
+data:            /tempZone/home/lfinsto/abc.txt
+ttl_type:        0
+ttl:             86400
+timestamp:       1364483174 (Thu, 2013-03-28 15:06:14 UTC)
+refs_length:     0
+admin_read:      1
+admin_write:     1
+pub_read:        1
+pub_write:       0
+handle_id:       50
+handle_value_id: 112
+created:         1364479574 (Thu, 2013-03-28 14:06:14 UTC)
+last_modified:   0
+created_by_user: 1 
+
+get handle -->
+Response code:   0
+filename:        
+handle:          12345/00001
+idx:             300
+type:            HS_ADMIN
+data_length:     22
+data:            (binary)
+ttl_type:        0
+ttl:             86400
+timestamp:       1364483174 (Thu, 2013-03-28 15:06:14 UTC)
+refs_length:     0
+admin_read:      1
+admin_write:     1
+pub_read:        1
+pub_write:       0
+handle_id:       50
+handle_value_id: 111
+created:         1364479574 (Thu, 2013-03-28 14:06:14 UTC)
+last_modified:   0
+created_by_user: 1 
+@end example
+@end deffn
+
+
+@c *** (3)
+
+@deffn {Command} {get handle} @code{file} <filename> [OPTION @dots{}]
+Retrieve the handle values for the file <@var{filename}>.
+
+Options:
+@table @asis
+@item @code{no-store}
+Don't store the handle values in the client-side @code{gwirdcli.handles} 
+database table.
+@end table
+
+@noindent 
+Example:
+@example
+get handle file "abc.txt"
+
+@r{Client output:}
+
+get handle -->
+Response code:   0
+filename:        abc.txt
+handle:          12345/00001
+idx:             1
+type:            IRODS_OBJECT
+data_length:     30
+data:            /tempZone/home/lfinsto/abc.txt
+ttl_type:        0
+ttl:             86400
+timestamp:       1364483174 (Thu, 2013-03-28 15:06:14 UTC)
+refs_length:     0
+admin_read:      1
+admin_write:     1
+pub_read:        1
+pub_write:       0
+handle_id:       50
+handle_value_id: 112
+created:         1364479574 (Thu, 2013-03-28 14:06:14 UTC)
+last_modified:   0
+created_by_user: 1 
+
+get handle -->
+Response code:   0
+filename:        abc.txt
+handle:          12345/00001
+idx:             300
+type:            HS_ADMIN
+data_length:     22
+data:            (binary)
+ttl_type:        0
+ttl:             86400
+timestamp:       1364483174 (Thu, 2013-03-28 15:06:14 UTC)
+refs_length:     0
+admin_read:      1
+admin_write:     1
+pub_read:        1
+pub_write:       0
+handle_id:       50
+handle_value_id: 111
+created:         1364479574 (Thu, 2013-03-28 14:06:14 UTC)
+last_modified:   0
+created_by_user: 1 
+@end example
+
+The output for this command is similar to that for the @code{get handle pid} <@var{string}> 
+command above, except for the value of the @code{filename} field.  In the case of 
+this command, the user passes the filename to the command, so it is known and only 
+handle values are retrieved that correspond to this file.  With @code{get handle pid} <@var{string}>, 
+the filename is only known when the handle value 
+is of an appropriate type (e.g., @samp{IRODS_OBJECT}, as in the previous example), 
+in which case the filename is stored in the @samp{data} field of the handle value.
+Please note that a given handle may have multiple handle values referring to the same or 
+different files.
+@end deffn
+
+@menu
+* User commands for handle values::
+@end menu
+
+
+@c *** (3) User commands for handle values
+
+@node User commands for handle values, , , User commands for handles
+@subsection Handle values
+
+@c **** (4) add handle value
+
+@deffn {Command} {add handle_value} [ARGUMENT @dots{}]
+@cindex handle value
+@cindex value, handle
+@c
+Add a @dfn{handle value} to an existing handle.  
+The arguments are as for the @code{create handle} command (see above).
+@end deffn
+
+@c **** (4) delete handle_value(s)
+
+@c DELETE HANDLE_VALUE delete_handle_option_list STRING
+
+@deffn  {Commands} {delete handle_value}  [OPTION @dots{}] <string>
+@deffnx {}         {delete handle_values} [OPTION @dots{}] <string>
+@deffnx {}         {delete handle_value}  [OPTION @dots{}] <handle value specification>
+@deffnx {}         {delete handle_values} [OPTION @dots{}] <handle value specification>
+@c
+Mark the handle value or values specified with <@var{string}> or 
+<@var{handle value specification}> for deletion.
+
+@cindex undelimited string
+@cindex string, undelimited
+@c
+A @var{handle value specification} is in effect an @dfn{undelimited string}
+specifying a handle value, e.g., @samp{12345/00001:3} or @samp{12345/00001:TYPE}.
+@xref{Conventions user commands, Conventions user commands, Conventions}, above.
+It consists of five parts:
+
+@enumerate
+@item 
+the @dfn{handle prefix}, which must be exactly five digits 
+
+@item 
+a slash (@samp{/}), 
+
+@item 
+the handle itself, i.e., at least one character which must be alphanumerical, a hyphen (@samp{-}) 
+or underscore (@samp{_}).  
+
+@item 
+a colon
+
+@item
+@cindex handle, fields 
+@cindex fields, handle 
+@cindex handle index
+@cindex index, handle
+@cindex handle type
+@cindex type, handle
+@c
+the index or type of the the handle, i.e., the contents of the handle's @code{idx} 
+or @code{type} fields.  A number is interpreted as the index.  Otherwise, the same 
+characters may appear in this part as for the handle itself (see above).
+@end enumerate
+
+The options are as for the @code{delete handle} command (see above).
+
+Options:
+@table @asis
+@item @code{immediate}
+Mark the handle value or values for immediate deletion.  @xref{Purging gwirdsif}.
+
+@item <@var{delay option}>
+The handle value or values will be marked for deletion with the delay specified.
+@xref{Delay}.
+@end table 
+@end deffn
+
+@c **** (4) undelete handle value(s)
+
+@deffn  {Commands} {undelete handle_value}  <string>
+@deffnx {}         {undelete handle_values} <string>
+@deffnx {}         {undelete handle_value}  <handle value specification>
+@deffnx {}         {undelete handle_values} <handle value specification>
+@c
+Unmark the handle value or values specified with <@var{string}> or 
+<@var{handle value specification}> for deletion.
+@end deffn
+
+@c **** (4)
+
+@c *** (3)
+
+@c ** (2) User commands for Dublin Core metadata
+
+@node User commands for Dublin Core metadata, User commands for retrieving information, User commands for handles, User commands
+
+@section Dublin Core metadata
+
+@c *** (3) add metadata
+
+@deffn {Command} {add metadata} <metadata filename> <iRODS object path> @*@
+       [OPTION @dots{}]
+Transfer the contents of the file @var{metadata filename} to the server and associate it 
+with the iRODS object <iRODS object path>.
+
+Options:
+
+@table @code
+@item force_add
+Add the Dublin Core metadata even if the iRODS object doesn't exist.
+
+@item store
+@itemx force_store
+Store the Dublin Core metadata in an iRODS object of its own.
+If @option{force_store} is specified, do this even if the iRODS object doesn't 
+exist.
+
+@item force
+@itemx force_all
+Equivalent to @option{force_add} and @option{force_store}.
+@end table
+@end deffn
+
+@c *** (3) get metadata
+
+@deffn {Command} {get metadata} <path> [OPTION @dots{}] 
+@cindex Dublin Core metadata
+@cindex metadata, Dublin Core 
+@cindex standard output.
+@cindex output, standard
+@c
+Retrieve the Dublin Core metadata for the iRODS object @var{path}.  Other 
+data pertaining to the iRODS object is also sent to the client.  The Dublin Core 
+metadata is stored in a temporary file.  
+
+@table @asis
+@item @code{show} 
+Show the Dublin Core metadata.  This is done by generating a @code{show metadata} 
+command (see below).
+
+@item @code{store} 
+Store the Dublin Core metadata on the client side.
+
+@item @code{output}
+Write the file of Dublin Core metadata to written to standard output.
+@end table
+@end deffn
+
+@deffn {Command} {get metadata} INTEGER [@dots{}] [OPTION @dots{}] 
+Retrieve the Dublin Core metadata where the @code{INTEGER} values
+refer to the @code{dublin_core_metadata_id} field of rows in the server-side
+@code{gwirdsif.Dublin_Core_Metadata} database table.
+
+This commmand takes the same options as the version with the @code{<path>} argument,
+above.
+@end deffn
+
+
+@deffn {Command} {get metadata} @code{pid} <string> [@code{output}]
+@cindex Dublin Core metadata
+@cindex metadata, Dublin Core 
+@c
+Retrieve the Dublin Core metadata for the iRODS object that has the 
+handle @var{string}.
+@strong{Please note}:  As of 2013.10.24., this command exists, but 
+is not yet functional.
+@end deffn
+
+@c *** (3) delete metadata
+
+@deffn {Command} {delete metadata} <iRODS object path> [@dots{}] [OPTION @dots{}]
+Mark the Dublin Core metadata for the iRODS object or objects named by <iRODS object path> for deletion.
+With no options, the corresponding entry or entries in the @code{gwirdsif.Dublin_Core_Metadata} 
+database table are marked for deletion.
+
+For the sake of simplicity, the following descriptions of the options 
+assume a single <iRODS object path>.  However, they function analogously for calls 
+with more than one <iRODS object path>.  
+
+Options:
+
+@table @asis
+@item @code{file}
+If the metadata had been stored in an iRODS object of its own, 
+i.e., if the @code{add metadata} had been called with the @option{store} option, 
+mark the iRODS object for deletion.
+
+@item @code{file_only}
+Mark only the iRODS object in which the Dublin Core metadata has been stored, 
+for deletion, if it exists.  Do not mark the entry in the @code{gwirdsif.Dublin_Core_Metadata} 
+database table for deletion.
+
+@item @code{immediate}
+Mark the Dublin Core metadata and/or the iRODS object for immediate deletion.  
+In this case, the deletion timestamp or timestamps are set to a value 366 days 
+in the past and the thread running the function @code{purge_dc_metadata} is ``woken up''.
+@xref{Deleting and rotating files}. 
+
+@item @code{delay} [[@t{=}] (@t{INTEGER} | <@slanted{time specification}>) ]
+@itemx @code{no_delay }
+@xref{Delay}.
+
+@item @code{force}
+Mark for deletion even if <iRODS object path> has already been marked for deletion.
+Without this option, if <iRODS object path> is already marked for deletion, it is 
+not remarked and a warning is sent to the client.  
+This option can be used to remark an <iRODS object path> for deletion using different
+options.
+
+@item @code{save_db_entry}
+If this option is used together with the @option{file} or @option{file_only} option, 
+then only the actual iRODS object will be deleted, while the corresponding entry in 
+the @code{gwirdsif.Irods_Objects} database table will be saved.
+
+If this option is used without either the @option{file} or @option{file_only} option, 
+it has no effect and is ignored.
+@end table
+
+Example:
+
+@example
+delete metadata abc.txt
+
+@r{Client output:}
+
+Delete metadata value response -->
+Response code:                0 (GW_SUCCESS)
+Filename (iRODS object path): /tempZone/home/lfinsto/abc.txt
+Options:                      0 (00000000)
+Message:                      Success
+@end example
+@end deffn
+
+@c *** (3) undelete metadata
+
+@deffn {Command} {undelete metadata} <iRODS object path> [@dots{}]
+Unmark the Dublin Core metadata for the iRODS object or objects named
+by the occurrences of <iRODS object path> for deletion.
+
+
+@example
+undelete metadata abc.txt
+
+@r{Client output:}
+
+Undelete metadata value response -->
+Response code:                0 (GW_SUCCESS)
+Filename (iRODS object path): /tempZone/home/lfinsto/abc.txt
+Message:                      Success
+@end example
+@end deffn
+
+@c *** (3) show metadata
+
+@deffn {Command} {show metadata} [OPTION @dots{}]
+@cindex Dublin Core metadata
+@cindex metadata, Dublin Core 
+@c
+Retrieve Dublin Core metadata from the server-side 
+@code{gwirdsif.Dublin_Core_Metadata} database table.
+@xref{Dublin Core database tables (gwirdsif)}.
+
+Unlike the @code{get metadata} command described above, this command does 
+not take an iRODS object path as an argument and does not send information 
+about iROD objects to the client.  Nor does it send the Dublin Core metadata 
+in the form of a file.  Instead, it sends the values of the fields from the 
+@code{gwirdsif.Dublin_Core_Metadata} and optionally the 
+@code{gwirdsif.Dublin_Core_Metadata_Sub} database tables individually.
+In the client-side parser, one or more objects of type 
+@code{class Dublin_Core_Metadata_Type} are created and ``shown'', i.e., 
+the member function @code{Dublin_Core_Metadata_Type::show} is called on them.
+@xref{Dublin_Core_Metadata_Type Member Functions, 
+      Dublin_Core_Metadata_Type Member Functions, 
+      Member Functions (Dublin_Core_Metadata_Type)}.
+
+@c !! TODO: 
+@cindex TODO
+TODO:  It would also be possible to use them to store the Dublin Core in a client-side
+database table.  However, it would make more sense to use the @code{get metadata} 
+command for this purpose, which would require modifying the latter command.
+
+Options:
+@c
+@table @asis
+@item @code{INTEGER}
+Refers to the @code{dublin_core_metadata_id} field of the entries in the 
+@code{gwirdsif.Dublin_Core_Metadata} database table.
+
+
+@item @code{full}
+Send the corresponding entries from the @code{gwirdsif.Dublin_Core_Metadata_Sub} 
+database table.
+
+@item @code{store}
+Store the Dublin Core metadata in the client-side @code{gwirdcli} database.
+
+@item  @code{user}
+@itemx @code{group}
+@itemx @code{all}
+These options are not yet functional (as of 2013.12.17.).
+@end table
+@end deffn
+
+
+
+@c ** (2) User commands for retrieving information
+@node User commands for retrieving information, User commands for testing gwirdsif, User commands for Dublin Core metadata, User commands 
+
+@section Retrieving information
+
+@deffn Command whoami
+Sends brief user information to the client.
+
+@noindent 
+Example:
+
+@example
+whoami
+
+@r{Client output:}
+
+Whoami response -->
+Response code:  0
+User Info:
+user_id:      1
+username:     lfinsto
+Common Name:  Laurence Finston
+@end example
+@end deffn
+
+
+@deffn {Commands} get_user_info [<username> [delay option]]
+
+Sends detailed user information to the client.
+
+
+@noindent 
+Example:
+@example
+get_user_info
+
+@r{Client output:}
+
+Get user info response -->
+Response code:  0
+User Info:
+user_id:      1
+username:     lfinsto
+distinguished_name:
+     organization:................GWDG
+     organizationalUnitName:......gwrdifpk
+     commonName:..................Laurence Finston
+     countryName:.................DE
+     localityName:................Goettingen
+     stateOrProvinceName:.........Germany
+     user_id:.....................1
+     user_name:...................lfinsto
+privileges:
+   superuser:                1
+   delegate:                 1
+   delete_handles:           1
+   show_user_info:           1
+   show_certificates:        1
+   show_distinguished_names: 1
+   show_privileges:          1
+irods_password_encrypted:            
+irods_password_encrypted_timestamp:  
+irods_homedir:                       /tempZone/home/lfinsto
+irods_current_dir:                   /tempZone/home/lfinsto
+irods_zone:                          tempZone
+irods_default_resource:              demoResc
+irods_env_filename:                  
+irods_auth_filename:                 
+default_handle_prefix_id:            1
+default_handle_prefix:               12345
+default_institute_id:                1
+default_institute_name:              GWDG Test Institute
+public_key_id:                       
+certificate:
+     serialNumber:................2 (hexadecimal)
+     organization:................GWDG
+     organizationalUnitName:......gwrdifpk
+     commonName:..................Laurence Finston
+     countryName:.................DE
+     localityName:................Goettingen
+     stateOrProvinceName:.........Germany
+     user_id:.....................1
+     certificate_id:..............2
+     issuer_cert_id:..............0
+     user_name:...................lfinsto
+     is_ca:.......................0
+     is_proxy:....................0
+     Activation time:.............2013-05-03 13:02:53 UTC
+     Expiration time:.............2033-04-28 13:02:56 UTC
+@end example
+
+Users with the @code{show user info} privilege may call this command with the <username> argument:
+
+@example
+whoami
+get_user_info jsmith
+
+@r{Client output:}
+
+Whoami response -->
+Response code:  0
+User Info:
+user_id:      1
+username:     lfinsto
+Common Name:  Laurence Finston
+
+Get user info response -->
+Response code:  0
+User Info:
+user_id:      3
+username:     jsmith
+distinguished_name:
+     organization:................GWDG
+     organizationalUnitName:......gwrdifpk
+     commonName:..................Jane Smith
+     countryName:.................DE
+     localityName:................Goettingen
+     stateOrProvinceName:.........Niedersachsen
+     user_id:.....................3
+     user_name:...................jsmith
+privileges:
+   superuser:                0
+   delegate:                 0
+   delete_handles:           0
+   show_user_info:           0
+   show_certificates:        0
+   show_distinguished_names: 0
+   show_privileges:          0
+irods_password_encrypted:            
+irods_password_encrypted_timestamp:  
+irods_homedir:                       /tempZone/home/jsmith
+irods_current_dir:                   
+irods_zone:                          tempZone
+irods_default_resource:              demoResc
+irods_env_filename:                  
+irods_auth_filename:                 
+default_handle_prefix_id:            1
+default_handle_prefix:               12345
+default_institute_id:                1
+default_institute_name:              GWDG Test Institute
+public_key_id:                       
+certificate:
+     serialNumber:................6 (hexadecimal)
+     organization:................GWDG
+     organizationalUnitName:......gwrdifpk
+     commonName:..................Jane Smith
+     countryName:.................DE
+     localityName:................Goettingen
+     stateOrProvinceName:.........Niedersachsen
+     user_id:.....................3
+     certificate_id:..............4
+     issuer_cert_id:..............1
+     user_name:...................jsmith
+     is_ca:.......................0
+     is_proxy:....................0
+     Activation time:.............2013-05-15 09:08:07 UTC
+     Expiration time:.............2033-05-10 09:08:10 UTC
+@end example
+
+If a user without the @code{show user info} privilege tries this, an error message is issued:
+
+@example
+whoami
+get_user_info jsmith
+
+@r{Client output:} 
+
+Whoami response -->
+Response code:  0
+User Info:
+user_id:      2
+username:     jdoe
+Common Name:  John Doe
+
+Get user info response -->
+Response code:  1
+Server-side error:  "get_user_info" command failed.
+@end example
+@end deffn
+
+@c *** (3) X.509 Certificates
+
+@deffn  {Commands} {show certificate} [@code{user}]
+@deffnx {}         {show certificates} [@code{all}]
+@c
+@cindex X.509 certificate
+@cindex certificate, X.509 
+@cindex standard output
+@cindex output, standard
+@c
+The server sends information about the X.509 certificate or certificates to the client, 
+which prints it to standard output.
+
+Which certificates may be shown depends on whether the user has the @code{show_certificates} 
+privilege.  @xref{Privileges database table}.  Any user can use this command to retrieve 
+information about his or her own certificate.  Users with the @code{show_privileges} 
+may retrieve information about other users' certificates as well.
+
+@cindex group management
+@cindex management, group
+@c
+When @dfn{group management} is implemented, it should be possible to exercise finer 
+control over the way certificates are shown on the basis of @dfn{roles} within groups.
+@xref{Groups database tables and views}.
+
+@noindent 
+Options:
+
+@table @code 
+@item user
+@itemx all
+Currently, these options have no effect.  The @command{show certificate} 
+command shows the current user's certificate while the @command{show certificates} 
+command shows the certificates for all users, if the current user has the 
+@code{show_certificates} privilege (see above).
+
+@c TODO
+@c
+In the future, additional options and/or arguments should make it possible 
+to specify the certificate or certificates to be shown more precisely, e.g., 
+@code{show certificate [user [}<@var{string}>@code{]]}. 
+@end table 
+@end deffn
+
+
+
+@c *** (3) Groups
+
+@deffn {Command} {show groups} @code{all}
+@cindex standard output
+@cindex output, standard
+@c
+The server sends information about all existing groups to the client, which prints it 
+to standard output.  The current user must have the @code{show_groups} privilege.  
+Otherwise, an error message is output.  @xref{Privileges database table}.
+
+Example:
+@example
+show groups all
+
+@r{Client output:} 
+
+Show groups response -->
+Response code:  0
+Group info for 2 groups:
+Group_Type:
+group_id ==           1
+`group_name' ==       test_group_0
+`creator_id' ==       1
+`creator_username' == lfinsto
+`created' ==          1370433954 == 2013-06-05 14:05:54
+member_id_map.size() == 2
+member_id_map:
+User ID:  1  Username: lfinsto   Privileges: 7 (octal) 
+   Add user privilege:      true
+   Delete user privilege:   true
+   Delete group privilege:  true
+User ID:  2  Username: jdoe      Privileges: 0 (octal) 
+   Add user privilege:      false
+   Delete user privilege:   false
+   Delete group privilege:  false
+
+@group
+Group_Type:
+group_id ==           2
+`group_name' ==       test_group_1
+`creator_id' ==       1
+`creator_username' == lfinsto
+`created' ==          1370433954 == 2013-06-05 14:05:54
+member_id_map.size() == 2
+member_id_map:
+User ID:  1  Username: lfinsto   Privileges: 6 (octal) 
+   Add user privilege:      false
+   Delete user privilege:   true
+   Delete group privilege:  true
+User ID:  2  Username: jdoe      Privileges: 1 (octal) 
+   Add user privilege:      true
+   Delete user privilege:   false
+   Delete group privilege:  false
+@end group
+@end example
+@end deffn
+
+@c ** (2) User commands for testing gwirdsif
+@node User commands for testing gwirdsif, User commands for raising signals, User commands for retrieving information, User commands
+
+@section Testing gwirdsif
+
+@c *** (3) distinguished_name
+
+@cindex distinguished name
+@c
+@deffn Command distinguished_name <distinguished name>
+@code{[STRING]} is the @dfn{distinguished name} from an X.509 certificate, for example:
+@code{"/C=DE/O=GridGermany/OU=Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH/CN=Laurence Finston"}.
+@*
+@cindex Unix-domain socket
+@cindex socket, Unix-domain
+@c
+This command is used only when the client contacts a server running locally through a Unix-domain socket 
+or via GnuTLS with the @option{--anonymous} option.  @xref{Invoking gwirdcli (Getting Started)}.
+@end deffn
+
+@c *** (3) sleep user command
+
+@deffn  Commands sleep INTEGER
+@deffnx {}       sleep @code{client} INTEGER
+@findex sleep
+@cindex sleep
+@cindex threads
+@c
+These commands cause the server or the client to ``sleep'' for @var{INTEGER} seconds.  
+That is, the server or client calls the C library function @command{sleep}.  
+In the case of the server, this only effects the thread which receives this command.
+@end deffn
+
+@c *** (3) end_server user command
+
+@deffn Command end_server
+@cindex profiling
+@cindex d@ae{}mon process
+@cindex process, d@ae{}mon 
+@cindex threads (POSIX)
+@cindex POSIX threads
+@cindex multithreading
+@cindex process, multithreaded
+@c
+Terminate the server program @command{gwirdsif}.  In normal use, the server runs as a 
+@dfn{d@ae{}mon process}, i.e., it could theoretically run ``forever'' and never 
+terminate.  In addition, it is a @dfn{multithreaded process} which may be serving multiple 
+clients at the same time.  In normal use, it would therefore be very undesirable if a client 
+were able to terminate the server as a whole, including threads in which it's communicating 
+with other clients.  
+
+@cindex profiling
+@c
+This command is therefore normally disabled and must be enabled by invoking @command{gwirdsif} 
+with the @option{--end-server-enable} option.  @xref{Debugging options}.  It is needed for 
+@dfn{profiling} using @command{gprof} and @command{gcov}.  @xref{Profiling and testing}.
+@end deffn
+
+@c ** (2) User commands for raising signals
+
+@node User commands for raising signals, User commands for TANs, User commands for testing gwirdsif, User commands
+
+@section Raising signals
+
+@cindex implementation-dependent
+@cindex signals
+The commands in this section make it possible for a user to have either the server or the client 
+send a signal to itself.  
+
+
+@deffn Commands signal @code{server} INTEGER
+@deffnx {}      signal @code{server} <string>
+@c
+When the server receives one of these commands, it checks if the signal number (@var{INTEGER}) or 
+name (@var{STRING}) is valid (see below).  If it is, it sends the signal to the main thread of the server 
+program.
+
+If the signal name or number is invalid, an error message is issued and the server continues execution.
+@end deffn
+
+@deffn Commands signal @code{client} INTEGER
+@deffnx {}      signal @code{client} STRING
+@c
+When the server receives one of these commands, it checks if the signal number (@var{INTEGER}) or 
+name (@var{STRING}) is valid (see below).  If it is, it creates a ``command-only'' response which 
+causes the command @samp{signal INTEGER} to be returned to the client, which will then send the
+signal to itself.
+@xref{class Response_Type}.
+
+If the signal name or number is invalid, an error message is issued and the server continues execution.
+@end deffn
+
+@cindex implementation-dependent
+@cindex signals
+@cindex POSIX
+@c
+Signal names and numbers are implementation-dependent, though some signal names 
+and/or numbers are specified by POSIX.  
+@xref{kill invocation, , , Coreutils, GNU Coreutils}.
+
+@command{gwrdifpk} assumes the existence of the following signals and 
+the association of signal name and number as listed:
+
+@multitable {00 @dots{} 00} {SIGRTMIN @dots{} SIGRTMAX} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item 1 @tab SIGHUP @tab Hangup
+@c
+@item 2 @tab SIGINT @tab Terminal interrupt
+@c
+@item 3 @tab SIGQUIT @tab Terminal quit
+@c
+@item 4 @tab SIGILL @tab Illegal Instruction
+@c
+@item 5 @tab SIGTRAP @tab Trace/breakpoint trap
+@c
+@item 6 @tab SIGABRT @tab Process abort
+@c
+@item 7 @tab SIGBUS @tab Access to an undefined portion of a memory object
+@c
+@item 8 @tab SIGFPE @tab Erroneous arithmetic operation
+@c
+@item 9 @tab SIGKILL @tab Kill (cannot be caught or ignored)
+@c
+@item 10 @tab SIGUSR1 @tab User-defined signal 1
+@c
+@item 11 @tab SIGSEGV @tab Invalid memory reference (segment violation)
+@c
+@item 12 @tab SIGUSR2 @tab User-defined signal 2
+@c
+@item 13 @tab SIGPIPE @tab Write on a pipe with no one to read it
+@c
+@item 14 @tab SIGALRM @tab Alarm Clock
+@c
+@item 15 @tab SIGTERM @tab Termination
+@c
+@item 16 @tab SIGSTKFLT @tab Stack fault on coprocessor (unused)
+@c
+@item 17 @tab SIGCHLD @tab Child process terminated, stopped, or continued
+@c
+@item 18 @tab SIGCONT @tab Continue executing, if stopped
+@c
+@item 19 @tab SIGSTOP @tab Stop executing (cannot be caught or ignored)
+@c
+@item 20 @tab SIGTSTP @tab Terminal stop
+@c
+@item 21 @tab SIGTTIN @tab Background process attempting read
+@c
+@item 22 @tab SIGTTOU @tab Background process attempting write
+@c
+@item 23 @tab SIGURG @tab High bandwidth data is available at a socket
+@c
+@item 24 @tab SIGXCPU @tab CPU time limit exceeded
+@c
+@item 25 @tab SIGXFSZ @tab File size limit exceeded
+@c
+@item 26 @tab SIGVTALRM @tab Virtual timer expired
+@c
+@item 27 @tab SIGPROF @tab Profiling timer expired
+@c
+@item 28 @tab SIGWINCH @tab Window resize signal
+@c
+@item 29 @tab SIGIO @tab I/O now possible
+@c
+@item 30 @tab SIGPWR @tab Power failure
+@c
+@item 31 @tab SIGSYS @tab Bad system call
+@c
+@item 34 @dots{} 64 @tab SIGRTMIN @dots{} SIGRTMAX @tab Real-time signals, minimum @dots{} maximum
+@end multitable
+
+@cindex real-time signals
+@cindex signals, real-time
+@cindex implementation dependent
+@cindex POSIX
+@cindex signals
+@noindent 
+@code{SIGRTMIN} and @code{SIGRTMAX} define the range of available @dfn{real-time signals}.
+Real-time signals > @code{SIGRTMIN} and < @code{SIGRTMAX} should be specified as 
+@code{SIGRTMIN+@var{x}} where @var{x} = 1 @dots{} 15 for signal numbers 35 @dots{} 49
+or @code{SIGRTMAX-@var{y}} where @var{y} = 1 @dots{} 14 for signal numbers 50 @dots{} 63.
+@strong{Please Note:}  The specific numbers are implementation dependent, as are the 
+number of real-time signals available (POSIX mandates at least 8).
+
+@c *** (3)
+
+
+@c ** (2) User commands for TANs
+@node User commands for TANs, User commands for cryptographic operations, User commands for raising signals, User commands 
+
+@section TANs
+
+@deffn {Command} {send tan list}
+@cindex TAN (transaction authentication numbers)
+@cindex transaction authentication numbers (TAN)
+@cindex authentication/authorization.
+@c
+This command is currently non-functional.  It succeeds on the
+server-side, but no response is sent to the client.  It will only be
+needed if @dfn{TANs} (i.e., @dfn{transaction authentication numbers}) are used for 
+authentication/authorization.
+@end deffn
+
+@c ** (2) User commands for cryptographic operations
+@node User commands for cryptographic operations, User commands for pull requests, User commands for TANs, User commands
+
+@section Cryptographic operations
+
+@menu
+* GPG key pairs::
+* Checksums::
+@end menu
+
+@c *** (3) GPG key pairs
+
+@node GPG key pairs, Checksums, , User commands for cryptographic operations
+
+@subsection GPG key pairs
+
+@deffn {Command} {store public_key}
+Send the user's public key to the server and store it in the server-side 
+@code{gwirdsif.GPG_Key_Pairs} database table.  It must already have been 
+stored in the @code{gwirdcli.GPG_Key_Pairs} database table.  As of 2014.01.23., 
+this must have been done ``by hand'', since no means to do 
+this ``automatically'' has been implemented yet.
+@xref{GPG_Key_Pair database tables (gwirdsif)}.
+@end deffn
+
+@c *** (3) Checksums
+
+@node Checksums, , GPG key pairs, User commands for cryptographic operations
+
+@subsection Checksums
+
+@c **** (4) checksum (Generate checksum)
+
+@deffn {Command} {checksum} <path> [OPTION @dots{}] 
+
+Retrieve a @dfn{checksum} for the iRODS object @var{path} from the server.  
+If a checksum of the specified type (MD5 by default) does not exist, create one.
+
+@need 2000
+@noindent 
+Options:
+
+@table @code 
+@item  md5 
+@itemx sha1
+@itemx sha224
+@itemx sha256
+@itemx sha384
+@itemx sha512
+MD5 is the default type of checksum.  The options @code{sha1} through @code{sha512} 
+may be used to create other types of checksums.
+
+Only one of these options should be used in a single call to the @command{checksum}
+command!  If more than one is used, the checksum with the largest number of bits 
+takes precedence.  That is, SHA512 has the highest precedence and MD5 the lowest.
+
+It is not currently possible to generate multiple checksums using a 
+single call to this command.  It would be possible to implement this, but
+at the present time the author doesn't consider this to be useful feature.
+
+@item no-handle
+By default, if a handle value containing the specified type of checksum for 
+the iRODS object @var{path} does not exist, it is created.  
+This option suppresses creation of the handle value.
+
+@item check
+By default, if a handle value containing the specified type of checksum for 
+the iRODS object @var{path} exists, the checksum is simply extracted from the 
+handle value and sent to the client without checking it.  If this option is used,
+@command{gwirdsif} calls the corresponding checksum function to ensure that the checksum
+is correct.  If it is not, it sends a warning message to the client and tries to update the
+handle value with the correct checksum.
+@end table 
+@end deffn
+
+@c **** (4) verify checksum
+
+@deffn {Command} {verify checksum} <path> <checksum>  [OPTIONS @dots{}]
+
+Verify checksum @var{checksum} for iRODS object @var{path}.
+
+@need 2000
+@noindent 
+Options:
+@table @code 
+@item  md5 
+@itemx sha1
+@itemx sha224
+@itemx sha256
+@itemx sha384
+@itemx sha512
+MD5 is the default type of checksum.  The options @code{sha1} through @code{sha512} 
+may be used to verifyother types of checksums.
+
+Only one of these options should be used in a single call to the @command{checksum}
+command!  If more than one is used, the checksum with the largest number of bits 
+takes precedence.  That is, SHA512 has the highest precedence and MD5 the lowest.
+
+It is not currently possible to verify multiple checksums using a 
+single call to this command.  It would be possible to implement this, but
+at the present time the author doesn't consider this to be useful feature.
+
+@item no-handle
+This option has no effect.  It exists because this command and the 
+@command{checksum} command (see above) use the same options.
+
+@item check
+By default, if a handle value containing the specified type of checksum for 
+the iRODS object @var{path} exists, the checksum is simply extracted from the 
+handle value and compared with the @var{checksum} sent by the client without checking it.  
+If this option is used, @command{gwirdsif} calls the corresponding checksum function to 
+ensure that the checksum is correct.  If it is not, it sends a warning message to the 
+client and tries to update the handle value with the correct checksum.
+@end table 
+@end deffn
+
+@c **** (4)
+
+@c *** (3)
+
+@c ** (2) User commands for pull requests
+@node User commands for pull requests, Other user commands, User commands for cryptographic operations, User commands
+
+@section Pull requests
+
+@deffn Command {register pull} [OPTION @dots{}]
+Register pull request.
+@xref{Pull archiving}, and @ref{Pull Request database table (gwirdsif)}.
+@end deffn
+
+
+@c ** (2) Other user commands
+@node Other user commands, , User commands for pull requests, User commands
+
+@section Other user commands
+
+@deffn Command end
+Tell the server that the client is finished.  Any input following this
+command is ignored by the server.
+@end deffn
+
+
+
+@c ** (2)
+
+@c * (1) Emacs-Lisp code for use in indirect buffers
+
+@c (progn (ignore (quote
+@c    ))  (texinfo-mode) (abbrev-mode t) (outline-minor-mode t) (ignore (quote
+@c    )) (setq outline-regexp "@c *\\*+") (setq fill-column 80))
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

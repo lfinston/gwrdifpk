@@ -1,0 +1,2773 @@
+@c getstart.texi
+@c /home/lfinsto/irods_proj/irods_master/Finston/gwrdifpk/doc/getstart.texi
+
+@c Created by Laurence D. Finston (LDF) Wed Apr 10 09:51:38 CEST 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) Getting Started
+
+@node Getting Started, Security considerations, Standalone handle service, Top
+@chapter Getting Started
+
+@menu
+* gwirdsif (Getting Started)::
+* gwirdcli (Getting Started)::
+* Concluding Remarks (Getting Started)::
+@end menu
+
+
+@c ** (2) gwirdsif (Getting Started)
+
+@node gwirdsif (Getting Started), gwirdcli (Getting Started), , Getting Started
+@section gwirdsif
+
+@cindex environment variable
+@cindex variable, environment
+@c
+The server program must ``know'' the location of the iRODS server in order to function.
+If it's stored in the @dfn{environment variable} @env{IRODS_SERVER_DIR}, e.g.,
+
+@example
+export IRODS_SERVER_DIR=/home/lfinsto/iRODS
+@end example
+
+@noindent 
+then starting the server program @command{gwirdsif} can be as simple as this:
+
+@example
+gwirdsif
+@end example
+
+@cindex command-line options
+@cindex options, command-line 
+@c
+@noindent 
+Alternatively, the location may be passed to @command{gwirdsif} using the @dfn{command-line option} 
+@option{--irods-server-directory}:
+
+@example
+gwirdsif --irods-server-directory /home/lfinsto/iRODS
+@end example
+
+@command{gwirdsif} takes many more options, but they have sensible defaults. 
+For more information on @command{gwirdsif's} options, see @ref{Invoking gwirdsif/gwirdcli}.
+
+When @command{gwirdsif} is started in a shell, it prints some information for the user to the 
+terminal and then waits for connections from the client:
+
+@example
+gwirdsif --irods-server-directory /home/lfinsto/iRODS 
+@result{} 
+# 1377700507  'Wed, 28 Aug 2013 15:35:07 GMT'
+Started run
+iRODS server directory:  /home/lfinsto/iRODS
+iRODS server running.  PID:  27237
+Process ID:     12985
+Socket path:    /tmp/gwirdsif.sock
+Log directory:  /home/lfinsto/.gwirdsif
+# 1377700507  'Wed, 28 Aug 2013 15:35:07 GMT'
+Started run
+[Thread 3] In `purge_irods_archive':  Deleted 0 iRODS objects \
+   from archive.
+Deleted 0 iRODS objects from `gwirdsif' database.
+[Thread 4]  In `listen_local':         Server ready. \
+   Listening to Unix domain socket `/tmp/gwirdsif.sock'.
+[Thread 6]  In `listen_remote_X_509':  Server ready. \
+   Listening to port 5557.
+[Thread 5]  In `listen_remote_anon':   Server ready. \
+   Listening to port 5556.
+@end example
+
+@cindex listen
+@cindex listening
+@findex listen
+@c
+@command{gwirdsif} ``listens'' for connections at three different places:  The most important is
+port 5557 (by default), because authentication/authorization using X.509 certificates is performed
+for TLS connections using this port.  This is the only kind of connection that should be used in a
+production environment;  the others are for testing purposes @emph{only}!
+@samp{/tmp/gwirdsif.sock} is a Unix domain socket and can therefore only be used for local connections 
+while port 5556 (again, by default), like port 5557, is used for TLS connections, but without any 
+authentication/authorization.@footnote{The ports used can be reset by
+means of the command-line options @option{--x509-port} and
+@option{--anon-port}, respectively.  
+@xref{Command-line options}.  Of course, if the ports
+are changed, they must be changed for both the client and the server!} 
+
+@cindex nohup
+@cindex background process
+@cindex process, background
+@cindex d@ae{}mon process
+@cindex process, d@ae{}mon 
+@cindex redirection
+@cindex redirecting output
+@cindex output, redirecting
+@c
+Normally, it is intended that @command{gwirdsif} be run as a @dfn{d@ae{}mon process}, i.e., 
+it runs in the background and doesn't terminate when the user who started it logs out.
+For example, it could be invoked like this:
+
+@example
+nohup gwirdsif > /home/lfinsto/.gwirdsif/gwirdsif.stdout \
+   2> /home/lfinsto/.gwirdsif/gwirdsif.stderr &
+@end example
+
+@noindent 
+Here, @command{gwirdsif's} output to standard output and standard error is @dfn{redirected} to
+the files @file{/home/lfinsto/.gwirdsif/gwirdsif.stdout} and 
+@file{/home/lfinsto/@-.gwirdsif/@-gwirdsif.stderr}.  The directory @file{$HOME/.gwirdsif/} is 
+the default for @command{gwirdsif}'s log directory, which may also be set using the 
+@option{log-directory} option or by setting the environment variable @code{GWIRDSIF_DIR}.
+
+@cindex rotating logs
+@cindex logs, rotating
+@findex purge_server_logs
+@c
+
+If the output is redirected to files named @file{gwirdsif.stdout} and @file{gwirdsif.stderr} 
+in the log directory, the function @code{purge_server_logs} will take care of rotating them.  
+If other paths are chosen, the files will not be rotated.
+@xref{Deleting and rotating files}.
+
+For testing purposes, however, it's much more useful to invoke @command{gwirdsif} 
+as a foreground process (and without @command{nohup}), so that its output is written 
+to the terminal.
+
+@c ** (2) gwirdcli (Getting Started)
+
+@node gwirdcli (Getting Started), Concluding Remarks (Getting Started), gwirdsif (Getting Started), Getting Started
+@section gwirdcli
+
+@menu
+* Invoking gwirdcli (Getting Started)::
+* Putting and Getting iRODS Objects (Getting Started)::
+* Dublin Core Metadata (Getting Started)::
+* Deleting and Undeleting (Getting Started)::
+@end menu
+
+@c *** (3) Invoking gwirdcli (Getting Started)
+
+@node Invoking gwirdcli (Getting Started), Putting and Getting iRODS Objects (Getting Started), , gwirdcli (Getting Started)
+@subsection Invoking gwirdcli
+
+The simplest way to invoke @command{gwirdcli} is with a single argument, namely 
+the hostname of the machine where the server program @command{gwirdsif} is running.
+For example, if @command{gwirdsif} is running on @samp{pcfinston.gwdg.de},
+@command{gwirdcli} may be invoked like this:
+
+@example
+gwirdcli pcfinston.gwdg.de
+@result{} 
+Enter commands:
+Type commands followed by <ENTER>.  Multiple lines may be entered.
+Enter a single period (`.') on a line to finish.
+Use `q' (or `Q') command to quit.
+
+@r{(User input:)}
+whoami
+.
+@result{} 
+Whoami response -->
+Response code:  0
+User Info:
+user_id:      1
+username:     lfinsto
+Common Name:  Laurence Finston
+@end example
+
+@cindex response
+@cindex standard output
+@cindex output, standard
+@c
+@noindent 
+When invoked in this way, @command{gwirdcli} prompts the user for
+commands which it will send to the server.  The server processes them
+and sends a @dfn{response} to the client, which prints out a message
+to the terminal (or whatever @command{gwirdcli}'s @dfn{standard output}
+happens to be connected to).
+
+@cindex X.509 certificate
+@cindex X.509 
+@cindex authentication/authorization
+@c
+In this example, something important happened ``behind the scenes'',
+namely authentication/authorization with X.509 certificates.  The
+default filenames for the user's certificate and key are 
+@file{user_cert.pem} and @file{user_key.pem}, respectively.  If these
+aren't the names of the user's certificate and key (or of symbolic links to
+them), then @command{gwirdcli} will have to be invoked using the 
+@option{--cert-filename} and @option{--key-filename} options:
+
+@example
+gwirdcli --cert-filename my_cert.pem --key-filename my_key.pem \
+   pcfinston.gwdg.de
+@result{} 
+Enter commands:
+Type commands followed by <ENTER>.  Multiple lines may be entered.
+Enter a single period (`.') on a line to finish.
+Use `q' (or `Q') command to quit.
+[@dots{}]
+@end example
+
+If the server has been installed on the localhost, then the hostname
+argument can be left off:
+
+@example
+gwirdcli 
+@result{} 
+Enter commands:
+Type commands followed by <ENTER>.  Multiple lines may be entered.
+Enter a single period (`.') on a line to finish.
+Use `q' (or `Q') command to quit.
+
+@r{(User input:)}
+whoami
+.
+@result{} 
+Authentication error -->
+Error code:  1
+Exiting.
+Unauthenticated connection and "DISTINGUISHED_NAME" command was either \
+   not sent to server, or failed.
+Please note that unauthenticated connections are only for \
+   testing purposes!
+Exiting.
+@end example
+
+@cindex socket
+@cindex Unix Domain socket
+@cindex socket, Unix Domain 
+@cindex distinguished name
+@cindex name, distinguished
+@c
+@noindent 
+Oops!  In this case, the client connects with the server via the 
+Unix Domain socket @file{/tmp/gwirdsif.sock}, so that
+authentication/authorization using X.509 certificates is not
+performed, which is only allowed for testing purposes.
+In this case, the user must provide a @dfn{distinguished name} to
+identify himself or herself to the server:
+
+@example
+gwirdcli 
+@result{} 
+Enter commands:
+Type commands followed by <ENTER>.  Multiple lines may be entered.
+Enter a single period (`.') on a line to finish.
+Use `q' (or `Q') command to quit.
+
+@r{(User input:)}
+distinguished_name \
+"/C=DE/ST=Germany/L=Goettingen/O=GWDG/OU=gwrdifpk/CN=Laurence Finston"
+get_user_info
+.
+@result{} 
+Get user info response -->
+Response code:  0
+User Info:
+user_id:      1
+username:     lfinsto
+distinguished_name:
+     organization:................GWDG
+     organizationalUnitName:......gwrdifpk
+     commonName:..................Laurence Finston
+     countryName:.................DE
+     localityName:................Goettingen
+     stateOrProvinceName:.........Niedersachsen
+     user_id:.....................1
+     user_name:...................lfinsto
+[@dots{}]
+@end example
+
+@noindent
+Of course, there's nothing to prevent the user from sending some other user's
+distinguished name to the server, so that this feature is only
+for testing purposes.
+
+In the examples so far, @command{gwirdcli} has exited immediately after sending a
+single batch of commands to the server, receiving its responses and
+printing them to the terminal.  Often, however, the user will want to
+have a dialogue with the server.  The option
+@option{--no-terminate-on-end-input} can be used for this purpose:
+
+@example
+gwirdcli --no-terminate-on-end-input localhost
+@result{} 
+Enter commands:
+Type commands followed by <ENTER>.  Multiple lines may be entered.
+Enter a single period (`.') on a line to finish.
+Use `q' (or `Q') command to quit.
+
+@r{(User input:)}
+whoami
+.
+@result{} 
+Whoami response -->
+Response code:  0
+User Info:
+user_id:      1
+username:     lfinsto
+Common Name:  Laurence Finston
+
+Enter commands:
+Type commands followed by <ENTER>.  Multiple lines may be entered.
+Enter a single period (`.') on a line to finish.
+Use `q' (or `Q') command to quit.
+
+@r{(User input:)}
+show groups all
+.
+@result{} 
+Show groups response -->
+Response code:  0
+Group info for 2 groups:
+Group_Type:
+group_id ==           1
+`group_name' ==       test_group_0
+`creator_id' ==       1
+`creator_username' == lfinsto
+`created' ==          1370433954 == 2013-06-05 14:05:54
+[@dots{}]
+Enter commands:
+Type commands followed by <ENTER>.  Multiple lines may be entered.
+Enter a single period (`.') on a line to finish.
+Use `q' (or `Q') command to quit.
+
+@r{(User input:)}
+q
+@result{} 
+Exiting.
+@end example
+
+In this example, @samp{localhost} is the server hostname argument.  
+In this case, a TLS connection with X.509 authentication/authorization
+is used, so that the @command{distinguished_name} command isn't needed.
+
+@cindex pipe
+@c
+Users don't have to type in commands at a prompt, however.  
+Another way of passing intput to @command{gwirdcli} is to use a pipe:
+
+@example
+echo "whoami" | gwirdcli localhost
+@result{} 
+Enter commands:
+Type commands followed by <ENTER>.  Multiple lines may be entered.
+Enter a single period (`.') on a line to finish.
+Use `q' (or `Q') command to quit.
+Whoami response -->
+Response code:  0
+User Info:
+user_id:      1
+username:     lfinsto
+Common Name:  Laurence Finston
+@end example
+
+The prompt is printed to the terminal even though input has already
+been provided.  It can be suppressed using the
+@option{--suppress-prompt} option:
+
+@example
+echo "whoami" | gwirdcli --suppress-prompt localhost
+@result{} 
+Whoami response -->
+Response code:  0
+User Info:
+user_id:      1
+username:     lfinsto
+Common Name:  Laurence Finston
+@end example
+
+Typing in commands at a prompt or passing a couple of commands to
+@command{gwirdcli} via a pipe may be useful sometimes, but in most
+cases, it will be more convenient to put the commands into a file and
+pass the filename to @command{gwirdcli}.
+
+The file can be passed using @dfn{redirection}:
+
+@example
+cat sample_input.txt
+@result{} 
+whoami
+
+gwirdcli --suppress-prompt localhost < sample_input.txt 
+@result{} 
+Whoami response -->
+Response code:  0
+User Info:
+user_id:      1
+username:     lfinsto
+Common Name:  Laurence Finston
+@end example
+
+@noindent 
+Alternatively, @command{gwirdcli} can be invoked with the
+@option{--input-filename} option:
+
+@example
+gwirdcli localhost --input-filename sample_input.txt 
+@result{} 
+Whoami response -->
+Response code:  0
+User Info:
+user_id:      1
+username:     lfinsto
+Common Name:  Laurence Finston
+@end example
+
+@noindent 
+In this case, no prompt is printed to the terminal.
+
+If the @option{--no-terminate-on-end-input} option is used, then the
+user can have a dialogue with the server after the commands in the
+input file have been processed:
+
+@example
+gwirdcli localhost --input-filename sample_input.txt \
+   --no-terminate-on-end-input
+@result{} 
+Whoami response -->
+Response code:  0
+User Info:
+user_id:      1
+username:     lfinsto
+Common Name:  Laurence Finston
+
+Enter commands:
+Type commands followed by <ENTER>.  Multiple lines may be entered.
+Enter a single period (`.') on a line to finish.
+Use `q' (or `Q') command to quit.
+
+@r{(User input:)}
+ls
+.
+@result{} 
+ls -->
+/tempZone/home/lfinsto:
+  abc.txt
+
+Enter commands:
+Type commands followed by <ENTER>.  Multiple lines may be entered.
+Enter a single period (`.') on a line to finish.
+Use `q' (or `Q') command to quit.
+
+@r{(User input:)}
+q
+@result{} 
+Exiting.
+@end example
+
+Please note that a dialogue is only possible when the user types the
+first batch of commands after the prompt or a file is specified using
+the @option{--input-filename} option.  That is, it is not possible
+when passing input to @command{gwirdcli} using a pipe or redirection.
+In these cases, standard input has been disconnected from the terminal
+so the latter can no longer be used for passing input to @command{gwirdcli}.
+
+@c *** (3) Putting and Getting iRODS Objects (Getting Started)
+
+@node Putting and Getting iRODS Objects (Getting Started), Dublin Core Metadata (Getting Started), Invoking gwirdcli (Getting Started), gwirdcli (Getting Started)
+@subsection Putting and Getting iRODS Objects
+
+Let's say I have a file @file{abc.txt} that I want to send to the
+server and have it stored in the remote iRODS archive.  The command
+for this is @command{put}:
+
+@example
+echo "put abc.txt" | gwirdcli --suppress_prompt localhost
+@result{} 
+put -->
+Filename:     /tempZone/home/lfinsto/abc.txt
+Exit status:  0
+Response:     `iput' command succeeded, returning 0
+@end example
+
+Lets's say now I've deleted my local copy of @file{abc.txt} and I want
+to restore it from the remote iRODS archive.  The command for this is
+@command{get}:
+
+@example
+ls -l abc.txt
+@result{} 
+ls: cannot access abc.txt: No such file or directory
+
+@r{(User input:)}
+echo "get abc.txt" | gwirdcli --suppress-prompt localhost
+@result{} 
+get -->
+Local filename:  abc.txt
+Response code:   2
+Response:        Success.  Queuing "SEND FILE" command.
+
+get -->
+Remote filename: /tempZone/home/lfinsto/abc.txt
+Local filename:  abc.txt
+Exit status:     0
+Overwrite:       False
+
+Received remote file `/tempZone/home/lfinsto/abc.txt'.
+Stored in local file `abc.txt'.
+
+@r{(User input:)}
+ls -l abc.txt
+@result{} 
+-rw-r----- 1 lfinsto users 5064 Aug 29 15:22 abc.txt
+@end example
+
+@cindex AVU (Attribute-Value-Unit triple)
+@cindex Attribute-Value-Unit triple 
+@c
+iRODS objects can have @dfn{Attribute-Value-Unit triples} (AVUs)
+associated with them.  They can be shown by the @command{get metadata} command:
+
+@example
+echo "get metadata abc.txt" | gwirdcli --suppress-prompt localhost
+@result{} 
+get metadata -->
+Filename:        /tempZone/home/lfinsto/abc.txt
+Exit status:     0
+Number of AVUs:  0
+
+No user-defined metadata (AVUs) to display
+@end example
+
+@noindent
+@file{abc.txt} doesn't have any AVUs because @command{put} was called
+without any options.
+
+@cindex handle
+@cindex Handle System
+@c
+The GWDG Archive Interface uses @dfn{handles} to store information
+about iRODS objects and other entities.  Normally, when a file is
+``put'', options are used to tell the server to generate a handle for
+it:
+
+@example
+echo "put +pid +gen abc.txt" | gwirdcli --suppress-prompt localhost
+@result{}
+put -->
+Filename:     /tempZone/home/lfinsto/abc.txt
+Exit status:  1
+Response:     Server error:  `iput' command failed, returning 3:
+ERROR: putUtil: put error for /tempZone/home/lfinsto/abc.txt, \
+   status = -312000 status = -312000 OVERWRITE_WITHOUT_FORCE_FLAG
+@end example
+
+Oops!  @file{abc.txt} already exists in the remote archive.  We can
+use the @option{-f} flag to tell the server to overwrite it:
+
+@example
+echo "put -f +pid +gen abc.txt" | gwirdcli --suppress-prompt localhost
+@result{}
+put -->
+Filename:     /tempZone/home/lfinsto/abc.txt
+Exit status:  0
+Response:     `iput' command succeeded, returning 0
+
+put -->
+Filename:     /tempZone/home/lfinsto/abc.txt
+Exit status:  0
+Response:     Success:  Generated PID `12345/00001'
+
+put -->
+Filename:     /tempZone/home/lfinsto/abc.txt
+Exit status:  0
+Response:     Added handle values with type == `IRODS_OBJECT' \
+   and type == `CREATOR_INDEX' successfully
+
+put -->
+Filename:     /tempZone/home/lfinsto/abc.txt
+Exit status:  0
+Response:     Success:  Stored PID `12345/00001' in \
+   iRODS object metadata
+@end example
+
+@cindex icommands
+@c
+Now, the remote iRODS object @file{/tempZone/home/lfinsto/abc.txt}
+should have an AVU.  In these examples, the server is running on the
+same host as the client, so I can use the normal @dfn{icommands} to
+access the iRODS server:
+
+@example
+imeta ls -d abc.txt
+@result{}
+AVUs defined for dataObj abc.txt:
+attribute: PID
+value: 12345/00001
+units: 
+@end example
+
+@noindent
+The output from the @command{get metadata} command contains this
+information, but also quite a bit more, some of which I've left out of
+the following example to reduce clutter:
+
+@example
+echo "get metadata abc.txt" | gwirdcli --suppress-prompt localhost
+@result{}
+get metadata -->
+Filename:        /tempZone/home/lfinsto/abc.txt
+Exit status:     0
+Number of AVUs:  1
+
+Irods_Object_Type:
+id ==                                   0
+path ==                                 /tempZone/home/lfinsto/abc.txt
+[@dots{}]
+avu_vector.size() == 1
+Showing avu_vector:
+Irods_AVU_Type:
+id ==                       0
+irods_object_id ==          0
+user_id ==                  0
+irods_object_path ==        (empty)
+attribute ==                PID
+value ==                    12345/00001
+units ==                    (empty)
+time_set ==                 1367603247 (seconds since epoch):  \
+                               2013-05-03 19:47:27 CEST +0200
+deleted_from_archive ==     0
+deleted_from_gwirdsif_db == 0
+[@dots{}]
+@end example
+
+The handle @samp{12345/00001} which has been generated for the 
+iRODS object @file{abc.txt} can be retrieved by using the 
+@command{get handle} command:
+
+@example
+get handle pid "12345/00001"
+@result{} 
+get handle -->
+Response code:                   0
+filename:                        /tempZone/home/lfinsto/abc.txt
+handle:                          12345/00001
+idx:                             1
+type:                            IRODS_OBJECT
+data_length:                     30
+data:                            /tempZone/home/lfinsto/abc.txt
+ttl_type:                        0
+ttl:                             86400
+timestamp:                       1377784493 (2013-08-29 15:54:53 CEST)
+refs_length:0
+refs:                            NULL
+admin_read:                      1
+admin_write:                     1
+pub_read:                        1
+pub_write:                       0
+handle_id:                       56
+handle_value_id:                 130
+irods_object_id:                 0
+created:                         1377784493 (2013-08-29 15:54:53 CEST)
+last_modified:                   0
+delete_from_database_timestamp:  0
+created_by_user:                 1 
+marked_for_deletion:             0
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00001
+idx:                             211
+type:                            CREATOR
+data_length:                     68
+data: \
+   /C=DE/O=GWDG/OU=gwrdifpk/L=Goettingen/ST=Germany/CN=Laurence Finston
+[@dots{}]
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00001
+idx:                             300
+type:                            HS_ADMIN
+data_length:                     22
+data:                            ^G\363^@@^@@^@@
+0.NA/12345^@@^@@^@@\310^@@^@@
+[@dots{}]
+@end example
+
+@noindent
+The server generates a separate response for each handle value.
+The handle values are displayed on the terminal, but they are also
+stored in the client-side database @samp{gwirdcli} in the
+@samp{handles} table.
+
+@c *** (3) Dublin Core Metadata (Getting Started)
+
+@node Dublin Core Metadata (Getting Started), Deleting and Undeleting (Getting Started), Putting and Getting iRODS Objects (Getting Started), gwirdcli (Getting Started)
+
+@subsection Dublin Core Metadata
+
+@cindex Dublin Core
+@cindex Dublin Core metadata
+@cindex metadata, Dublin Core 
+@cindex Dublin Core Metadata Initiative (DCMI)
+@cindex DCMI (Dublin Core Metadata Initiative)
+@cindex Dublin Core
+@cindex XML
+@cindex XML metadata
+@cindex metadata, XML
+@c
+@command{gwrdifpk} provides facilities for storing and retrieving @dfn{Dublin Core metadata}, 
+i.e., XML data conforming to the standards developed in connection with the 
+Dublin Core Metadata Initiative (DCMI):  @uref{http://dublincore.org}
+
+Let's say I've @samp{put} the file @file{abc.txt} and generated the handle
+@samp{12345/00001}, as in 
+@ref{Putting and Getting iRODS Objects (Getting Started), , Putting and Getting iRODS Objects},
+and that I have some Dublin Core metadata in file @file{metadata_sample_1.xml}:
+
+@example
+cat metadata_sample_1.xml
+@result{}
+<?xml version="1.0"?>
+
+<metadata
+  xmlns="http://example.org/myapp/"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://example.org/myapp/ \
+     http://example.org/myapp/schema.xsd"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:dcterms="http://purl.org/dc/terms/">
+
+  <dc:title xsi:type="title attribute" xsi:typex="title attribute 2">
+    Sample Dublin Core Metadata (Title)
+  </dc:title>
+  <dc:creator>
+    Laurence D. Finston (Creator)
+  </dc:creator>
+  <dc:subject>
+    Sample Dublin Core Metadata 1 (Subject)
+  </dc:subject>
+  <dc:description>
+    Sample Dublin Core Metadata 1 (Description)
+  </dc:description>
+  <dc:publisher>
+    GWDG 1 (Publisher)
+  </dc:publisher>
+  <dc:contributor>
+    Sample contributor 1
+  </dc:contributor>
+  <dc:date>
+    2012-12-06 12:11:26
+  </dc:date>
+  <dc:type>
+    iRODS object (Type)
+  </dc:type>
+  <dc:format>
+    ASCII (Format)
+  </dc:format>
+  <dc:identifier>
+    XXX (Identifier)
+  </dc:identifier>
+  <dc:source>
+    GWDG (Source)
+  </dc:source>
+  <dc:language>
+    English (Language)
+  </dc:language>
+  <dc:relation>
+    Not applicable (Relation)
+  </dc:relation>
+  <dc:coverage>
+    Not applicable (Coverage)
+  </dc:coverage>
+  <dc:rights>
+    All rights reserved (Rights)
+  </dc:rights>
+  <dcterms:abstract>
+    Sample Abstract
+  </dcterms:abstract>
+</metadata>
+@end example
+
+@noindent
+I can now send the contents of @file{metadata_sample_1.xml} to the server and
+associate it with the (server-side) iRODS object @file{abc.txt}:
+
+@example
+add metadata metadata_sample_1.xml abc.txt
+@result{}
+add metadata-->
+Exit status:                              0
+Metadata file                             metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Generated handle for metadata:  12345/00002.
+
+add metadata-->
+Exit status:                              0
+Metadata file                             metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Added handle value for handle `12345/00001' \
+      with type `IRODS_OBJECT_PID' to handle `12345/00002' successfully
+
+add metadata-->
+Exit status:                              0
+Metadata file                             metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Added handle value for iRODS object \
+      `/tempZone/home/lfinsto/abc.txt' with type `IRODS_OBJECT_REF' \
+      to handle `12345/00002' successfully
+
+add metadata-->
+Exit status:                              0
+Metadata file                             metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Added handle value for handle `12345/00002' \
+      with type `DC_METADATA_PID' to handle `12345/00001' successfully
+
+add metadata-->
+Exit status:                              0
+Metadata file                             metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Call to `imeta' succeeded.  Added AVU \
+      with type `DC_METADATA_PID' and value `12345/00002' \
+      to iRODS object `/tempZone/home/lfinsto/abc.txt'.
+
+add metadata-->
+Exit status:                              0
+Metadata file                             metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   (Success)
+@end example
+
+@noindent
+The @command{add metadata} command causes rows to be created in the tables
+@code{Dublin_Core_Metadata} @code{Dublin_Core_Metadata_Sub} in the @code{gwirdsif} 
+database:
+
+@example
+mysql> select * from gwirdsif.Dublin_Core_Metadata \
+   where irods_object_path = '/tempZone/home/lfinsto/abc.txt'\G
+@result{}
+*************************** 1. row ***************************
+dublin_core_metadata_id: 1
+                user_id: 1
+        irods_server_id: 1
+      irods_object_path: /tempZone/home/lfinsto/abc.txt
+              handle_id: 61
+                deleted: 0
+                created: 2013-08-30 12:56:45
+          last_modified: 0000-00-00 00:00:00
+1 row in set (0.00 sec)
+
+mysql> select * from gwirdsif.Dublin_Core_Metadata_Sub \
+   where dublin_core_metadata_id=1 \
+   order by dublin_core_metadata_sub_id\G
+@result{}
+*************************** 1. row ***************************
+dublin_core_metadata_sub_id: 1
+    dublin_core_metadata_id: 1
+     dublin_core_element_id: 1
+        dublin_core_term_id: 0
+                      value: Sample Dublin Core Metadata (Title)
+*************************** 2. row ***************************
+dublin_core_metadata_sub_id: 2
+    dublin_core_metadata_id: 1
+     dublin_core_element_id: 2
+        dublin_core_term_id: 0
+                      value: Laurence D. Finston (Creator)
+[@dots{}]
+16 rows in set (0.00 sec)
+@end example
+
+@noindent
+
+The following MySQL query prints out the data in a more informative way, using 
+fields from the tables @code{Users}, 
+@code{Dublin_Core_Elements} and @code{Dublin_Core_Terms}.  
+(Redundant information has been replaced by ``[@dots{}]'' after the first row.)
+
+@example
+select U.user_id, U.username, M.dublin_core_metadata_id, 
+    M.irods_server_id, M.irods_object_path, M.handle_id, 
+    S.dublin_core_metadata_sub_id, 
+    S.dublin_core_element_id, E.element_name, 
+    S.dublin_core_term_id, T.term_name, 
+    S.value
+    from Users as U, Dublin_Core_Metadata as M, 
+    Dublin_Core_Metadata_Sub as S,
+    Dublin_Core_Elements as E, Dublin_Core_Terms as T
+    where U.user_id = M.user_id 
+    and M.dublin_core_metadata_id = 1 
+    and M.dublin_core_metadata_id = S.dublin_core_metadata_id
+    and S.dublin_core_element_id = E.dublin_core_element_id
+    and S.dublin_core_term_id = T.dublin_core_term_id
+    order by S.dublin_core_metadata_sub_id, S.dublin_core_element_id, \
+       S.dublin_core_term_id\G
+@result{}
+@group 
+************ 1. row ***************************
+                    user_id: 1
+                   username: lfinsto
+    dublin_core_metadata_id: 1
+            irods_server_id: 1
+          irods_object_path: /tempZone/home/lfinsto/abc.txt
+                  handle_id: 61
+dublin_core_metadata_sub_id: 1
+     dublin_core_element_id: 1
+               element_name: title
+        dublin_core_term_id: 0
+                  term_name: NULL_DUBLIN_CORE_TERM
+                      value: Sample Dublin Core Metadata (Title)
+@end group
+@group
+*************************** 2. row ***************************
+[@dots{}]
+dublin_core_metadata_sub_id: 2
+     dublin_core_element_id: 2
+               element_name: creator
+        dublin_core_term_id: 0
+                  term_name: NULL_DUBLIN_CORE_TERM
+                      value: Laurence D. Finston (Creator)
+@end group
+@group
+*************************** 3. row ***************************
+[@dots{}]
+dublin_core_metadata_sub_id: 3
+     dublin_core_element_id: 3
+               element_name: subject
+        dublin_core_term_id: 0
+                  term_name: NULL_DUBLIN_CORE_TERM
+                      value: Sample Dublin Core Metadata 1 (Subject)
+@end group
+@group
+*************************** 4. row ***************************
+[@dots{}]
+dublin_core_metadata_sub_id: 4
+     dublin_core_element_id: 4
+               element_name: description
+        dublin_core_term_id: 0
+                  term_name: NULL_DUBLIN_CORE_TERM
+                      value: Sample Dublin Core Metadata 1 (Description)
+@end group
+@group
+*************************** 5. row ***************************
+[@dots{}]
+dublin_core_metadata_sub_id: 5
+     dublin_core_element_id: 5
+               element_name: publisher
+        dublin_core_term_id: 0
+                  term_name: NULL_DUBLIN_CORE_TERM
+                      value: GWDG 1 (Publisher)
+@end group
+@group
+*************************** 6. row ***************************
+[@dots{}]
+dublin_core_metadata_sub_id: 6
+     dublin_core_element_id: 6
+               element_name: contributor
+        dublin_core_term_id: 0
+                  term_name: NULL_DUBLIN_CORE_TERM
+                      value: Sample contributor 1
+@end group
+@group
+*************************** 7. row ***************************
+[@dots{}]
+dublin_core_metadata_sub_id: 7
+     dublin_core_element_id: 7
+               element_name: date
+        dublin_core_term_id: 0
+                  term_name: NULL_DUBLIN_CORE_TERM
+                      value: 2012-12-06 12:11:26
+@end group
+@group
+*************************** 8. row ***************************
+[@dots{}]
+dublin_core_metadata_sub_id: 8
+     dublin_core_element_id: 8
+               element_name: type
+        dublin_core_term_id: 0
+                  term_name: NULL_DUBLIN_CORE_TERM
+                      value: iRODS object (Type)
+@end group
+@group
+*************************** 9. row ***************************
+[@dots{}]
+dublin_core_metadata_sub_id: 9
+     dublin_core_element_id: 9
+               element_name: format
+        dublin_core_term_id: 0
+                  term_name: NULL_DUBLIN_CORE_TERM
+                      value: ASCII (Format)
+@end group
+@group
+*************************** 10. row ***************************
+[@dots{}]
+dublin_core_metadata_sub_id: 10
+     dublin_core_element_id: 10
+               element_name: identifier
+        dublin_core_term_id: 0
+                  term_name: NULL_DUBLIN_CORE_TERM
+                      value: XXX (Identifier)
+@end group
+@group
+*************************** 11. row ***************************
+[@dots{}]
+dublin_core_metadata_sub_id: 11
+     dublin_core_element_id: 11
+               element_name: source
+        dublin_core_term_id: 0
+                  term_name: NULL_DUBLIN_CORE_TERM
+                      value: GWDG (Source)
+@end group
+@group
+*************************** 12. row ***************************
+[@dots{}]
+dublin_core_metadata_sub_id: 12
+     dublin_core_element_id: 12
+               element_name: language
+        dublin_core_term_id: 0
+                  term_name: NULL_DUBLIN_CORE_TERM
+                      value: English (Language)
+@end group
+@group
+*************************** 13. row ***************************
+[@dots{}]
+dublin_core_metadata_sub_id: 13
+     dublin_core_element_id: 13
+               element_name: relation
+        dublin_core_term_id: 0
+                  term_name: NULL_DUBLIN_CORE_TERM
+                      value: Not applicable (Relation)
+@end group
+@group
+*************************** 14. row ***************************
+[@dots{}]
+dublin_core_metadata_sub_id: 14
+     dublin_core_element_id: 14
+               element_name: coverage
+        dublin_core_term_id: 0
+                  term_name: NULL_DUBLIN_CORE_TERM
+                      value: Not applicable (Coverage)
+@end group
+@group
+*************************** 15. row ***************************
+[@dots{}]
+dublin_core_metadata_sub_id: 15
+     dublin_core_element_id: 15
+               element_name: rights
+        dublin_core_term_id: 0
+                  term_name: NULL_DUBLIN_CORE_TERM
+                      value: All rights reserved (Rights)
+@end group
+@group
+*************************** 16. row ***************************
+[@dots{}]
+dublin_core_metadata_sub_id: 16
+     dublin_core_element_id: 0
+               element_name: NULL_DUBLIN_CORE_ELEMENT
+        dublin_core_term_id: 1
+                  term_name: abstract
+                      value: Sample Abstract
+16 rows in set (0.01 sec)
+@end group
+@end example
+
+As indicated in the client-side terminal output from the @command{add metadata} 
+command, a handle, @samp{12345/00002}, is added for the Dublin Core (DC) metadata 
+and an AVU is created for the iRODS object @file{abc.txt}:
+
+@example
+get handle pid 12345/00002
+@result{}
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00002
+idx:                             11
+type:                            IRODS_OBJECT_PID
+data_length:                     11
+data:                            12345/00001
+[@dots{}]
+timestamp:                       1377860205 (2013-08-30 12:56:45 CEST)
+[@dots{}]
+handle_id:                       61
+handle_value_id:                 141
+irods_object_id:                 0
+created:                         1377860205 (2013-08-30 12:56:45 CEST)
+last_modified:                   0
+delete_from_database_timestamp:  0
+created_by_user:                 1 
+marked_for_deletion:             0
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00002
+idx:                             21
+type:                            IRODS_OBJECT_REF
+data_length:                     30
+data:                            /tempZone/home/lfinsto/abc.txt
+[@dots{}]
+handle_id:                       61
+[@dots{}]
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00002
+idx:                             91
+type:                            DC_METADATA
+data_length:                     83
+data:                            Qualified Dublin Core XML Metadata \
+   for iRODS object /tempZone/home/lfinsto/abc.txt.
+[@dots{}]
+handle_value_id:                 140
+[@dots{}]
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00002
+idx:                             300
+type:                            HS_ADMIN
+data_length:                     22
+data:                            ^G\363^@@^@@^@@
+0.NA/12345^@@^@@^@@\310^@@^@@
+[@dots{}]
+handle_value_id:                 139
+[@dots{}]
+@end example
+
+@noindent
+This handle contains handle values referring both to the iRODS object 
+@file{/tempZone/home/lfinsto/abc.txt} and the handle for the latter, 
+namely @samp{12345/00001}. 
+
+
+@example
+get metadata abc.txt
+@result{}
+get metadata -->
+Filename:        /tempZone/home/lfinsto/abc.txt
+Exit status:     0
+Number of AVUs:  2
+
+Irods_Object_Type:
+id ==                                   0
+path ==                                 /tempZone/home/lfinsto/abc.txt
+[@dots{}]
+avu_vector.size() == 2
+Showing avu_vector:
+Irods_AVU_Type:
+id ==                       0
+irods_object_id ==          0
+user_id ==                  0
+irods_object_path ==        (empty)
+attribute ==                PID
+value ==                    12345/00001
+units ==                    (empty)
+time_set ==                 1367603247 (seconds since epoch):  \
+   2013-05-03 19:47:27 CEST +0200
+deleted_from_archive ==     0
+deleted_from_gwirdsif_db == 0
+
+Irods_AVU_Type:
+id ==                       0
+irods_object_id ==          0
+user_id ==                  0
+irods_object_path ==        (empty)
+attribute ==                DC_METADATA_PID
+value ==                    12345/00002
+units ==                    (empty)
+time_set ==                 1369297602 (seconds since epoch):  \
+   2013-05-23 10:26:42 CEST +0200
+deleted_from_archive ==     0
+deleted_from_gwirdsif_db == 0
+
+
+[@dots{}]
+
+Received metadata for iRODS object `/tempZone/home/lfinsto/abc.txt'.
+Stored in temporary file:  /tmp/gwirdcli.00K8FW
+@end example
+
+@noindent
+The @command{get metadata} command tells the server to send any Dublin Core
+metadata for the iRODS object to the client, which stores it in a temporary
+file, here, @file{/tmp/gwirdcli.00K8FW}:
+
+@example
+cat /tmp/gwirdcli.00K8FW
+@result{}
+<?xml version="1.0"?>
+
+<metadata
+  xmlns="http://example.org/myapp/"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://example.org/myapp/ \
+     http://example.org/myapp/schema.xsd"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:dcterms="http://purl.org/dc/terms/">
+
+  <dc:title xsi:type="title attribute" xsi:typex="title attribute 2">
+    Sample Dublin Core Metadata (Title)
+  </dc:title>
+  <dc:creator>
+    Laurence D. Finston (Creator)
+  </dc:creator>
+[@dots{}]
+@end example
+
+@noindent
+Except for a couple of blank lines at the end of @file{metadata_sample_1.xml},
+the two files are identical:
+
+@example
+diff --brief /tmp/gwirdcli.00K8FW metadata_sample_1.xml
+@result{}
+Files /tmp/gwirdcli.00K8FW and metadata_sample_1.xml differ
+
+diff --ignore-blank-lines --brief \
+   /tmp/gwirdcli.00K8FW metadata_sample_1.xml; echo $?
+@result{}
+0
+@end example
+
+@noindent
+When the server converted the contents of @file{metadata_sample_1.xml} to 
+database entries, it ignored the trailing blank lines.  When it reversed the
+procedure to generate a text to send to the client, nothing more was known on the
+server-side about the blank lines in the original file (nor was there any reason
+for there to be).
+
+@c **** (4)
+
+If desired, the Dublin Core metadata can additionally be stored in an iRODS object of its own.
+To do this, call @command{add metadata} with the @option{store} option:
+
+@example
+add metadata metadata_sample_1.xml abc.txt store
+@result{}
+add metadata-->
+Exit status:                              0
+Metadata file                             metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Generated handle for metadata:  12345/00002.
+
+add metadata-->
+Exit status:                              0
+Metadata file                             metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Added handle value for handle `12345/00001' with type \
+   `IRODS_OBJECT_PID' to handle `12345/00002' successfully
+
+add metadata-->
+Exit status:                              0
+Metadata file                             metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Added handle value for iRODS object \
+      `/tempZone/home/lfinsto/abc.txt' with type `IRODS_OBJECT_REF' \
+      to handle `12345/00002' successfully
+
+add metadata-->
+Exit status:                              0
+Metadata file                             metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Added handle value for handle `12345/00002' with type \
+      `DC_METADATA_PID' to handle `12345/00001' successfully
+
+add metadata-->
+Exit status:                              0
+Metadata file                             metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Call to `imeta' succeeded.  Added AVU with type `DC_METADATA_PID' \
+      and value `12345/00002' to iRODS object \
+      `/tempZone/home/lfinsto/abc.txt'.
+
+store metadata-->
+Exit status:                              0
+Dublin Core metadata/iRODS object file:   \
+   /tempZone/home/lfinsto/metadata_sample_1.xml
+iRODS object referred to:                 /tempZone/home/lfinsto/abc.txt
+Server message:
+   Generated handle 12345/00003 for Dublin Core metadata iRODS object \
+      `/tempZone/home/lfinsto/metadata_sample_1.xml'.
+
+add metadata-->
+Exit status:                              0
+Metadata file                             metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Stored Dublin Core metadata in iRODS object \
+      `/tempZone/home/lfinsto/metadata_sample_1.xml' successfully.
+
+add metadata-->
+Exit status:                              0
+Metadata file                             metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   (Success)
+@end example
+
+The @command{ls} command shows that the server has created an 
+iRODS object @file{metadata_sample_1.xml} for me in my current working iRODS directory:
+
+
+@example
+echo "ls" | gwirdcli --suppress-prompt localhost
+@result{}
+ls -->
+/tempZone/home/lfinsto:
+  abc.txt
+  metadata_sample_1.xml
+@end example
+
+Yet another handle, @samp{12345/00003}, has been created for this iRODS object,
+in addition to @samp{12345/00002}, which refers to the Dublin Core metadata
+stored in the @code{gwirdsif.Dublin_Core_Metadata} and
+@code{gwirdsif.Dublin_Core_Metadata_Sub} database tables:
+
+@example
+get handle pid 12345/00003
+@result{}
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00003
+idx:                             11
+type:                            IRODS_OBJECT_PID
+data_length:                     11
+data:                            12345/00001
+[@dots{}]
+timestamp:                       1377863624 (2013-08-30 13:53:44 CEST)
+[@dots{}]
+handle_id:                       62
+handle_value_id:                 147
+irods_object_id:                 0
+created:                         1377863624 (2013-08-30 13:53:44 CEST)
+last_modified:                   0
+delete_from_database_timestamp:  0
+created_by_user:                 1 
+marked_for_deletion:             0
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00003
+idx:                             21
+type:                            IRODS_OBJECT_REF
+data_length:                     30
+data:                            /tempZone/home/lfinsto/abc.txt
+[@dots{}]
+handle_value_id:                 146
+[@dots{}]
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00003
+idx:                             101
+type:                            DC_METADATA_PID
+data_length:                     11
+data:                            12345/00002
+[@dots{}]
+handle_value_id:                 148
+[@dots{}]
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00003
+idx:                             121
+type:                            DC_METADATA_IRODS_OBJECT
+data_length:                     44
+data: \
+   /tempZone/home/lfinsto/metadata_sample_1.xml
+[@dots{}]
+handle_value_id:                 145
+[@dots{}]
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00003
+idx:                             300
+type:                            HS_ADMIN
+data_length:                     22
+data:                            ^G\363^@@^@@^@@
+0.NA/12345^@@^@@^@@\310^@@^@@
+[@dots{}]
+handle_value_id:                 144
+[@dots{}]
+@end example
+
+@noindent
+This handle contains a handle value with index (@code{idx}) 121, 
+type @code{DC_METADATA_IRODS_OBJECT} and 
+data @samp{/tempZone/home/lfinsto/metadata_sample_1.xml}, as well as handle values
+referring to the iRODS object @file{/tempZone/home/lfinsto/abc.txt}, its handle
+@samp{12345/00001} and finally the handle @samp{12345/00002} for the 
+Dublin Core metadata stored in the @code{gwirdsif} database.
+
+@noindent
+AVUs have been created for the iRODS object@*
+@file{/tempZone/home/lfinsto/metadata_sample_1.xml}
+referring to it's own handle @samp{12345/00003}, 
+the handle @samp{12345/00002} for the Dublin Core metadata in the
+@code{gwirdsif} database, the iRODS object @file{/tempZone/home/lfinsto/abc.txt}, 
+and the latter's handle @samp{12345/00001}:
+
+@example
+get metadata metadata_sample_1.xml
+@result{}
+get metadata -->
+Filename:        /tempZone/home/lfinsto/metadata_sample_1.xml
+Exit status:     0
+Number of AVUs:  5
+
+Irods_Object_Type:
+id ==                                   0
+path == \
+   /tempZone/home/lfinsto/metadata_sample_1.xml
+[@dots{}]
+avu_vector.size() == 5
+Showing avu_vector:
+Irods_AVU_Type:
+id ==                       0
+irods_object_id ==          0
+user_id ==                  0
+irods_object_path ==        (empty)
+attribute ==                IRODS_OBJECT_PID
+value ==                    12345/00001
+units ==                    (empty)
+time_set ==                 1369397378 (seconds since epoch): \
+   2013-05-24 14:09:38 CEST +0200
+deleted_from_archive ==     0
+deleted_from_gwirdsif_db == 0
+
+Irods_AVU_Type:
+id ==                       0
+irods_object_id ==          0
+user_id ==                  0
+irods_object_path ==        (empty)
+attribute ==                IRODS_OBJECT_REF
+value ==                    /tempZone/home/lfinsto/abc.txt
+[@dots{}]
+
+Irods_AVU_Type:
+id ==                       0
+irods_object_id ==          0
+user_id ==                  0
+irods_object_path ==        (empty)
+attribute ==                DC_METADATA_PID
+value ==                    12345/00002
+[@dots{}]
+
+Irods_AVU_Type:
+id ==                       0
+irods_object_id ==          0
+user_id ==                  0
+irods_object_path ==        (empty)
+attribute ==                PID
+value ==                    12345/00003
+[@dots{}]
+
+Irods_AVU_Type:
+id ==                       0
+irods_object_id ==          0
+user_id ==                  0
+irods_object_path ==        (empty)
+attribute ==                TYPE
+value ==                    DC_METADATA_IRODS_OBJECT
+[@dots{}]
+
+[@dots{}]
+@end example
+
+@cindex Dublin Core metadata iRODS object
+@cindex iRODS object, Dublin Core metadata 
+@c
+Handle values referring to the @dfn{Dublin Core metadata iRODS object}
+@file{/tempZone/home/lfinsto/metadata_sample_1.xml} and its
+handle @samp{12345/00003} have also been added to the handles @samp{12345/00001} 
+and @samp{12345/00002}: 
+
+@example
+get handle pid 12345/00001 
+get handle pid 12345/00002
+@result{}
+get handle -->
+Response code:                   0
+filename:                        /tempZone/home/lfinsto/abc.txt
+handle:                          12345/00001
+idx:                             1
+type:                            IRODS_OBJECT
+data_length:                     30
+data:                            /tempZone/home/lfinsto/abc.txt
+[@dots{}]
+timestamp:                       1377863607 (2013-08-30 13:53:27 CEST)
+[@dots{}]
+handle_id:                       60
+handle_value_id:                 137
+irods_object_id:                 0
+created:                         1377863607 (2013-08-30 13:53:27 CEST)
+last_modified:                   0
+[@dots{}]
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00001
+idx:                             101
+type:                            DC_METADATA_PID
+data_length:                     11
+data:                            12345/00002
+[@dots{}]
+handle_value_id:                 143
+[@dots{}]
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00001
+idx:                             131
+type:                            DC_METADATA_IRODS_OBJECT_PID
+data_length:                     11
+data:                            12345/00003
+[@dots{}]
+handle_value_id:                 150
+[@dots{}]
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00001
+idx:                             141
+type:                            DC_METADATA_IRODS_OBJECT_REF
+data_length:                     44
+data: \
+   /tempZone/home/lfinsto/metadata_sample_1.xml
+[@dots{}]
+handle_value_id:                 149
+[@dots{}]
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00001
+idx:                             211
+type:                            CREATOR
+data_length:                     68
+data: \
+   /C=DE/O=GWDG/OU=gwrdifpk/L=Goettingen/ST=Germany/CN=Laurence Finston
+[@dots{}]
+handle_value_id:                 138
+[@dots{}]
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00001
+idx:                             300
+type:                            HS_ADMIN
+data_length:                     22
+data:                            ^G\363^@@^@@^@@
+0.NA/12345^@@^@@^@@\310^@@^@@
+[@dots{}]
+handle_value_id:                 136
+[@dots{}]
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00002
+idx:                             11
+type:                            IRODS_OBJECT_PID
+data_length:                     11
+data:                            12345/00001
+[@dots{}]
+handle_value_id:                 141
+[@dots{}]
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00002
+idx:                             21
+type:                            IRODS_OBJECT_REF
+data_length:                     30
+data:                            /tempZone/home/lfinsto/abc.txt
+[@dots{}]
+handle_value_id:                 142
+[@dots{}]
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00002
+idx:                             91
+type:                            DC_METADATA
+data_length:                     83
+data: \
+   Qualified Dublin Core XML Metadata for iRODS object \
+   /tempZone/home/lfinsto/abc.txt.
+[@dots{}]
+handle_value_id:                 140
+[@dots{}]
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00002
+idx:                             131
+type:                            DC_METADATA_IRODS_OBJECT_PID
+data_length:                     11
+data:                            12345/00003
+[@dots{}]
+handle_value_id:                 152
+[@dots{}]
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00002
+idx:                             141
+type:                            DC_METADATA_IRODS_OBJECT_REF
+data_length:                     44
+data: \
+   /tempZone/home/lfinsto/metadata_sample_1.xml
+[@dots{}]
+handle_value_id:                 151
+[@dots{}]
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00002
+idx:                             300
+type:                            HS_ADMIN
+data_length:                     22
+data:                            ^G\363^@@^@@^@@
+0.NA/12345^@@^@@^@@\310^@@^@@
+[@dots{}]
+handle_value_id:                 139
+[@dots{}]
+@end example
+
+@noindent
+AVUs have also been added to the iRODS object @file{/tempZone/home/lfinsto/abc.txt}:
+
+@example
+get metadata abc.txt
+@result{}
+get metadata -->
+Filename:        /tempZone/home/lfinsto/abc.txt
+Exit status:     0
+Number of AVUs:  4
+
+Irods_Object_Type:
+id ==                                   0
+path ==                                 /tempZone/home/lfinsto/abc.txt
+[@dots{}]
+avu_vector.size() == 4
+Showing avu_vector:
+Irods_AVU_Type:
+id ==                       0
+irods_object_id ==          0
+user_id ==                  0
+irods_object_path ==        (empty)
+attribute ==                DC_METADATA_IRODS_OBJECT_REF
+value ==                    /tempZone/home/lfinsto/metadata_sample_1.xml
+units ==                    (empty)
+time_set ==                 1369400978 (seconds since epoch): \
+   2013-05-24 15:09:38 CEST +0200
+deleted_from_archive ==     0
+deleted_from_gwirdsif_db == 0
+
+Irods_AVU_Type:
+id ==                       0
+irods_object_id ==          0
+user_id ==                  0
+irods_object_path ==        (empty)
+attribute ==                DC_METADATA_IRODS_OBJECT_PID
+value ==                    12345/00003
+[@dots{}]
+
+Irods_AVU_Type:
+id ==                       0
+irods_object_id ==          0
+user_id ==                  0
+irods_object_path ==        (empty)
+attribute ==                DC_METADATA_PID
+value ==                    12345/00002
+[@dots{}]
+
+Irods_AVU_Type:
+id ==                       0
+irods_object_id ==          0
+user_id ==                  0
+irods_object_path ==        (empty)
+attribute ==                PID
+value ==                    12345/00001
+[@dots{}]
+
+[@dots{}]
+
+Received metadata for iRODS object `/tempZone/home/lfinsto/abc.txt'.
+Stored in temporary file:  /tmp/gwirdcli.1AX3MU
+@end example
+
+@noindent
+Finally, AVUs have been added to the iRODS object 
+@file{/tempZone/home/lfinsto/abc.txt} referring to
+@file{metadata_sample_1.xml} and its handle @samp{12345/00003}, 
+as well as to the handle for the Dublin Core metadata in the @code{gwirdsif}
+database, namely @samp{12345/00002}:
+
+@example
+get metadata -->
+Filename:        /tempZone/home/lfinsto/abc.txt
+Exit status:     0
+Number of AVUs:  4
+
+Irods_Object_Type:
+id ==                                   0
+path ==                                 /tempZone/home/lfinsto/abc.txt
+[@dots{}]
+avu_vector.size() == 4
+Showing avu_vector:
+Irods_AVU_Type:
+id ==                       0
+irods_object_id ==          0
+user_id ==                  0
+irods_object_path ==        (empty)
+attribute ==                DC_METADATA_IRODS_OBJECT_REF
+value ==                    /tempZone/home/lfinsto/metadata_sample_1.xml
+units ==                    (empty)
+time_set ==                 1369397378 (seconds since epoch): \
+   2013-05-24 14:09:38 CEST +0200
+deleted_from_archive ==     0
+deleted_from_gwirdsif_db == 0
+
+Irods_AVU_Type:
+id ==                       0
+irods_object_id ==          0
+user_id ==                  0
+irods_object_path ==        (empty)
+attribute ==                DC_METADATA_IRODS_OBJECT_PID
+value ==                    12345/00003
+[@dots{}]
+
+Irods_AVU_Type:
+id ==                       0
+irods_object_id ==          0
+user_id ==                  0
+irods_object_path ==        (empty)
+attribute ==                DC_METADATA_PID
+value ==                    12345/00002
+[@dots{}]
+
+Irods_AVU_Type:
+id ==                       0
+irods_object_id ==          0
+user_id ==                  0
+irods_object_path ==        (empty)
+attribute ==                PID
+value ==                    12345/00001
+[@dots{}]
+
+[@dots{}]
+@end example
+
+@c *** (3) Deleting and Undeleting (Getting Started)
+
+@node Deleting and Undeleting (Getting Started), , Dublin Core Metadata (Getting Started), gwirdcli (Getting Started)
+@subsection Deleting and Undeleting
+
+In most of the following examples, and in most of the ones in subsequent chapters, only the
+commands are shown, not the calls to @command{gwirdcli}, as in the examples above.
+For information on how to invoke @command{gwirdcli}, 
+see @ref{Invoking gwirdcli (Getting Started), , Invoking gwirdcli}, above.
+
+@menu
+* Handles (Deleting and Undeleting)::
+* iRODS Objects (Deleting and Undeleting)::
+* Dublin Core metadata (Deleting and Undeleting)::
+@end menu
+
+@c **** (4) iRODS Objects (Deleting and Undeleting)
+
+@node iRODS Objects (Deleting and Undeleting), Handles (Deleting and Undeleting), , Deleting and Undeleting (Getting Started)
+@subsubsection iRODS Objects
+
+@cindex iRODS objects, deleting
+@cindex deleting iRODS objects
+@c
+If I decide that I no longer need the remote iRODS object @file{abc.txt}, 
+I can delete it with the @command{rm} command:
+
+@example
+rm abc.txt
+@result{}
+Mark iRODS object for deletion response -->
+iRODS object path(s):          /tempZone/home/lfinsto/abc.txt
+Response code:                 0
+Options:                       0
+Marked for deletion from archive.
+Message:                       Success
+@end example
+
+@noindent 
+Huh?  It was just ``marked for deletion''?!  I can use the @command{ls} command 
+to check if it still exists:  
+
+@example
+echo "ls abc.txt" | gwirdcli --suppress-prompt localhost
+@result{}
+ls -->
+ERROR: lsUtil: srcPath /tempZone/home/lfinsto/abc.txt does not exist \
+   or user lacks access permission
+@end example
+
+@noindent 
+No, it was deleted alright.  
+
+@cindex purging
+@cindex thread function
+@c
+When the @command{rm} command is used without any options, the iRODS object is 
+``marked for immediate deletion''.  If @command{gwirdsif} has been invoked in 
+such a way that @dfn{purging} the iRODS archive is enabled, then a thread 
+in which a function for this purpose is running will be ``woken up'' and the 
+iRODS object will be deleted.
+
+Once an iRODS object has been deleted, however, it cannot be recovered, unless an external 
+backup system is used.  It may therefore often be useful to delay deletion for a period of 
+time, in order to give oneself time to reconsider.  During this ``window'' of time, 
+the iRODS object can be ``undeleted'' using the @command{undelete} command.  
+
+In order to be able to do this, @command{rm} must be called using the @option{delay} 
+option, which takes an optional argument:
+
+@example
+echo "rm --delay abc.txt" | gwirdcli --suppress-prompt localhost
+@result{}
+Mark iRODS object for deletion response -->
+iRODS object path(s):          /tempZone/home/lfinsto/abc.txt
+Response code:                 0
+Options:                       1
+Marked for deletion from archive.
+Timestamp (deletion time):     1377789922 == 2013-08-29 17:25:22 CEST
+Message:                       Success
+@end example
+
+@vindex purge_irods_archive_limit
+@c
+@noindent 
+The ``deletion time'' is 2013-08-29 17:25:22 CEST, which happens to be the 
+current time when the author typed this paragraph.  However, the time that 
+the iRODS object will actually be deleted depends on the server-side parameter
+@var{purge_irods_archive_limit}.  This parameter can be set by using the 
+command-line option @option{--purge-irods-archive-limit} when starting the server.  
+Its default value is 172,800, which is two days in seconds.  The function that 
+actually deletes the iRODS objects won't do so until @var{purge_irods_archive_limit} 
+seconds have elapsed since the time stored in the ``deletion time'' timestamp.
+
+@vindex purge_irods_archive_limit
+@c
+Users of the client, however, will not necessarily know the value of 
+@var{purge_irods_archive_limit}, which may also differ from run-to-run of the server.
+In addition, there is no way at present for a user to query the server for the 
+current value of @var{purge_irods_archive_limit}.  If I want to be sure that an 
+iRODS object won't be deleted for, say, a week, then I can call the @command{rm} 
+command with the @option{--delay} and an argument to the latter:
+
+@example
+echo "rm --delay 7: abc.txt" | gwirdcli --suppress-prompt localhost
+@result{}
+Mark iRODS object for deletion response -->
+iRODS object path(s):          /tempZone/home/lfinsto/abc.txt
+Response code:                 0
+Options:                       1
+Marked for deletion from archive.
+Timestamp (deletion time):     1378395406 == 2013-09-05 17:36:46 CEST
+Message:                       Success
+@end example
+
+@vindex purge_irods_archive_limit
+@c
+@noindent 
+The argument @samp{7:} tells the server to set the deletion time timestamp to a 
+time seven days in the future.  Now, the purge function will delete the iRODS 
+object at the soonest @var{purge_irods_archive_limit} seconds after this time.
+
+@vindex purge_irods_archive_limit
+@c
+Please note that if @var{purge_irods_archive_limit} is set to 0, then all iRODS 
+objects that have been marked for deletion and whose timestamps are earlier than 
+the current time will be deleted as soon as the purge function runs.  This will 
+be all iRODS objects that have been deleted without specifying a delay plus those 
+whose ``delay'' has expired.
+
+@vindex purge_irods_archive_interval
+@findex purge_irods_archive
+@cindex sleep (thread)
+@cindex thread, sleep 
+@cindex waking up (thread)
+@cindex thread, waking up 
+@c
+The way iRODS objects are purged is also influenced by a second parameter,
+namely @var{purge_irods_archive_interval}, which can be set using the
+command-line option @option{--purge-irods-archive-interval}.  The function
+@code{purge_irods_archive} runs in an endless loop.
+@var{purge_irods_archive_interval} is the time in seconds that the purge thread
+``sleeps'' between iterations of this loop, unless it's ``woken up'' for an
+immediate deletion.  The default value of @var{purge_irods_archive_interval} is
+3600, i.e., one hour in seconds.  Purging can be suppressed entirely by invoking
+@command{gwirdsif} with 0 as the argument to the
+@option{--purge-irods-archive-interval} option:
+
+@example
+gwirdsif --purge-irods-archive-interval 0 [@dots{}]
+@end example
+
+@noindent
+In this case, the purge thread won't be started at all.  
+
+@cindex session
+@c
+One consequence of performing the actual deletion in a separate thread is 
+that the thread function has no connection with any @dfn{session} in which 
+the server is communicating with the client.  That is, the purge thread has 
+no way of communicating with the owner of the iRODS objects, who may not even 
+be communicating with the server when the actual deletion takes place.  It is 
+therefore not possible for the server to send a response to the client informing 
+the latter when deletion has taken place.
+
+If I now decide that deleting @file{abc.txt} was a mistake, after all, 
+I can cancel the pending deletion with the @command{undelete} command:
+
+@example
+echo "undelete abc.txt" | gwirdcli --suppress-prompt localhost
+@result{}
+Undelete response -->
+Response code:         0
+iRODS object name(s):  /tempZone/home/lfinsto/abc.txt
+Message:               Undeleted iRODS objects successfully
+@end example
+
+@example
+mysql> select * from gwirdsif.Irods_Objects where irods_object_id > 0\G
+@result{}
+*************************** 1. row ***************************
+                     irods_object_id: 1
+                             user_id: 1
+                     irods_server_id: 1
+                   irods_object_path: /tempZone/home/lfinsto/abc.txt
+    marked_for_deletion_from_archive: 0
+                deleted_from_archive: 0
+       delete_from_archive_timestamp: 0000-00-00 00:00:00
+marked_for_deletion_from_gwirdsif_db: 0
+   delete_from_gwirdsif_db_timestamp: 0000-00-00 00:00:00
+                             created: 2013-08-29 17:36:45
+                       last_modified: 2013-08-29 18:05:37
+1 row in set (0.00 sec)
+@end example
+
+In the row for @file{abc.txt} in the @samp{gwirdsif.Irods_Objects} database
+table, the fields @samp{marked_for_deletion_from_gwirdsif_db} and
+@samp{delete_from_archive_timestamp} have been reset to 0 (the latter displayed
+as a timestamp), and the field @samp{last_modified} has been updated.  Now, when
+the purging function next runs, it will not delete @samp{abc.txt}.
+
+@c **** (4) Handles (Deleting and Undeleting)
+
+@node Handles (Deleting and Undeleting), Dublin Core metadata (Deleting and Undeleting), iRODS Objects (Deleting and Undeleting), Deleting and Undeleting (Getting Started)
+@subsubsection Handles 
+
+@cindex handles, deleting
+@cindex deleting handles
+@c
+Handles, too, can be deleted and undeleted:
+
+@example
+delete handle "12345/00001"
+@result{}
+Delete handle response -->
+Response code:  0 (Success)
+Handle:         12345/00001
+Message:        Marked 4 rows for deletion from \
+   `handlesystem_standalone.handles' database table
+@end example
+
+@noindent
+As with iRODS objects, handles are first marked for deletion and then finally
+deleted by a ``purging'' function in a separate thread, whereby different
+threads and functions are used for iRODS objects and handles.
+
+@cindex command-line options
+@vindex purge_database_interval
+@vindex purge_database_limit
+@c
+Analogous to the way purging is managed for iRODS objects 
+(@pxref{iRODS Objects (Deleting and Undeleting), , iRODS Objects}),
+the way handles are purged is controlled by two parameters, namely
+@var{purge_database_interval} and @var{purge_database_limit}, which can be set
+using the command-line options @option{--purge-database-interval} and 
+@option{--purge-database-limit}, respectively.
+
+@cindex Corporation for National Research Initiatives (CNRI)
+@cindex CNRI (Corporation for National Research Initiatives)
+@cindex Handle System, The
+@cindex standalone handle service
+@cindex handle service, standalone 
+@c
+Purging handles is simpler than purging iRODS objects because the former exist
+only in the form of rows in a database table, whereas the database entries for iRODS
+objects refer to objects within the iRODS system, i.e., external to the
+@command{gwrdifpk} system.  The handle database may either be
+@samp{handlesystem} for handles with prefixes registered with CNRI's 
+Handle System, or @samp{handlesystem_standalone} for a @dfn{standalone} handle
+service using private prefixes and not integrated with the global Handle System.
+
+@example
+get handle pid 12345/00001
+@result{} 
+get handle -->
+Response code:                   0
+filename:                        /tempZone/home/lfinsto/abc.txt
+handle:                          12345/00001
+idx:                             1
+type:                            IRODS_OBJECT
+data_length:                     30
+data:                            /tempZone/home/lfinsto/abc.txt
+[@dots{}]
+timestamp:                       1377790605 (2013-08-29 17:36:45 CEST)
+[@dots{}]
+handle_id:                       56
+handle_value_id:                 130
+irods_object_id:                 0
+created:                         1377790605 (2013-08-29 17:36:45 CEST)
+last_modified:                   1377850629 (2013-08-30 10:17:09 CEST)
+delete_from_database_timestamp:  1377850629 (2013-08-30 10:17:09 CEST)
+created_by_user:                 1 
+marked_for_deletion:             1
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00001
+idx:                             211
+type:                            CREATOR
+data_length:                     68
+data: \
+   /C=DE/O=GWDG/OU=gwrdifpk/L=Goettingen/ST=Germany/CN=Laurence Finston
+[@dots{}]
+timestamp:                       1377790605 (2013-08-29 17:36:45 CEST)
+[@dots{}]
+handle_id:                       56
+handle_value_id:                 131
+irods_object_id:                 0
+created:                         1377790605 (2013-08-29 17:36:45 CEST)
+last_modified:                   1377850629 (2013-08-30 10:17:09 CEST)
+delete_from_database_timestamp:  1377850629 (2013-08-30 10:17:09 CEST)
+created_by_user:                 1 
+marked_for_deletion:             1
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00001
+idx:                             231
+type:                            HANDLE_MARKED_FOR_DELETION
+data_length:                     23
+data:                            2013-08-30 08:17:09 UTC
+[@dots{}]
+timestamp:                       1377850629 (2013-08-30 10:17:09 CEST)
+[@dots{}]
+handle_id:                       56
+handle_value_id:                 132
+irods_object_id:                 0
+created:                         1377850629 (2013-08-30 10:17:09 CEST)
+last_modified:                   1377850629 (2013-08-30 10:17:09 CEST)
+delete_from_database_timestamp:  1377850629 (2013-08-30 10:17:09 CEST)
+created_by_user:                 1 
+marked_for_deletion:             1
+
+get handle -->
+Response code:                   0
+filename:                        
+handle:                          12345/00001
+idx:                             300
+type:                            HS_ADMIN
+data_length:                     22
+data:                            ^G\363^@@^@@^@@
+0.NA/12345^@@^@@^@@\310^@@^@@
+[@dots{}]
+timestamp:                       1377790605 (2013-08-29 17:36:45 CEST)
+[@dots{}]
+handle_id:                       56
+handle_value_id:                 129
+irods_object_id:                 0
+created:                         1377790605 (2013-08-29 17:36:45 CEST)
+last_modified:                   1377850629 (2013-08-30 10:17:09 CEST)
+delete_from_database_timestamp:  1377850629 (2013-08-30 10:17:09 CEST)
+created_by_user:                 1 
+marked_for_deletion:             1
+@end example
+
+
+@noindent
+In all of the handle values, the field @samp{marked_for_deletion} has been set
+to 1 and the fields @samp{delete_from_database_timestamp} and
+@samp{last_modified} have been set to the current time.  Furthermore, a handle
+value with index (@samp{idx}) 231 and type @code{HANDLE_MARKED_FOR_DELETION} has
+been added to the handle.
+
+If purging the database hasn't been disabled by calling @command{gwirdsif} with
+@samp{--purge-database-interval 0}, then the thread function
+@code{purge_server_database} will delete the handle when it next runs after the
+limit @var{purge_database_limit} has expired.  
+
+Let's say the limit has expired and @code{purge_server_database} has deleted the
+handle.  Now, trying to retrieve the handle fails:
+
+@example
+get handle pid 12345/00001
+@result{}
+get handle -->
+Server-side error:
+Response code:   3
+handle:          12345/00001
+Database query returned 0 rows
+@end example
+
+@noindent
+Remember the AVU that was created for @file{abc.txt} to store the PID?  It's
+been deleted, too:
+
+@example
+get metadata abc.txt
+@result{}
+get metadata -->
+Filename:        /tempZone/home/lfinsto/abc.txt
+Exit status:     0
+Number of AVUs:  0
+
+No user-defined metadata (AVUs) to display
+@end example
+
+@cindex immediate deletion 
+@cindex deletion, immediate 
+@cindex marking for immediate deletion 
+@cindex immediate deletion, marking for
+@cindex delay
+@cindex delayed deletion
+@cindex deletion, delayed 
+@cindex marking for delayed deletion 
+@cindex delayed deletion, marking for
+@c
+Please note that whereas iRODS objects are marked for immediate deletion by default and any delay
+must be specified with the @option{delay} option, handles are marked for delayed
+deletion by default.  If immediate deletion is desired for a handle, then this
+must be specified using the @option{immediate} option.  
+
+@cindex delayed deletion
+@cindex deletion, delayed 
+@cindex icommands
+@c
+The reason for this difference is that the @command{gwrdifpk} commands based on
+iRODS' icommands, such as @command{rm}, based on @command{irm}, are intended to
+function as much like their models as possible and not to diverge unless there's
+a good reason.  @command{irm} deletes an iRODS object immediately;  there is no
+concept of delayed deletion in iRODS itself, at least on the level of the
+icommands interface.
+
+@cindex immediate deletion 
+@cindex deletion, immediate 
+@cindex delayed deletion
+@cindex deletion, delayed 
+@c
+The author is considering implementing a @command{delete} command for iRODS
+objects, analogous to @command{delete} for handles, i.e., with delayed deletion
+by default.
+
+@c **** (4) Dublin Core metadata (Deleting and Undeleting)
+
+@node Dublin Core metadata (Deleting and Undeleting), , Handles (Deleting and Undeleting), Deleting and Undeleting (Getting Started)
+
+@subsubsection Dublin Core metadata
+
+Dublin Core metadata can also be deleted, whereby the procedure is similar to that used for iRODS objects and handles.
+An added complication is that Dublin Core metadata may also be stored in an iRODS object of its own.  When deleting, 
+users may specify whether the database entry containing the metadata is deleted, or the iRODS object, or both.
+
+@noindent 
+Example:
+
+@smallexample
+put -f +pid +gen abc.txt
+add metadata "metadata_sample_1.xml" "abc.txt" 
+
+@r{(Client output:)}
+
+put -->
+Filename:     /tempZone/home/lfinsto/abc.txt
+Exit status:  0
+Response:     `iput' command succeeded, returning 0
+
+put -->
+Filename:     /tempZone/home/lfinsto/abc.txt
+Exit status:  0
+Response:     Success:  Generated PID `12345/00001'
+
+put -->
+Filename:     /tempZone/home/lfinsto/abc.txt
+Exit status:  0
+Response:     Added handle values with type == `IRODS_OBJECT' \
+                 and type == `CREATOR_INDEX' successfully
+
+put -->
+Filename:     /tempZone/home/lfinsto/abc.txt
+Exit status:  0
+Response:     Success:  Stored PID `12345/00001' in iRODS object metadata
+
+add metadata-->
+Exit status:                              0
+Metadata file                             /tempZone/home/lfinsto/metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Generated handle for metadata:  12345/00002.
+
+add metadata-->
+Exit status:                              0
+Metadata file                             /tempZone/home/lfinsto/metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Added handle value for handle `12345/00001' with type `IRODS_OBJECT_PID' \
+      to handle `12345/00002' successfully
+
+add metadata-->
+Exit status:                              0
+Metadata file                             /tempZone/home/lfinsto/metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Added handle value for iRODS object `/tempZone/home/lfinsto/abc.txt' \
+      with type `IRODS_OBJECT_REF' to handle `12345/00002' successfully
+
+add metadata-->
+Exit status:                              0
+Metadata file                             /tempZone/home/lfinsto/metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Added handle value for handle `12345/00002' with type `DC_METADATA_PID' \
+      to handle `12345/00001' successfully
+
+add metadata-->
+Exit status:                              0
+Metadata file                             /tempZone/home/lfinsto/metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Call to `imeta' succeeded.  Added AVU with type `DC_METADATA_PID' \
+      and value `12345/00002' to iRODS object `/tempZone/home/lfinsto/abc.txt'.
+
+add metadata-->
+Exit status:                              0
+Metadata file                             /tempZone/home/lfinsto/metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   (Success)
+@end smallexample
+
+@noindent 
+An iRODS object @file{abc.txt}, the handles @samp{12345/00001} and @samp{12345/00001} and 
+rows have been created in the tables @code{Dublin_Core_Metadata} 
+and @code{Dublin_Core_Metadata_Sub} in the @code{gwirdsif} database:
+
+@smallexample
+mysql> select * from Dublin_Core_Metadata where dublin_core_metadata_id = 1\G
+
+@result{} 
+
+*************************** 1. row ***************************
+       dublin_core_metadata_id: 1
+                       user_id: 1
+               irods_server_id: 1
+             irods_object_path: /tempZone/home/lfinsto/abc.txt
+                     handle_id: 118
+           marked_for_deletion: 0
+                       created: 2013-12-04 14:36:45
+                 last_modified: 0000-00-00 00:00:00
+delete_from_database_timestamp: 0000-00-00 00:00:00
+                   delete_file: 0
+ dc_metadata_irods_object_path: /tempZone/home/lfinsto/metadata_sample_1.xml
+           irods_object_ref_id: 1
+          irods_object_self_id: 0
+1 row in set (0.00 sec)
+
+mysql> select * from Dublin_Core_Metadata_Sub where dublin_core_metadata_id = 1 
+       order by dublin_core_metadata_sub_id\G
+
+@result{} 
+
+*************************** 1. row ***************************
+dublin_core_metadata_sub_id: 1
+    dublin_core_metadata_id: 1
+     dublin_core_element_id: 1
+        dublin_core_term_id: 0
+                      value: Sample Dublin Core Metadata (Title)
+*************************** 2. row ***************************
+dublin_core_metadata_sub_id: 2
+    dublin_core_metadata_id: 1
+     dublin_core_element_id: 2
+        dublin_core_term_id: 0
+                      value: Laurence D. Finston (Creator)
+*************************** 3. row ***************************
+dublin_core_metadata_sub_id: 3
+    dublin_core_metadata_id: 1
+     dublin_core_element_id: 3
+        dublin_core_term_id: 0
+                      value: Sample Dublin Core Metadata 1 (Subject)
+
+[@dots{}]
+
+16 rows in set (0.00 sec)
+@end smallexample
+
+In the row for the iRODS object @samp{abc.txt} in the @code{Irods_Objects} 
+database table, the field @code{dublin_core_metadata_id} contains a reference 
+to the @code{dublin_core_metadata_id} field of the row in the @code{Dublin_Core_Metadata} 
+table: 
+
+@smallexample
+mysql> select * from Irods_Objects where irods_object_id > 0\G
+*************************** 1. row ***************************
+                     irods_object_id: 1
+                             user_id: 1
+                     irods_server_id: 1
+                   irods_object_path: /tempZone/home/lfinsto/abc.txt
+    marked_for_deletion_from_archive: 0
+                deleted_from_archive: 0
+       delete_from_archive_timestamp: 0000-00-00 00:00:00
+marked_for_deletion_from_gwirdsif_db: 0
+   delete_from_gwirdsif_db_timestamp: 0000-00-00 00:00:00
+                             created: 2013-12-04 14:36:45
+                       last_modified: 0000-00-00 00:00:00
+             dublin_core_metadata_id: 1
+dublin_core_metadata_irods_object_id: 0
+                 irods_object_ref_id: 0
+1 row in set (0.00 sec)
+@end smallexample
+
+@cindex Dublin Core metadata, marking for deletion
+@cindex marking for deletion, Dublin Core metadata 
+@cindex deletion, marking for, Dublin Core metadata
+@cindex metadata, Dublin Core, marking for deletion
+@c
+The command @code{delete metadata abc.txt} does not cause the Dublin Core metadata 
+to be deleted immediately, but rather @dfn{marks it for deletion} by setting the 
+value of the @code{marked_for_deletion} field to 1 and that of the 
+@code{delete_from_database_timestamp} and @code{last_modified} fields to the current time:
+
+@smallexample
+delete metadata abc.txt
+
+@r{(Client output:)}
+
+Delete metadata value response -->
+Response code:                0 (GW_SUCCESS)
+Filename (iRODS object path): /tempZone/home/lfinsto/abc.txt
+Options:                      0 (00000000)
+Message:                      Success
+
+mysql> select * from Dublin_Core_Metadata where dublin_core_metadata_id = 1\G
+
+@result{} 
+
+*************************** 1. row ***************************
+       dublin_core_metadata_id: 1
+                       user_id: 1
+               irods_server_id: 1
+             irods_object_path: /tempZone/home/lfinsto/abc.txt
+                     handle_id: 118
+           marked_for_deletion: 1
+                       created: 2013-12-04 14:36:45
+                 last_modified: 2013-12-05 10:20:18
+delete_from_database_timestamp: 2013-12-05 10:20:18
+                   delete_file: 0
+ dc_metadata_irods_object_path: /tempZone/home/lfinsto/metadata_sample_1.xml
+           irods_object_ref_id: 1
+          irods_object_self_id: 0
+1 row in set (0.00 sec)
+@end smallexample
+
+@cindex thread function
+@cindex function, thread
+@cindex command-line options
+@cindex options, command-line 
+@c
+@findex purge_dc_metadata
+@c
+This row will not be deleted until @emph{at least} @code{purge_dc_metadata_limit} 
+seconds have passed since the time stored in the @code{delete_from_database_timestamp}
+field.  The global variable @code{purge_dc_metadata_limit} is set on the server-side 
+by means of the command-line option @option{--purge-dc-metadata-limit}.  
+After  @code{purge_dc_metadata_limit} have passed, the row will be deleted the next time
+the thread function @code{purge_dc_metadata} runs.  The command-line option 
+@option{--purge-metadata-interval} sets the global variable @code{purge_dc_metadata_interval}, 
+which controls how often @code{purge_dc_metadata} runs.  In particular, 
+if @command{gwirdsif} has been invoked with @option{--purge-dc-metadata-interval 0}, 
+@code{purge_dc_metadata} will never run and the row will never be deleted.
+@xref{Global variables}, and @ref{Purging options}.  
+
+@cindex undeleting, Dublin Core metadata 
+@cindex Dublin Core metadata, undeleting
+@cindex metadata, Dublin Core, undeleting
+@c
+So long as the row has not ``expired'', as described above, the user may ``undelete'' it 
+by means of the @code{undelete metadata} command:
+
+@smallexample 
+undelete metadata abc.txt 
+
+@r{(Client output:)} 
+
+Undelete metadata value response -->
+Response code:                0 (GW_SUCCESS)
+Filename (iRODS object path): /tempZone/home/lfinsto/abc.txt
+Message:                      Success
+
+mysql> select * from Dublin_Core_Metadata where dublin_core_metadata_id = 1\G
+*************************** 1. row ***************************
+       dublin_core_metadata_id: 1
+                       user_id: 1
+               irods_server_id: 1
+             irods_object_path: /tempZone/home/lfinsto/abc.txt
+                     handle_id: 118
+           marked_for_deletion: 0
+                       created: 2013-12-04 14:36:45
+                 last_modified: 2013-12-05 10:39:29
+delete_from_database_timestamp: 0000-00-00 00:00:00
+                   delete_file: 0
+ dc_metadata_irods_object_path: /tempZone/home/lfinsto/metadata_sample_1.xml
+           irods_object_ref_id: 1
+          irods_object_self_id: 0
+1 row in set (0.00 sec)
+@end smallexample
+
+The value of the @code{marked_for_deletion} field has been reset to 0, the 
+@code{delete_from_database_timestamp} has been reset to @samp{0000-00-00 00:00:00}, 
+i.e., the zero timestamp, and the value of the @code{last_modified} field has been 
+updated to the current date and time.
+
+Assuming that the Dublin Core metadata is @emph{not} ``undeleted'', the rows in the 
+@code{Dublin_Core_Metadata} and @code{Dublin_Core_Metadata_Sub} tables in the @code{gwirdsif}
+database will be deleted:
+
+@smallexample 
+mysql> select * from Dublin_Core_Metadata where dublin_core_metadata_id = 1\G
+Empty set (0.00 sec)
+@end smallexample
+
+In addition, in the @code{Irods_Objects} table, 
+the @code{dublin_core_metadata_id} has been reset to 0:
+
+@smallexample 
+mysql> select * from Irods_Objects where irods_object_id > 0\G
+*************************** 1. row ***************************
+                     irods_object_id: 1
+                             user_id: 1
+                     irods_server_id: 1
+                   irods_object_path: /tempZone/home/lfinsto/abc.txt
+    marked_for_deletion_from_archive: 0
+                deleted_from_archive: 0
+       delete_from_archive_timestamp: 0000-00-00 00:00:00
+marked_for_deletion_from_gwirdsif_db: 0
+   delete_from_gwirdsif_db_timestamp: 0000-00-00 00:00:00
+                             created: 2013-12-05 11:01:53
+                       last_modified: 2013-12-05 11:07:25
+             dublin_core_metadata_id: 0
+dublin_core_metadata_irods_object_id: 0
+                 irods_object_ref_id: 0
+1 row in set (0.00 sec)
+@end smallexample
+
+To delete Dublin Core metadata immediately, the @code{delete metadata} command 
+may be called with the @code{immediate} option:
+
+@smallexample 
+delete metadata abc.txt immediate
+
+@r{(Client output:)} 
+
+Delete metadata value response -->
+Response code:                0 (GW_SUCCESS)
+Filename (iRODS object path): /tempZone/home/lfinsto/abc.txt
+Options:                      4 (00000100)
+Message:                      Success
+@end smallexample
+
+@noindent
+In this case, the @code{marked_for_deletion} field will be
+set to 1 and the @code{delete_from_database_timestamp} will be set to a time 366 days in 
+the past:
+
+@smallexample
+mysql> select * from Dublin_Core_Metadata where dublin_core_metadata_id = 1\G
+*************************** 1. row ***************************
+       dublin_core_metadata_id: 1
+                       user_id: 1
+               irods_server_id: 1
+             irods_object_path: /tempZone/home/lfinsto/abc.txt
+                     handle_id: 118
+           marked_for_deletion: 1
+                       created: 2013-12-05 11:16:28
+                 last_modified: 2013-12-05 11:16:31
+delete_from_database_timestamp: 2012-12-04 11:16:31
+                   delete_file: 0
+ dc_metadata_irods_object_path: /tempZone/home/lfinsto/metadata_sample_1.xml
+           irods_object_ref_id: 1
+          irods_object_self_id: 0
+1 row in set (0.00 sec)
+@end smallexample
+
+@findex pthread_cond_signal
+@findex Dublin_Core_Metadata_Type::mark_dc_metadata_for_deletion
+@findex mark_dc_metadata_for_deletion (Dublin_Core_Metadata_Type)
+@findex purge_dc_metadata
+@vindex purge_dc_metadata_interval
+@c
+@noindent
+If purging Dublin Core metadata has not been disabled by invoking the server
+with @option{--purge-dc-metadata-interval 0}, the function 
+@code{Dublin_Core_Metadata_Type::mark_dc_metadata_for_deletion} will
+call @code{pthread_cond_signal} to ``wake up'' the thread running 
+@code{purge_dc_metadata} instead of letting it ``sleep'' until it would 
+normally ``wake up'' by itself after @code{purge_dc_metadata_interval} seconds.
+
+The @code{add metadata} command may be called with the @code{store} option:
+
+@smallexample 
+add metadata metadata_sample_1.xml abc.txt store
+
+@r{(Client output:)} 
+
+add metadata-->
+Exit status:                              0
+Metadata file                             /tempZone/home/lfinsto/metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Generated handle for metadata:  12345/00002.
+
+add metadata-->
+Exit status:                              0
+Metadata file                             /tempZone/home/lfinsto/metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Added handle value for handle `12345/00001' with type `IRODS_OBJECT_PID' to handle \
+      `12345/00002' successfully
+
+add metadata-->
+Exit status:                              0
+Metadata file                             /tempZone/home/lfinsto/metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Added handle value for iRODS object `/tempZone/home/lfinsto/abc.txt' with type \
+      `IRODS_OBJECT_REF' to handle `12345/00002' successfully
+
+add metadata-->
+Exit status:                              0
+Metadata file                             /tempZone/home/lfinsto/metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Added handle value for handle `12345/00002' with type `DC_METADATA_PID' to handle \
+      `12345/00001' successfully
+
+add metadata-->
+Exit status:                              0
+Metadata file                             /tempZone/home/lfinsto/metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Call to `imeta' succeeded.  Added AVU with type `DC_METADATA_PID' and value \
+      `12345/00002' to iRODS object `/tempZone/home/lfinsto/abc.txt'.
+
+store metadata-->
+Exit status:                              0
+Dublin Core metadata/iRODS object file:   /tempZone/home/lfinsto/metadata_sample_1.xml
+iRODS object referred to:                 /tempZone/home/lfinsto/abc.txt
+Server message:
+   Generated handle 12345/00003 for Dublin Core metadata iRODS object \
+      `/tempZone/home/lfinsto/metadata_sample_1.xml'.
+
+add metadata-->
+Exit status:                              0
+Metadata file                             /tempZone/home/lfinsto/metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   Stored Dublin Core metadata in iRODS object \
+      `/tempZone/home/lfinsto/metadata_sample_1.xml' successfully.
+
+add metadata-->
+Exit status:                              0
+Metadata file                             /tempZone/home/lfinsto/metadata_sample_1.xml
+iRODS object                              /tempZone/home/lfinsto/abc.txt
+Server message:
+   (Success)
+@end smallexample
+
+@noindent
+In this case, the Dublin Core metadata is not only stored in the @code{gwirdsif} database, 
+but also in an iRODS object, in this example, 
+@file{/tempZone/home/lfinsto/metadata_sample_1.xml}.
+Handles and AVUs are also created accordingly.  In particular, a row is created in the 
+@code{Irods_Objects} table:
+
+@smallexample 
+mysql> select * from Irods_Objects where irods_object_id > 1\G
+*************************** 1. row ***************************
+                     irods_object_id: 2
+                             user_id: 1
+                     irods_server_id: 1
+                   irods_object_path: /tempZone/home/lfinsto/metadata_sample_1.xml
+    marked_for_deletion_from_archive: 0
+                deleted_from_archive: 0
+       delete_from_archive_timestamp: 0000-00-00 00:00:00
+marked_for_deletion_from_gwirdsif_db: 0
+   delete_from_gwirdsif_db_timestamp: 0000-00-00 00:00:00
+                             created: 2013-12-05 11:25:02
+                       last_modified: 0000-00-00 00:00:00
+             dublin_core_metadata_id: 1
+dublin_core_metadata_irods_object_id: 0
+                 irods_object_ref_id: 1
+1 row in set (0.00 sec)
+@end smallexample
+
+@noindent
+The @code{dublin_core_metadata_id} field contains a reference to the row in the @code{Dublin_Core_Metadata}
+table, while the @code{irods_object_ref_id} field contains one to the row in @code{Irods_Objects} for 
+@file{/tempZone/home/lfinsto/abc.txt}.
+
+By default, the @code{delete metadata} command does not delete an iRODS object containing the Dublin Core metadata.
+To do this, the @code{file} option must be used:
+
+@smallexample 
+delete metadata abc.txt file
+
+@r{(Client output:)}
+
+Delete metadata value response -->
+Response code:                0 (GW_SUCCESS)
+Filename (iRODS object path): /tempZone/home/lfinsto/abc.txt
+Options:                      1 (00000001)
+Message:                      Success
+@end smallexample
+
+@smallexample 
+mysql> select * from Dublin_Core_Metadata where dublin_core_metadata_id = 1\G
+*************************** 1. row ***************************
+       dublin_core_metadata_id: 1
+                       user_id: 1
+               irods_server_id: 1
+             irods_object_path: /tempZone/home/lfinsto/abc.txt
+                     handle_id: 118
+           marked_for_deletion: 1
+                       created: 2013-12-05 11:25:02
+                 last_modified: 2013-12-05 12:36:17
+delete_from_database_timestamp: 2013-12-05 12:36:17
+                   delete_file: 1
+ dc_metadata_irods_object_path: /tempZone/home/lfinsto/metadata_sample_1.xml
+           irods_object_ref_id: 1
+          irods_object_self_id: 2
+1 row in set (0.00 sec)
+@end smallexample
+
+@noindent
+The @code{marked_for_deletion} field is set to 1, @code{delete_from_database_timestamp} 
+and @code{last_modified} are set to the current time and @code{delete_file} is set to 1.
+When @code{purge_dc_metadata} is run, it will delete the row in @code{Dublin_Core_Metadata}
+and the corresponding rows in @code{Dublin_Core_Metadata_Sub}.  In order to delete the iRODS 
+object, it marks the row in the @code{Irods_Objects} table for immediate deletion and 
+``wakes up'' the thread running @code{purge_irods_archive}, assuming that purging the iRODS archive
+has not been disabled.  
+@xref{iRODS Objects (Deleting and Undeleting), iRODS Objects (Deleting and Undeleting), iRODS Objects}. 
+
+If the @code{delete metadata} command is called with the @code{file_only} option, then only 
+the iRODS object will be marked for deletion, while the rows in the @code{Dublin_Core_Metadata} and
+@code{Dublin_Core_Metadata_Sub} tables will not be:
+
+@smallexample
+delete metadata abc.txt file_only
+
+Delete metadata value response -->
+Response code:                0 (GW_SUCCESS)
+Filename (iRODS object path): /tempZone/home/lfinsto/abc.txt
+Options:                      2 (00000010)
+Message:                      Success
+@end smallexample
+
+@smallexample 
+*************************** 1. row ***************************
+       dublin_core_metadata_id: 1
+                       user_id: 1
+               irods_server_id: 1
+             irods_object_path: /tempZone/home/lfinsto/abc.txt
+                     handle_id: 118
+           marked_for_deletion: 1
+                       created: 2013-12-05 11:25:02
+                 last_modified: 2013-12-05 12:33:25
+delete_from_database_timestamp: 2013-12-05 12:33:25
+                   delete_file: 2
+ dc_metadata_irods_object_path: /tempZone/home/lfinsto/metadata_sample_1.xml
+           irods_object_ref_id: 1
+          irods_object_self_id: 2
+1 row in set (0.00 sec)
+@end smallexample
+
+@noindent
+Here, the @code{delete_file} field is set to 2.
+
+For more information about the the @code{delete metadata} command and its options, 
+see @ref{User commands for Dublin Core metadata, User commands for Dublin Core metadata, Dublin Core metadata}.
+For more information about the function @code{purge_dc_metadata}, see @ref{Deleting and rotating files}.
+
+@c *** (3)
+
+@c ** (2) Concluding Remarks (Getting Started)
+
+@node Concluding Remarks (Getting Started), , gwirdcli (Getting Started), Getting Started
+@section Concluding Remarks
+
+This chapter has attempted to give an overview of the most important user
+commands for the client-server application @code{gwrdifpk}.  For this purpose,
+it was necessary to leave out many details.  For further information, please see
+the following chapters, in particular @ref{Invoking gwirdsif/gwirdcli}, 
+and @ref{User commands}.
+
+@c * (1) Emacs-Lisp code for use in indirect buffers
+
+@c (progn (ignore (quote
+@c    ))  (texinfo-mode) (abbrev-mode t) (outline-minor-mode t) (ignore (quote
+@c    )) (setq outline-regexp "@c *\\*+") (setq fill-column 80))
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:

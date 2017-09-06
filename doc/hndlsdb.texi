@@ -1,0 +1,155 @@
+@c hndlsdb.texi
+@c [...]/gwrdifpk/doc/hndlsdb.texi
+
+@c Created by Laurence D. Finston (LDF) Wed Mar 13 14:02:31 CET 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) handlesystem and handlesystem_standalone Databases
+
+@node handlesystem and handlesystem_standalone Databases, gwirdsif Database, Non-class Functions, Top
+@chapter handlesystem and handlesystem_standalone Databases
+
+@cindex Corporation for National Research Initiatives (CNRI)
+@cindex CNRI (Corporation for National Research Initiatives)
+@cindex handle server
+@cindex server, handle
+@cindex standalone handle server
+@cindex handle server, standalone 
+@c
+The @samp{handlesystem} database is used by a handle server configured
+to use an ``official'' handle prefix assigned by CNRI, while the
+@samp{handlesystem_standalone} database is used one configured to
+ask as a ``standalone'' handle server using ``internal'' prefixes
+outside the domain defined by CNRI.  @xref{Handles}.
+
+@menu
+* nas database table::
+* handles database table::
+* admin_data database table::
+* pid_counters database table::
+@end menu
+
+
+@c ** (2) nas database table
+
+@node nas database table, handles database table, , handlesystem and handlesystem_standalone Databases
+@section nas
+
+@table @code
+@item na 
+@code{varchar(255) not null primary key}
+@end table
+
+@c ** (2) handles database table
+
+@node handles database table, admin_data database table, nas database table, handlesystem and handlesystem_standalone Databases
+@section handles
+
+@table @code
+@item handle 
+@code{varchar(255) not null}
+
+@item idx 
+@code{int4 not null}
+
+@item type 
+@code{blob}
+
+@item data 
+@code{blob}
+
+@item ttl_type 
+@code{int2}
+
+@item ttl 
+@code{int4}
+
+@item timestamp 
+@code{int4}
+
+@item refs 
+@code{blob}
+
+@item admin_read 
+@code{bool}
+
+@item admin_write 
+@code{bool}
+
+@item pub_read 
+@code{bool}
+
+@item pub_write 
+@code{bool}
+
+@item created 
+@code{timestamp default 0}
+
+@item last_modified 
+@code{timestamp default 0}
+
+@item created_by_user_id 
+@code{int}
+
+@item irods_object_id 
+@code{bigint unsigned not null default 0}
+
+@item handle_id 
+@code{bigint unsigned not null default 0}
+
+@item handle_value_id 
+@code{bigint unsigned not null default 0}
+
+@item deleted 
+@code{boolean not null default false}
+
+@item PRIMARY KEY(handle, idx)
+@end table
+
+@c ** (2) admin_data database table
+
+@node admin_data database table, pid_counters database table, handles database table, handlesystem and handlesystem_standalone Databases
+@section admin_data 
+
+@table @code 
+@item handle 
+@code{varchar(255) not null}
+
+@item data 
+@code{blob}
+@end table
+
+@c ** (2) pid_counters database table
+
+@node pid_counters database table, , admin_data database table, handlesystem and handlesystem_standalone Databases
+@section pid_counters 
+
+@table @code
+
+@item prefix 
+@code{varchar(16) primary key not null}
+
+@item pid_counter 
+@code{bigint unsigned not null}
+@end table
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

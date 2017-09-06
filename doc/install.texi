@@ -1,0 +1,460 @@
+@c install.texi
+@c [...]/gwrdifpk/doc/install.texi
+
+@c Created by Laurence D. Finston (LDF) Mon Aug 26 16:52:05 CEST 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) Installation
+
+@node Installation, Standalone handle service, Introduction,  Top
+@chapter Installation
+
+@menu
+* Obtaining the package::
+* Prerequisites::
+* Building::
+* X.509 certificates::
+* Database setup::
+@end menu
+
+@c ** (2) Obtaining the package
+
+@node Obtaining the package, Prerequisites, , Installation
+@section Obtaining the package
+
+The GWDG Archive Interface may be obtained from @uref{https://github.com}:
+
+@display
+@uref{git clone https://github.com/gwdg/gwrdifpk.git}
+or
+@uref{git clone git@@github.com:gwdg/gwrdifpk.git}
+@end display
+
+
+@c ** (2) Prerequisites
+
+@node Prerequisites, Building, Obtaining the package, Installation
+@section Prerequisites
+
+@c *** (3)
+
+@table @asis
+@item iRODS
+@uref{https://www.irods.org}
+
+@quotation
+``iRODS, which stands for i Rule Oriented Data Systems, is a project for
+building the next generation data management cyberinfrastructure.'' 
+@xref{iRODS}.
+@end quotation
+
+@item Handle System
+@uref{http://www.handle.net/}
+
+@quotation
+``The Handle System provides efficient, extensible, and secure resolution
+services for unique and persistent identifiers of digital objects, and is a
+component of CNRI's Digital Object Architecture.''  
+@xref{Handles}.
+@end quotation
+
+@item CWEB
+@uref{http://www-cs-faculty.stanford.edu/~knuth/cweb.html}
+
+@quotation
+``WEB is a software system that facilitates the creation of readable programs. 
+[@dots{}]  CWEB is a version of WEB for documenting C, C++, and Java programs.''
+@end quotation
+
+CWEB should be included in most @TeX{} distributions, though possibly as part of
+an ``extended'' version, as opposed to a basic version containing only the most
+commonly used @TeX{}-related packages.
+
+@item MySQL
+@uref{http://www.mysql.com}@*
+Database server and client library.
+
+@c **** (4)
+
+@item GnuTLS 
+@uref{http://www.gnutls.org}
+
+@quotation
+``GnuTLS is a secure communications library implementing the SSL, TLS
+and DTLS protocols and technologies around them. It provides a simple
+C language application programming interface (API) to access the
+secure communications protocols as well as APIs to parse and write
+X.509, PKCS #12, OpenPGP and other required structures. It is aimed to
+be portable and efficient with focus on security and interoperability.''  
+@end quotation
+
+
+GnuTLS, in turn, has a number of prerequisites of its own.  Please see the 
+GnuTLS documentation for more information.
+Please note that @command{gwrdifpk} uses GnuTLS version 2.4.1!  Unfortunately, some functions 
+from this version that @command{gwrdifpk} uses have been removed from more recent versions (3.x) 
+of the GnuTLS library.  An upgrade is planned.
+
+@c **** (4)
+
+@item GNU Privacy Guard (GnuPG)
+@uref{http://www.gnupg.de}
+
+@quotation
+``GnuPG is the GNU project's complete and free implementation of the
+OpenPGP standard as defined by RFC4880 . GnuPG allows to encrypt and
+sign your data and communication, features a versatile key management
+system as well as access modules for all kinds of public key
+directories. GnuPG, also known as GPG, is a command line tool with
+features for easy integration with other applications. A wealth of
+frontend applications and libraries are available. Version 2 of GnuPG
+also provides support for S/MIME.''
+@end quotation
+
+@c **** (4)
+
+@item expat
+@uref{http://expat.sourceforge.net}
+
+@quotation
+``Expat is an XML parser library written in C. It is a stream-oriented
+parser in which an application registers handlers for things the
+parser might find in the XML document (like start tags).'' 
+@end quotation
+
+@c **** (4)
+
+@item FastCGI
+@uref{http://www.fastcgi.com/drupal}
+
+@quotation
+``The Fast Common Gateway Interface (FastCGI) is an enhancement to the
+existing CGI (Common Gateway Interface), which is a standard for
+interfacing external applications with Web servers.''
+@end quotation
+
+@c **** (4)
+
+@item Flex
+@uref{http://flex.sourceforge.net/}
+
+@quotation
+``Flex is a tool for generating scanners. A scanner, sometimes called a tokenizer,
+is a program which recognizes lexical patterns in text.''
+@end quotation
+
+@c **** (4)
+
+@item GNU Bison
+@uref{http://www.gnu.org/software/bison/}
+
+@quotation
+``Bison is a general-purpose parser generator that converts an annotated
+context-free grammar into a deterministic LR or generalized LR (GLR) parser
+employing LALR(1) parser tables.''
+@end quotation
+
+@c **** (4)
+
+@item GNU Make
+@uref{http://www.gnu.org/software/make}
+
+@quotation
+``[@dots{}] the GNU `make' utility, [@dots{}] determines
+automatically which pieces of a large program need to be recompiled,
+and issues the commands to recompile them.''
+@end quotation
+
+Make will almost certainly already be installed on any GNU/Linux or 
+other Unix-like system.
+@end table
+
+@c **** (4)
+
+@c *** (3)
+
+All of the files needed for building the package are included in the 
+GitHub repository (@pxref{Obtaining the package}) and the distribution
+generated from @samp{make dist}.  If, however, a user wishes to build 
+the package ``from scratch'', there are additional prerequisites:
+
+@table @asis
+@item Libtool
+@uref{http://www.gnu.org/software/libtool}
+
+@item Autoconf
+@uref{http://www.gnu.org/software/autoconf}
+
+@item Automake
+@uref{http://www.gnu.org/software/automake}
+
+@item Texinfo
+@uref{http://www.gnu.org/software/texinfo}
+For generating this manual.
+@end table
+
+Most, if not all, of the prerequisites for @command{gwrdifpk} can be installed by 
+using the package managers supplied with common GNU/Linux distributions.
+
+@c ** (2) Building
+
+@node Building, X.509 certificates, Prerequisites, Installation
+
+@section Building
+
+The @command{gwrdifpk} distribution includes a @samp{configure} script, @samp{Makefile.in} and 
+all other required files, so the package can be built by simply invoking @samp{configure} 
+followed by @samp{make all} and @samp{make install}.  
+However, the @file{configure.ac} and @file{Makefile.am} files 
+are also included in the distribution, so that the package may be built 
+``from scratch'', if desired:
+
+@example
+libtoolize && aclocal && autoconf && autoheader && \
+   automake --add-missing --copy
+@end example
+
+@noindent
+The options @samp{--add-missing} and @samp{--copy} to @samp{automake} only need to be 
+used the first time @samp{automake} is called.
+
+@cindex root privileges
+@cindex privileges, root
+@c
+@command{gwrdifpk} does not require @dfn{root privileges}.  On the other hand, 
+the default installation directory of the @samp{configure} script (as generated by Autoconf)
+is @file{/usr/local/bin}, which will normally belong to @samp{root}.  Therefore, when 
+installing @command{gwrdifpk} as a user without root privileges, it will be necessary to specify
+a different installation directory with the @samp{--prefix} option:
+
+@example 
+./configure LIBS="-pthread -lm -lgnutls -lgcrypt -lexpat" \
+   --prefix=`pwd`
+@end example
+
+@cindex shared libraries
+@cindex libraries, shared
+@c
+By default, @samp{make} will create @dfn{shared libraries} when building the package.  
+This is good for production versions, but not so good for testing purposes, because it's 
+time-consuming.  The @samp{--disable-shared} option can be used to suppress building 
+shared libraries:
+
+@example 
+./configure LIBS="-pthread -lm -lgnutls -lgcrypt -lexpat" \
+   --prefix=`pwd` --disable-shared 
+@end example
+
+If some header files or libraries needed by @command{gwrdifpk} @command{gwrdifpk} are not in locations 
+where they will found by the system ``automatically'', for example, on GNU/Linux systems, 
+if the library directories are not listed in the file @file{/etc/ld.so.conf} 
+or included in the environment variable @samp{LDFLAGS}, they will have to be 
+passed to @samp{configure} specially.  For example, if some required header is located in 
+@file{/usr/users/lfinsto/my_header_dir} and a library in @file{/usr/users/lfinsto/my_library_dir},
+@samp{configure} could be invoked like this:
+
+@example 
+./configure CPPFLAGS="-I/usr/users/lfinsto/my_header_dir" \
+    LDFLAGS="-L/usr/users/lfinsto/my_library_dir" \
+    LIBS="-pthread -lm -lgnutls -lgcrypt -lexpat" \
+   --prefix=`pwd` --disable-shared 
+@end example
+The shellscript @file{pcfinston_master_config.sh} in the top-level directory
+(i.e., @file{gwrdifpk-1.0/}) contains an example of how one could invoke 
+@samp{configure}.
+
+After @samp{configure} and @samp{make} succeed, the package may be used.
+If desired, @samp{make all} and @samp{make install} may be run, too.
+@samp{make install} causes the programs and libraries to be installed 
+in the default locations or in those specified with the options to @samp{configure} 
+(see above).  The server program @command{gwirdsif} may be started in a shell and 
+the client program @command{gwirdcli} may be invoked in another shell to communicate with it.
+
+@c ** (2) X.509 certificates
+@node X.509 certificates, Database setup, Building, Installation
+
+@section X.509 certificates
+
+@cindex authorization/authentication
+@cindex authorization
+@cindex authentication
+@cindex X.509 certificate
+@cindex certificate, X.509 
+@cindex certification authority (CA)
+@cindex authority, certification (CA)
+@cindex CA (certification authority)
+@c
+@command{gwrdifpk} uses @dfn{X.509 certificates} for @dfn{authorization} 
+and @dfn{authentication}.  For production use, ``genuine'' certificates, i.e., 
+certificates issued by a recognized @dfn{certification authority} (@dfn{CA})   
+must be used.  However, for testing purposes certificates may be generated 
+ad hoc by using @command{certtool} (@pxref{Invoking certtool, , , gnutls.info, GnuTLS}).
+or @command{openssl}.
+
+@command{gwrdifpk} includes the shellscript @file{[...]/src/gen_x509_cert_key_pair.sh}, 
+which makes it easier to generate a certificate-key pair.  See 
+@xref{X.509 certificates (Shellscripts and Utilities), , X.509 certificates}.
+In addition, @command{gen_x509_cert_key_pair.sh} calls 
+@command{certtool --certificate-info @dots{}} to create a file containing the 
+information from the certificate in human-readable form.
+
+@cindex distinguished name (DN)
+@cindex name, distinguished (DN)
+@cindex DN (distinguished name)
+@c
+The @dfn{distinguished name} or (DN) from a user's certificate must be entered into the row
+for that user in the @samp{gwirdsif.Users} database table.  The distinguished name is based 
+on the @samp{Subject} field of the certificate.  For example, if a certificate-key pair is 
+generated for a person named ``John Smith'' with username @samp{jsmith}, the @samp{Subject} 
+field in his certificate (translated into human-readable form) might look like this:
+
+@example
+Subject: C=DE,O=GWDG,OU=gwrdifpk,L=Goettingen,ST=Germany,CN=John Smith,UID=2
+@end example
+
+@cindex distinguished name (DN)
+@cindex name, distinguished (DN)
+@cindex DN (distinguished name)
+@c
+@noindent 
+so that his distinguished name will look like this:
+
+@example
+/C=DE/ST=Germany/L=Goettingen/O=GWDG/OU=gwrdifpk/CN=John Smith
+@end example
+
+@cindex common name (X.509 certificates)
+@cindex name, common (X.509 certificates)
+@c
+@noindent
+@samp{CN} stands for ``Common Name''.  In the distinguished name, the codes for the fields, i.e., 
+@samp{C} for ``Country'', @samp{O} for ``Organization'', etc., are preceded by slashes, the commas 
+have been removed, as has the @samp{UID} field.
+
+@c ** (2) Database setup
+
+@node Database setup, , X.509 certificates, Installation
+
+@section Database setup
+
+@command{gwrdifpk} uses three databases, @code{handlesystem} or @code{handlesystem_standalone}, 
+@code{gwirdsif} and @code{gwirdcli}.  The first two are used by the server program 
+@command{gwirdsif} only, while the third is used by the client program @command{gwirdcli} only.
+Of the three, @code{gwirdsif} contains the most tables.
+
+@cindex setupds (auxiliary program)
+@cindex auxiliary programs
+@cindex programs, auxiliary
+@c
+The auxiliary program @command{setupds} can be used to set up the database tables used by 
+@command{gwrdifpk}.  
+@xref{Set up databases (setupdbs), Set up databases (setupdbs), Set up databases}, for 
+instructions on invoking @command{setupdbs}.
+
+@menu
+* Setting up iRODS users::
+@end menu
+
+@c *** (3) Setting up iRODS users
+
+@node Setting up iRODS users, , , Database setup
+
+@subsection Setting up iRODS users
+
+iRODS users may be created as described in the iRODS documentation.  That is, an iRODS 
+administrator uses the @command{mkuser} command in the @command{iadmin} environment 
+to create a user and sets his or her password using the @command{moduser} command.
+The iRODS username must correspond to the @command{gwrdifpk} username.
+
+@cindex iRODS environment files
+@cindex environment files, iRODS 
+@cindex files, iRODS environment 
+@c
+It's most convenient to create @dfn{iRODS environment files} in @file{$HOME/.irods/} and to 
+call @command{iinit} to create files containing the ``scrambled'' iRODS passwords.
+
+An iRODS environment file for a user @samp{abrown} in @file{$HOME/.irods/}
+might be named @file{.irodsEnv.abrown} and have the following contents:
+
+@example
+# iRODS personal configuration file.
+#
+# iRODS server host name:
+irodsHost 'pcfinston.gwdg.de'
+# iRODS server port number:
+irodsPort 1247
+
+# Default storage resource name:
+irodsDefResource 'demoResc'
+# Home directory in iRODS:
+irodsHome '/tempZone/home/abrown'
+# Current directory in iRODS:
+irodsCwd '/tempZone/home/abrown'
+# Account name:
+irodsUserName 'abrown'
+# Zone:
+irodsZone 'tempZone'
+irodsAuthFileName '/home/lfinsto/.irods/.irodsA.abrown'
+@end example
+
+@noindent
+The last line indicates that the scrambled iRODS password should be stored in 
+@file{/home/lfinsto/.irods/.irodsA.abrown}.  If I copy @file{.irodsEnv.abrown} to 
+@file{.irodsEnv} or set the @samp{irodsEnvFile} environment variable,
+
+@example
+export irodsEnvFile=/home/lfinsto/.irods/.irodsEnv.abrown
+@end example
+
+@noindent
+and call @command{iinit}, @file{.irodsEnv.abrown} will indeed be created.
+
+@cindex GPG
+@cindex GNU Privacy Guard
+@cindex encryption
+@cindex decryption
+@cindex cryptography
+@c
+On my system, the scrambled password is only 14 characters long.  It is does not provide 
+any real security, so it is really more of a nuisance than anything else.  However, at the 
+present time, the iRODS passwords are needed in @command{gwrdifpk}, so they are encrypted using 
+GPG (the GNU Privacy Guard) stored in the @samp{gwirdsif.Users} database table.  Since the 
+``scrambling'' algorithm obviously uses the timestamp of the file containing the scrambled 
+password, the timestamp is stored in the table as well.
+
+To encrypt the iRODS passwords, and decrypt them later, a GPG key pair is needed.  On my system, 
+it's name is ``GWDG iRODS Interface Server (gwirdsif) <lfinsto@@gwdg.de>'', however any other 
+name may be used.  It is, however, important at the present time that the secret key @emph{not}
+be protected by a passphrase:  The reason is that @command{gwirdsif} must run unattended and so 
+it's not possible to have someone type in a passphrase everytime an iRODS password is needed.
+See @xref{Top, Using the GNU Privacy Guard, Using the GNU Privacy Guard, gnupg.info}.
+@c !! TODO:  LDF 2013.09.16.
+At some time, the author may change this so that the passphrase for the GPG secret key is 
+entered once when @command{gwirdsif} is invoked and saved as safely as possible until the program
+terminates.
+
+To make it easier to write the encrypted, scrambled iRODS password and the timestamp used 
+when it was scrambled to the database table, @command{gwrdifpk} includes the shellscript 
+@command{update_irods_passwd.sh}. 
+@xref{iRODS passwords (Shellscripts and Utilities), , iRODS passwords}.
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

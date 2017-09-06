@@ -1,0 +1,369 @@
+@c x509cert.texi
+@c [...]/gwrdifpk/doc/x509cert.texi
+
+@c Created by Laurence D. Finston (LDF) Fri Oct 25 14:03:31 CEST 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) X.509 Certificate Types
+
+@node X.509 Certificate Types, Dublin Core Metadata Types, Handle Types, Top
+@chapter X.509 Certificate Types
+
+@xref{Certificates database table}.
+
+@menu
+* class X509_Cert_Type::
+* class Distinguished_Name_Type::
+@end menu
+
+@c ** (2) class X509_Cert_Type
+
+@node class X509_Cert_Type, class Distinguished_Name_Type, , X.509 Certificate Types
+
+@section class X509_Cert_Type
+
+@tindex class X509_Cert_Type
+@tindex X509_Cert_Type, class 
+@c
+@cindex X.509 certificate
+@cindex certificate, X.509 
+@c
+@code{class X509_Cert_Type} represents @dfn{X.509 certificates} within @command{gwrdifpk}.  
+It contains data members corresponding to the fields of an X.509 certificate and to the 
+columns of the database table @code{gwirdsif.Certificates}.
+@xref{Certificates database table, Certificates database table, Certificates}.
+
+The following classes and functions are @code{friends} of @code{class X509_Cert_Type}:
+
+@tindex class Scan_Parse_Parameter_Type
+@tindex Scan_Parse_Parameter_Type, class 
+@tindex class Distinguished_Name_Type
+@tindex Distinguished_Name_Type, class 
+@tindex class User_Info_Type
+@tindex User_Info_Type, class 
+@c
+@findex get_user_info_func
+@findex extract_dn_fields
+@findex verify_certificate
+@findex yyparse
+@c
+@table @code
+@item class Scan_Parse_Parameter_Type 
+@xref{class Scan_Parse_Parameter_Type}.
+
+@item class Distinguished_Name_Type
+@xref{class Distinguished_Name_Type}, below.
+
+@item class User_Info_Type
+@xref{class User_Info_Type}.
+
+@item get_user_info_func
+@xref{Parser rule functions}.
+
+@item extract_dn_fields
+@xref{X.509 certificate functions, X.509 certificate functions, X.509 certificates}.
+
+@item verify_certificate
+@xref{X.509 certificate functions, X.509 certificate functions, X.509 certificates}.
+
+@item yyparse
+@xref{Scanning and parsing}.
+@end table
+
+@menu
+* X509_Cert_Type data members::
+* X509_Cert_Type member functions::
+@end menu
+
+@c *** (3) X509_Cert_Type data members
+
+@node X509_Cert_Type data members, X509_Cert_Type member functions, , class X509_Cert_Type
+
+@subsection Data members 
+
+@vindex organization (X509_Cert_Type)
+@vindex organizationalUnitName (X509_Cert_Type)
+@vindex commonName (X509_Cert_Type)
+@vindex countryName (X509_Cert_Type)
+@vindex localityName (X509_Cert_Type)
+@vindex stateOrProvinceName (X509_Cert_Type)
+@vindex serialNumber (X509_Cert_Type)
+@vindex Validity_notBefore (X509_Cert_Type)
+@vindex Validity_notAfter (X509_Cert_Type)
+@vindex issuer_cert (X509_Cert_Type)
+@vindex user_name (X509_Cert_Type)
+@vindex user_id (X509_Cert_Type)
+@vindex certificate_id (X509_Cert_Type)
+@vindex issuer_cert_id (X509_Cert_Type)
+@vindex is_ca (X509_Cert_Type)
+@vindex is_proxy (X509_Cert_Type)
+@c
+@vindex X509_Cert_Type::organization
+@vindex X509_Cert_Type::organizationalUnitName
+@vindex X509_Cert_Type::commonName
+@vindex X509_Cert_Type::countryName
+@vindex X509_Cert_Type::localityName
+@vindex X509_Cert_Type::stateOrProvinceName
+@vindex X509_Cert_Type::serialNumber
+@vindex X509_Cert_Type::Validity_notBefore
+@vindex X509_Cert_Type::Validity_notAfter
+@vindex X509_Cert_Type::issuer_cert
+@vindex X509_Cert_Type::user_name
+@vindex X509_Cert_Type::user_id
+@vindex X509_Cert_Type::certificate_id
+@vindex X509_Cert_Type::issuer_cert_id
+@vindex X509_Cert_Type::is_ca
+@vindex X509_Cert_Type::is_proxy
+@c
+@deftypevr  {Private variables} string organization
+@deftypevrx {}          string organizationalUnitName
+@deftypevrx {}          string commonName
+@deftypevrx {}          string countryName
+@deftypevrx {}          string localityName
+@deftypevrx {}          string stateOrProvinceName
+@deftypevrx {}          {unsigned long int} serialNumber
+@deftypevrx {}          time_t Validity_notBefore
+@deftypevrx {}          time_t Validity_notAfter
+@deftypevrx {}          {X509_Cert_Type*} issuer_cert
+@deftypevrx {}          string user_name
+@deftypevrx {}          {unsigned int} user_id
+@deftypevrx {}          {unsigned int} certificate_id
+@deftypevrx {}          {unsigned int} issuer_cert_id
+@deftypevrx {}          bool is_ca
+@deftypevrx {}          bool is_proxy
+@end deftypevr
+
+@c *** (3) X509_Cert_Type member functions
+
+@node X509_Cert_Type member functions, , X509_Cert_Type data members, class X509_Cert_Type
+
+@subsection Member functions 
+
+@findex X509_Cert_Type, default constructor
+@findex default constructor, X509_Cert_Type 
+@findex constructor, default, X509_Cert_Type 
+@c
+@deftypefn {Default constructor} void X509_Cert_Type (@code{void})
+@end deftypefn
+
+@findex X509_Cert_Type, copy constructor
+@findex copy constructor, X509_Cert_Type 
+@findex constructor, copy, X509_Cert_Type 
+@c
+@deftypefn {Copy constructor} void X509_Cert_Type (@code{const X509_Cert_Type &}@var{cert})
+@end deftypefn
+
+@findex X509_Cert_Type constructor
+@findex constructor, X509_Cert_Type 
+@findex constructor, X509_Cert_Type 
+@c
+@deftypefn {Constructor} void X509_Cert_Type (@code{unsigned long int} @var{sserialNumber}, @*@
+                                              @code{X509_Cert_Type *}{@var{iissuer_cert} = 0}, @*@
+                                              @code{string} {@var{oorganization} = ""}, @*@
+                                              @code{string} {@var{oorganizationalUnitName} = ""}, @*@
+                                              @code{string} {@var{ccommonName} @code{= ""}}, @*@
+                                              @code{string} {@var{ccountryName} @code{= ""}}, @*@
+                                              @code{string} {@var{llocalityName} @code{= ""}}, @*@
+                                              @code{string} {@var{sstateOrProvinceName} @code{= ""}}, @*@
+                                              @code{unsigned int} {@var{uuser_id} @code{= 0}}, @*@
+                                              @code{string} {@var{uuser_name} @code{= ""}}, @*@
+                                              @code{time_t} {@var{VValidity_notBefore} @code{= 0}}, @*@
+                                              @code{time_t} {@var{VValidity_notAfter} @code{= 0}}, @*@
+                                              @code{bool} {@var{iis_ca} @code{= false}}, @*@
+                                              @code{bool} {@var{iis_proxy} @code{= false}}, @*@
+                                              @code{unsigned int} {@var{ccertificate_id} @code{= 0}}, @*@
+                                              @code{unsigned int} {@var{iissuer_cert_id} @code{= 0}})
+@end deftypefn
+
+@findex set (X509_Cert_Type)
+@findex X509_Cert_Type::set
+@c
+@deftypefun int set (@code{unsigned long int} @var{sserialNumber}, @*@
+                     @code{X509_Cert_Type *}{@var{iissuer_cert}            @code{=  0}}, @*@
+                     @code{string}          {@var{oorganization}           @code{= ""}}, @*@
+                     @code{string}          {@var{oorganizationalUnitName} @code{= ""}}, @*@
+                     @code{string}          {@var{ccommonName}             @code{= ""}}, @*@
+                     @code{string}          {@var{ccountryName}            @code{= ""}}, @*@
+                     @code{string}          {@var{llocalityName}           @code{= ""}}, @*@
+                     @code{string}          {@var{sstateOrProvinceName}    @code{= ""}}, @*@
+                     @code{unsigned int}    {@var{uuser_id}                @code{=  0}}, @*@
+                     @code{string}          {@var{uuser_name}              @code{= ""}}, @*@
+                     @code{time_t}          {@var{VValidity_notBefore}     @code{=  0}}, @*@
+                     @code{time_t}          {@var{VValidity_notAfter}      @code{=  0}}, @*@
+                     @code{bool}            {@var{iis_ca}                  @code{= false}}, @*@
+                     @code{bool}            {@var{iis_proxy}               @code{= false}}, @*@
+                     @code{unsigned int}    {@var{ccertificate_id}         @code{= 0}}, @*@
+                     @code{unsigned int}    {@var{iissuer_cert_id}         @code{= 0}})
+@end deftypefun
+
+@findex set (X509_Cert_Type)
+@findex X509_Cert_Type::set
+@c
+@deftypefun int set (@code{MYSQL_ROW &}@var{row}, @code{string} {@var{thread_ctr_str} @code{= ""}})
+@end deftypefun
+
+@findex operator= (X509_Cert_Type)
+@findex X509_Cert_Type::operator= 
+@findex X509_Cert_Type assignment operator
+@findex X509_Cert_Type operator, assignment
+@findex assignment operator, X509_Cert_Type 
+@findex operator, assignment, X509_Cert_Type 
+@c
+@deftypefn {Assignment operator} void operator= (@code{const X509_Cert_Type &}@var{cert})
+@end deftypefn
+
+
+@findex get_from_database (X509_Cert_Type)
+@findex X509_Cert_Type::get_from_database
+@c
+@deftypefun int get_from_database (@code{MYSQL *}@var{mysql_ptr}, @code{unsigned int} @var{uuser_id}, @
+                                   @code{string} {@var{thread_ctr_str} @code{= ""}})
+@end deftypefun
+
+@findex clear (X509_Cert_Type)
+@findex X509_Cert_Type::clear
+@c
+@deftypefun void clear (@code{void})
+@end deftypefun
+
+@deftypefn {const function} void show (@code{string} {@var{s} @code{= ""}}, @*@
+                                       @code{stringstream *}{@var{strm} @code{= 0}}, @*@
+                                       @code{bool} {@var{show_issuer} @code{= false}}) 
+@end deftypefn
+
+@findex output (X509_Cert_Type)
+@findex X509_Cert_Type::output
+@c
+@deftypefn {const function} string output (@code{void}) 
+@end deftypefn
+
+@c ** (2) class Distinguished_Name_Type
+
+@node class Distinguished_Name_Type, , class X509_Cert_Type, X.509 Certificate Types
+
+@section class Distinguished_Name_Type 
+
+@code{class Distinguished_Name_Type} represents the @dfn{distinguished name} from an 
+@dfn{X.509 certificate} within @command{gwrdifpk}.  @xref{X.509 Certificates}, 
+@ref{class X509_Cert_Type}, above, 
+and @ref{Certificates database table, Certificates database table, Certificates (database table)}. 
+
+@code{class Scan_Parse_Parameter_Type} is a @code{friend} of @code{Distinguished_Name_Type}.
+@xref{class Scan_Parse_Parameter_Type}.
+
+@menu
+* Distinguished_Name_Type data members::
+* Distinguished_Name_Type member functions::
+@end menu
+
+@c *** (3) Distinguished_Name_Type data members
+
+@node Distinguished_Name_Type data members, Distinguished_Name_Type member functions, , class Distinguished_Name_Type
+
+@subsection Data members 
+
+@vindex organization (Distinguished_Name_Type)
+@vindex organization (Distinguished_Name_Type)
+@vindex organizationalUnitName (Distinguished_Name_Type)
+@vindex commonName (Distinguished_Name_Type)
+@vindex countryName (Distinguished_Name_Type)
+@vindex stateOrProvinceName (Distinguished_Name_Type)
+@vindex localityName (Distinguished_Name_Type)
+@vindex user_name (Distinguished_Name_Type)
+@vindex user_id (Distinguished_Name_Type)
+@c
+@vindex Distinguished_Name_Type::organization              
+@vindex Distinguished_Name_Type::organization              
+@vindex Distinguished_Name_Type::organizationalUnitName    
+@vindex Distinguished_Name_Type::commonName                
+@vindex Distinguished_Name_Type::countryName               
+@vindex Distinguished_Name_Type::stateOrProvinceName       
+@vindex Distinguished_Name_Type::localityName              
+@vindex Distinguished_Name_Type::user_name                 
+@vindex Distinguished_Name_Type::user_id                      
+@c
+@deftypevr  {Private variables} string organization              
+@deftypevrx {}                  string organization              
+@deftypevrx {}                  string organizationalUnitName    
+@deftypevrx {}                  string commonName                
+@deftypevrx {}                  string countryName               
+@deftypevrx {}                  string stateOrProvinceName       
+@deftypevrx {}                  string localityName              
+@deftypevrx {}                  string user_name                 
+@deftypevrx {}                  int user_id                      
+@end deftypevr
+
+@c *** (3) Distinguished_Name_Type member functions
+
+@node Distinguished_Name_Type member functions, , Distinguished_Name_Type data members, class Distinguished_Name_Type
+
+@subsection Member functions 
+
+@deftypefn {Default constructor} void Distinguished_Name_Type (@code{void})
+@end deftypefn
+
+@deftypefn {Constructor} void Distinguished_Name_Type (@code{string} @var{oorganization}, @*@
+                                                       @code{string} {@var{oorganizationalUnitName} @code{= ""}}, @*@
+                                                       @code{string} {@var{ccommonName} @code{= ""}}, , @*@
+                                                       @code{string} {@var{ccountryName} @code{= ""}}, , @*@
+                                                       @code{string} {@var{llocalityName} @code{= ""}}, @*@
+                                                       @code{string} {@var{sstateOrProvinceName} @code{= ""}}, @*@
+                                                       @code{unsigned int} {@var{uuser_id} @code{= 0}}, @*@
+                                                       @code{string} {@var{uuser_name} @code{= ""}})
+@end deftypefn
+
+
+@deftypefun int set (@code{string} @var{distinguished_name_str}, @*@
+                     @code{int} {@var{uuser_id} @code{= -1}}, @*@
+                     @code{string *}{@var{uuser_name} @code{= 0}})
+@end deftypefun
+
+
+@deftypefn  {Assignment operator} void operator= (@code{const X509_Cert_Type&} @var{c})  
+@end deftypefn
+
+
+
+@deftypefn  {Equality operators (constant)} bool operator== (@code{const Distinguished_Name_Type &}@var{d}) 
+@deftypefnx {}                              bool operator== (@code{const string &}@var{s}) 
+@end deftypefn
+
+
+@deftypefn {Inequality operator (constant)} bool operator!= (@code{const Distinguished_Name_Type&}@var{d}) 
+@end deftypefn
+
+
+@deftypefun void clear (@code{void})
+@end deftypefun
+
+
+@deftypefun string output (@code{void})
+@end deftypefun
+
+
+@deftypefn {const function} void show (@code{string} {@var{s} @code{= ""}}, @
+                                          @code{stringstream *}{@var{strm} @code{= 0}})
+@end deftypefn
+ 
+
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

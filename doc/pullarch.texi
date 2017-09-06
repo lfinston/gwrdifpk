@@ -1,0 +1,57 @@
+@c pullarch.texi
+@c [...]/gwrdifpk/doc/pullarch.texi
+
+@c Created by Laurence D. Finston (LDF) Fri Feb 21 13:45:28 CET 2014
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) User commands
+
+@node Pull archiving, User commands, Invoking gwirdsif/gwirdcli, Top
+@chapter Pull archiving
+
+@cindex pull archiving
+@cindex archiving, pull
+@cindex pull client
+@cindex client, pull
+@c
+@dfn{Pull archiving} refers to the procedure where the server program @command{gwirdsif} 
+contacts the @dfn{pull client} @command{gwirdpcl} with one or more @dfn{pull requests}. 
+@command{gwirdpcl} then calls a version of the ``normal'' client function to send 
+changed files to @command{gwirdsif}.  The pull client thus acts as a server with 
+the ``server'' program @command{gwirdsif} acting as a client with respect to 
+@command{gwirdpcl}.
+
+See also @ref{User commands for pull requests, , Pull requests},
+@ref{User commands for pull responses, , Pull responses},
+@ref{Pull client options}, 
+@ref{class Pull_Request_Type}, 
+@ref{class Pull_Response_Type},
+@ref{Pull Request database table (gwirdsif)}, 
+and @ref{Pull Response database tables (gwirdcli)}.
+
+@c ** (2)
+
+@c * (1) Emacs-Lisp code for use in indirect buffers
+
+@c (progn (ignore (quote
+@c    ))  (texinfo-mode) (abbrev-mode t) (outline-minor-mode t) (ignore (quote
+@c    )) (setq outline-regexp "@c *\\*+") (setq fill-column 80))
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

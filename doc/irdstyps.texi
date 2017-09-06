@@ -1,0 +1,535 @@
+@c irdstyps.texi
+@c /home/lfinsto/irods_proj/irods_master/Finston/gwrdifpk/doc/irdstyps.texi
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) iRODS Types
+
+@node iRODS Types, Handle Types, class Group_Type, Top
+@chapter iRODS Types
+
+@tindex class Irods_Object_Type
+@tindex Irods_Object_Type, class 
+@tindex class Irods_AVU_Type
+@tindex Irods_AVU_Type, class 
+@c
+@cindex iRODS 
+@cindex iRODS objects
+@cindex objects, iRODS
+@cindex Attribute-Value-Unit triple (AVU)
+@cindex triple, Attribute-Value-Unit (AVU)
+@cindex AVU (Attribute-Value-Unit triple)
+@cindex Irods_Objects (table in gwirdsif database)
+@cindex Irods_AVUs (table in gwirdsif database)
+@cindex gwirdsif.Irods_Objects (database table)
+@cindex gwirdsif.Irods_AVUs (database table)
+@cindex database
+@cindex database tables
+@cindex tables, database
+@c
+@code{class Irods_Object_Type} and @code{class Irods_AVU_Type} represent iRODS objects and 
+@dfn{AVUs} (i.e., @dfn{Attribute-Value-Unit} triples) within the programs belonging to the
+@command{gwrdifpk} package.  The data members correspond to the fields of the
+tables @code{Irods_Objects} and @code{Irods_AVUs} in the @code{gwirdsif} database.
+@xref{Irods_Objects database table}, and @ref{Irods_AVUs database table}.
+
+@cindex iRODS system
+@cindex iRODS 
+@cindex iRODS objects
+@cindex objects, iRODS
+@cindex database
+@cindex database tables
+@cindex tables, database
+@c
+Please note that @emph{contents} of the actual iRODS objects are @emph{not} stored, 
+neither in objects of @code{class Irods_Object_Type} nor in rows in the 
+@code{gwirdsif.Irods_Objects} database table!  There would be no benefit in doing so, 
+since the contents may be retrieved from the iRODS system at any time.  In addition, 
+iRODS objects may contain substantial amounts of data, which would affect performance.
+
+The ``contents'' of the AVUs, on the other hand, @emph{are} stored, both in objects 
+of type @code{class Irods_AVU_Type} and in rows in the @code{gwirdsif.Irods_AVUs} database
+table.  Since they are intended to consist of relatively short strings, there is a performance 
+benefit in keeping them available instead of having to retrieve them from the iRODS system 
+when needed.
+
+@menu
+* class Irods_Object_Type::
+* class Irods_AVU_Type::
+@end menu
+
+@c ** (2) class Irods_Object_Type
+
+@node class Irods_Object_Type, class Irods_AVU_Type, , iRODS Types
+@section class Irods_Object_Type
+
+@tindex class Irods_Object_Type
+@tindex Irods_Object_Type, class 
+@c
+@code{class Scan_Parse_Parameter_Type} and the functions @code{zzparse} and
+@code{purge_irods_archive} are @code{friends} of @code{class Irods_Object_Type}.
+
+@menu
+* Irods_Object_Type Data Members::
+* Irods_Object_Type Member Functions::
+@end menu
+
+@c *** (3) Irods_Object_Type Data Members
+
+@node Irods_Object_Type Data Members, Irods_Object_Type Member Functions, , class Irods_Object_Type
+@subsection Data Members
+
+@vindex Irods_Object_Type::avu_vector
+@vindex Irods_Object_Type::compressed_bzip2
+@vindex Irods_Object_Type::compressed_gzip
+@vindex Irods_Object_Type::compressed_tar_file
+@vindex Irods_Object_Type::created
+@vindex Irods_Object_Type::created_str
+@vindex Irods_Object_Type::delete_from_archive_timestamp
+@vindex Irods_Object_Type::delete_from_gwirdsif_db_timestamp
+@vindex Irods_Object_Type::deleted_from_archive
+@vindex Irods_Object_Type::deleted_from_gwirdsif_db
+@vindex Irods_Object_Type::detached_signature_irods_object_id
+@vindex Irods_Object_Type::dublin_core_metadata_id
+@vindex Irods_Object_Type::dublin_core_metadata_irods_object_id
+@vindex Irods_Object_Type::encrypted
+@vindex Irods_Object_Type::gpg_key_fingerprint_encrypt
+@vindex Irods_Object_Type::gpg_key_fingerprint_sign
+@vindex Irods_Object_Type::gpg_key_pair_id_encrypt
+@vindex Irods_Object_Type::gpg_key_pair_id_sign
+@vindex Irods_Object_Type::handle_id_vector
+@vindex Irods_Object_Type::handle_name_string_vector
+@vindex Irods_Object_Type::handle_value_id_vector
+@vindex Irods_Object_Type::handle_vector
+@vindex Irods_Object_Type::id
+@vindex Irods_Object_Type::irods_object_ref_id
+@vindex Irods_Object_Type::irods_server_id
+@vindex Irods_Object_Type::last_modified
+@vindex Irods_Object_Type::last_modified_str
+@vindex Irods_Object_Type::marked_for_deletion_from_archive
+@vindex Irods_Object_Type::marked_for_deletion_from_gwirdsif_db
+@vindex Irods_Object_Type::path
+@vindex Irods_Object_Type::signed_gpg
+@vindex Irods_Object_Type::user_id
+@c
+@vindex avu_vector (Irods_Object_Type)
+@vindex compressed_bzip2 (Irods_Object_Type)
+@vindex compressed_gzip (Irods_Object_Type)
+@vindex compressed_tar_file (Irods_Object_Type)
+@vindex created (Irods_Object_Type)
+@vindex created_str (Irods_Object_Type)
+@vindex delete_from_archive_timestamp (Irods_Object_Type)
+@vindex delete_from_gwirdsif_db_timestamp (Irods_Object_Type)
+@vindex deleted_from_archive (Irods_Object_Type)
+@vindex deleted_from_gwirdsif_db (Irods_Object_Type)
+@vindex detached_signature_irods_object_id (Irods_Object_Type)
+@vindex dublin_core_metadata_id (Irods_Object_Type)
+@vindex dublin_core_metadata_irods_object_id (Irods_Object_Type)
+@vindex encrypted (Irods_Object_Type)
+@vindex gpg_key_fingerprint_encrypt (Irods_Object_Type)
+@vindex gpg_key_fingerprint_sign (Irods_Object_Type)
+@vindex gpg_key_pair_id_encrypt (Irods_Object_Type)
+@vindex gpg_key_pair_id_sign (Irods_Object_Type)
+@vindex handle_id_vector (Irods_Object_Type)
+@vindex handle_name_string_vector (Irods_Object_Type)
+@vindex handle_value_id_vector (Irods_Object_Type)
+@vindex handle_vector (Irods_Object_Type)
+@vindex id (Irods_Object_Type)
+@vindex irods_object_ref_id (Irods_Object_Type)
+@vindex irods_server_id (Irods_Object_Type)
+@vindex last_modified (Irods_Object_Type)
+@vindex last_modified_str (Irods_Object_Type)
+@vindex marked_for_deletion_from_archive (Irods_Object_Type)
+@vindex marked_for_deletion_from_gwirdsif_db (Irods_Object_Type)
+@vindex path (Irods_Object_Type)
+@vindex signed_gpg (Irods_Object_Type)
+@vindex user_id (Irods_Object_Type)
+@c
+@deftypevr {Private variables} {unsigned long int} id
+@deftypevrx {} int user_id
+@deftypevrx {} int irods_server_id
+@deftypevrx {} string path
+@deftypevrx {} bool marked_for_deletion_from_archive
+@deftypevrx {} bool marked_for_deletion_from_gwirdsif_db
+@deftypevrx {} bool deleted_from_archive
+@deftypevrx {} bool deleted_from_gwirdsif_db
+@deftypevrx {} time_t delete_from_archive_timestamp
+@deftypevrx {} time_t delete_from_gwirdsif_db_timestamp
+@deftypevrx {} time_t created
+@deftypevrx {} time_t last_modified
+@deftypevrx {} string created_str
+@deftypevrx {} string last_modified_str
+@deftypevrx {} {vector<Handle_Type>} handle_vector
+@deftypevrx {} {vector<Irods_AVU_Type>} avu_vector
+@deftypevrx {} {vector<unsigned long int>} handle_id_vector
+@deftypevrx {} {vector<unsigned long int>} handle_value_id_vector
+@deftypevrx {} {vector<string>} handle_name_string_vector
+@deftypevrx {} {unsigned long int} dublin_core_metadata_id
+@deftypevrx {} {unsigned long int} dublin_core_metadata_irods_object_id
+@deftypevrx {} {unsigned long int} irods_object_ref_id
+@deftypevrx {} bool encrypted                                        
+@deftypevrx {} bool signed_gpg                                       
+@deftypevrx {} bool compressed_tar_file                              
+@deftypevrx {} bool compressed_gzip                                  
+@deftypevrx {} bool compressed_bzip2                                 
+@deftypevrx {} {unsigned long int} detached_signature_irods_object_id  
+@deftypevrx {} {unsigned int} gpg_key_pair_id_encrypt                  
+@deftypevrx {} {unsigned int} gpg_key_pair_id_sign                     
+@deftypevrx {} string gpg_key_fingerprint_encrypt                    
+@deftypevrx {} string gpg_key_fingerprint_sign                       
+@end deftypevr
+
+@c *** (3) Irods_Object_Type Member Functions
+
+@node Irods_Object_Type Member Functions, , Irods_Object_Type Data Members, class Irods_Object_Type
+@subsection Member Functions
+
+@findex Irods_Object_Type::Irods_Object_Type
+@findex Irods_Object_Type (constructor)
+@c
+@deftypefn {Default constructor} void Irods_Object_Type (@code{void})
+@end deftypefn
+
+@findex Irods_Object_Type::Irods_Object_Type
+@findex Irods_Object_Type (constructor)
+@c
+@deftypefn {Constructor} void Irods_Object_Type (@code{unsigned int} @var{uuser_id}, @code{string} @var{ppath})
+@end deftypefn
+
+@findex Irods_Object_Type::set
+@findex set (Irods_Object_Type)
+@c
+@deftypefun  int set (@code{unsigned int} @var{uuser_id},@*@
+                                @code{string} @var{ppath},@*@
+                                @code{unsigned long int} {@var{dc_metadata_id} @code{= 0UL}},@*@
+                                @code{unsigned long int} {@var{iirods_object_ref_id} @code{= 0UL}})
+@end deftypefun
+
+
+@findex Irods_Object_Type::clear
+@findex clear (Irods_Object_Type)
+@c
+@deftypefun void clear (@code{void})
+@end deftypefun
+
+@findex Irods_Object_Type::show
+@findex show (Irods_Object_Type)
+@c
+@deftypefun void show (@code{string} {@var{s} @code{= ""}},@*@
+                          @code{stringstream *}{@var{strm} @code{= 0}})
+@end deftypefun
+
+@findex Irods_Object_Type::write_to_database
+@findex write_to_database (Irods_Object_Type)
+@c
+@deftypefun int write_to_database (@code{MYSQL *}@var{mysql_ptr})
+@end deftypefun
+
+@findex Irods_Object_Type::get_from_database
+@findex get_from_database (Irods_Object_Type)
+@c
+@deftypefun int get_from_database (@code{MYSQL *}@var{mysql_ptr},@*@
+                                      @code{bool} {@var{id_only} @code{= false}})
+@end deftypefun
+
+@findex Irods_Object_Type::update
+@findex update (Irods_Object_Type)
+@c
+@deftypefun int update (@code{MYSQL *}@var{mysql_ptr})
+@end deftypefun
+
+@findex Irods_Object_Type::put_irods_object
+@findex put_irods_object (Irods_Object_Type)
+@c
+@deftypefun int put_irods_object (@code{string} @var{filename},@*@
+                                     @code{string} @var{irods_env_filename},@*@
+                                     @code{bool} {@var{force} @code{= false}})
+@end deftypefun
+
+@findex Irods_Object_Type::add_avu
+@findex add_avu (Irods_Object_Type)
+@c
+@deftypefun int add_avu (@code{Irods_AVU_Type} @var{avu},@*@
+                            @code{string} @var{irods_env_filename},@*@
+                            @code{bool} {@var{call_imeta} @code{= true}},@*@
+                            @code{bool} {@var{push_onto_vector} @code{= true}},@*@
+                            @code{bool} {@var{database} @code{= true}},@*@
+                            @code{MYSQL *}{@var{mysql_ptr} @code{= 0}},@*@
+                            @code{int} {@var{thread_ctr} @code{= 0}})
+
+@end deftypefun
+
+@findex Irods_Object_Type::add_avu_cond
+@findex add_avu_cond (Irods_Object_Type)
+@c
+@deftypefun int add_avu_cond (@code{string} irods_env_filename,@*@
+                                 @code{string} check_attrib,@*@
+                                 @code{string} check_val,@*@
+                                 @code{string} new_attrib,@*@
+                                 @code{MYSQL *}{@var{mysql_ptr} @code{= 0}},@*@
+                                 @code{string} {@var{new_val} @code{= ""}},@*@
+                                 @code{bool} {@var{database} @code{= true}},@*@
+                                 @code{bool} {@var{push_onto_vector} @code{= true}},@*@
+                                 @code{int} @var{thread_ctr} @code{= 0})
+@end deftypefun
+
+
+@findex Irods_Object_Type::delete_from_archive
+@findex delete_from_archive (Irods_Object_Type)
+@c
+@deftypefun int delete_from_archive (@code{MYSQL *&}@var{mysql_ptr},@*@
+                                        @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+@findex Irods_Object_Type::delete_from_gwirdsif_db
+@findex delete_from_gwirdsif_db (Irods_Object_Type)
+@c
+@deftypefun int delete_from_gwirdsif_db (@code{MYSQL *&}@var{mysql_ptr},@*@
+                                            @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+@findex Irods_Object_Type::add_handle_value
+@findex add_handle_value (Irods_Object_Type)
+@c
+@deftypefun int add_handle_value (@code{Handle_Type &}@var{handle},@*@
+                                     @code{MYSQL *&}@var{mysql_ptr},@*@
+                                     @code{string} @var{old_type_str},@*@
+                                     @code{string} @var{path},@*@
+                                     @code{unsigned int} @var{index},@*@
+                                     @code{string} @var{new_type_str},@*@
+                                     @code{string} @var{data_str},@*@
+                                      @code{string} {@var{thread_str} @code{= ""}}) 
+@end deftypefun
+
+@findex Irods_Object_Type::find_avu
+@findex find_avu (Irods_Object_Type)
+@c
+@deftypefun {const vector<Irods_AVU_Type>::iterator} find_avu (@code{string} @var{attrib},@*@
+                                                               @code{string} @var{val},@*@
+                                                               @code{bool} {@var{match_attrib_only} @code{= false}},@*@
+                                                               @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+@findex Irods_Object_Type::get_avus_from_irods_system
+@findex get_avus_from_irods_system (Irods_Object_Type)
+@c
+@deftypefun int get_avus_from_irods_system (@code{string} @var{command},@*@
+                                            @code{string} @var{filename},@*@
+                                            @code{Scan_Parse_Parameter_Type &}@var{param},@*@
+                                            @code{int *}{@var{ctr} @code{= 0}})
+@end deftypefun
+
+@findex Irods_Object_Type::mark_for_deletion
+@findex mark_for_deletion (Irods_Object_Type)
+@c
+@deftypefn {Static function} int mark_for_deletion (@
+        @code{vector<Irods_Object_Type> &}@var{irods_object_vector},@*@
+        @code{MYSQL *&}@var{mysql_ptr},@*@
+        @code{Response_Type &}@var{response},@*@
+        @code{int} @var{user_id},@*@
+        @code{string} irods_env_filename,@*@
+        @code{time_t &}@var{save_delay},@*@
+        @code{string} {@var{thread_str} @code{= ""}},@*@
+        @code{bool} {@var{wake_purge_thread} @code{= false}})
+@end deftypefn
+
+
+@findex Irods_Object_Type::undelete_irods_objects
+@findex undelete_irods_objects (Irods_Object_Type)
+@c
+@deftypefn {Static function} int undelete_irods_objects (@
+                                    @code{vector<Irods_Object_Type> &}@var{irods_object_vector},@*@
+                                    @code{MYSQL *&}@var{mysql_ptr},@*@
+                                    @code{bool} @var{archive},@*@
+                                    @code{bool} @var{database},@*@
+                                    @code{vector<Response_Type> &}@var{response_vector},@*@
+                                    @code{string} @var{irods_env_filename},@*@
+                                    @code{string} {@var{thread_str} @code{= ""}})
+
+@end deftypefn
+
+@deftypefun int rename_irods_object (@code{MYSQL *}@var{mysql_ptr},@*@
+                                     @code{string} @var{irods_env_filename},@*@
+                                     @code{Response_Type &}@var{response},@*@
+                                     @code{vector<Response_Type> &} @var{new_response_vector},@*@
+                                     @code{string} @var{new_filename},@*@
+                                     @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+
+@deftypefun int modify_irods_avu (@code{string} @var{irods_env_filename},@*@
+                                  @code{string} @var{attribute},@*@
+                                  @code{string} @var{old_value},@*@
+                                  @code{string} @var{new_value},@*@
+                                  @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+
+
+@deftypefun int verify_signature (@code{MYSQL *}@var{mysql_ptr},@*@
+                                  @code{Response_Type &}@var{response},@*@ 
+                                  @code{Irods_Object_Type &}@var{curr_irods_object},@*@
+                                  @code{string} @var{thread_str} @code{= ""})
+@end deftypefun
+
+
+@c ** (2) class Irods_AVU_Type
+
+@node class Irods_AVU_Type, , class Irods_Object_Type, iRODS Types
+@section class Irods_AVU_Type
+
+@tindex class Irods_AVU_Type
+@tindex Irods_AVU_Type, class
+
+The classes @code{Irods_Object_Type} and @code{Scan_Parse_Parameter_Type} and the function 
+@code{zzparse} are @code{friends} of @code{class Irods_AVU_Type}.  
+@xref{class Scan_Parse_Parameter_Type}, and @ref{class Irods_Object_Type}.
+
+@menu
+* Irods_AVU_Type Data Members::
+* Irods_AVU_Type Member Functions::
+@end menu
+
+@c *** (3)
+
+@node Irods_AVU_Type Data Members, Irods_AVU_Type Member Functions, , class Irods_AVU_Type
+@subsection Data Members
+
+@vindex Irods_AVU_Type::attribute
+@vindex Irods_AVU_Type::deleted_from_archive 
+@vindex Irods_AVU_Type::deleted_from_gwirdsif_db
+@vindex Irods_AVU_Type::id
+@vindex Irods_AVU_Type::irods_object_id
+@vindex Irods_AVU_Type::irods_object_path
+@vindex Irods_AVU_Type::time_set  
+@vindex Irods_AVU_Type::units     
+@vindex Irods_AVU_Type::user_id
+@vindex Irods_AVU_Type::value     
+@c
+@deftypevr  {Private variables} {unsigned long int} id
+@deftypevrx {}                  int                 user_id
+@deftypevrx {}                  {unsigned long int} irods_object_id
+@deftypevrx {}                  bool                deleted_from_archive 
+@deftypevrx {}                  bool                deleted_from_gwirdsif_db
+@deftypevrx {}                  string              irods_object_path
+@deftypevrx {}                  string              attribute
+@deftypevrx {}                  string              value     
+@deftypevrx {}                  string              units     
+@deftypevrx {}                  {unsigned int}      time_set  
+@end deftypevr
+
+@c *** (3)
+
+@node Irods_AVU_Type Member Functions, , Irods_AVU_Type Data Members, class Irods_AVU_Type
+@subsection Member Functions
+
+@findex Irods_AVU_Type::Irods_AVU_Type
+@findex Irods_AVU_Type (constructor)
+@c
+@deftypefn {Default constructor} void Irods_AVU_Type (@code{void})
+@end deftypefn
+
+
+@findex Irods_AVU_Type::Irods_AVU_Type
+@findex Irods_AVU_Type (constructor)
+@c
+@deftypefn {Constructor} void Irods_AVU_Type (@code{string} @var{attrib},@*@
+                                              @code{string} @var{val},@*@
+                                              @code{string} {@var{u} @code{= ""}},@*@
+                                              @code{unsigned int} {@var{t} @code{= 0U}},@*@
+                                              @code{unsigned int} {@var{iirods_object_id} @code{= 0U}},@*@
+                                              @code{int} {@var{uuser_id} @code{= 0}},@*@
+                                              @code{bool} {@var{ddeleted_from_archive} @code{= false}},@*@
+                                              @code{bool} {@var{ddeleted_from_gwirdsif_db} @code{= false}})
+@end deftypefn
+
+@findex Irods_AVU_Type::Irods_AVU_Type
+@findex Irods_AVU_Type (copy constructor)
+@c
+@deftypefn {Constructor} void Irods_AVU_Type (@code{const Irods_AVU_Type &}@var{i})
+@end deftypefn
+
+@deftypefn {Assignment operator} {const Irods_AVU_Type&} operator= (@code{const Irods_AVU_Type &}@var{i})
+@end deftypefn
+
+
+@findex Irods_AVU_Type::set
+@c
+
+@findex Irods_AVU_Type::set
+@findex set (Irods_AVU_Type)
+@c
+@deftypefun void set (@code{string} @var{attrib},@*@
+                      @code{string} @var{val},@*@
+                      @code{string} {@var{u} @code{= ""}},@*@
+                      @code{unsigned int} {@var{t} @code{= 0U}},@*@
+                      @code{unsigned int} {@var{iirods_object_id} @code{= 0U}},@*@
+                      @code{unsigned int} {@var{iid} @code{= 0U}},@*@
+                      @code{string} {@var{iirods_object_path} @code{= ""}},@*@
+                      @code{int} {@var{uuser_id} @code{= 0}},@*@
+                      @code{bool} {@var{ddeleted_from_archive} @code{= false}},@*@
+                      @code{bool} {@var{ddeleted_from_gwirdsif_db} @code{= false}})
+@end deftypefun
+
+
+@findex Irods_AVU_Type::write_to_database
+@findex write_to_database (Irods_AVU_Type)
+@c
+@deftypefun int write_to_database (@code{MYSQL *}@var{mysql_ptr}, @code{int} {@var{thread_ctr} @code{= 0}})
+@end deftypefun
+
+@findex Irods_AVU_Type::clear
+@findex clear (Irods_AVU_Type)
+@c
+@deftypefun void clear (@code{void}) 
+@end deftypefun
+
+@findex Irods_AVU_Type::get_id
+@findex Irods_AVU_Type::get_deleted_from_archive
+@findex Irods_AVU_Type::get_deleted_from_gwirdsif_db
+@c
+@findex get_id (Irods_AVU_Type)
+@findex get_deleted_from_archive (Irods_AVU_Type)
+@findex get_deleted_from_gwirdsif_db (Irods_AVU_Type)
+@c
+@deftypefn {const inline functions} {unsigned long int} get_id (@code{void}) 
+@deftypefnx {} bool get_deleted_from_archive (@code{void})
+@deftypefnx {} bool get_deleted_from_gwirdsif_db (@code{void})
+@end deftypefn
+
+
+@findex Irods_AVU_Type::delete_irods_avu
+@findex delete_irods_avu (Irods_AVU_Type)
+@c
+@deftypefn {Static function} int delete_irods_avu (@code{Irods_AVU_Type &}@var{irods_avu},@*@
+                                                   @code{bool} {@var{delete_from_database} @code{= true}},@*@
+                                                   @code{MYSQL *}{@var{mysql_ptr} @code{= 0}})
+@end deftypefn
+
+
+@findex Irods_AVU_Type::show
+@findex show (Irods_AVU_Type)
+@c
+@deftypefn {const function} void show (@code{string} {@var{s} @code{= ""}}, @code{stringstream *}{@var{strm} @code{= 0}})
+@end deftypefn
+
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

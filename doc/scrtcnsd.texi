@@ -1,0 +1,214 @@
+@c scrtcnsd.texi
+@c [...]/gwrdifpk/doc/scrtcnsd.texi
+
+@c Created by Laurence D. Finston (LDF) Fri Sep 20 17:56:00 CEST 2013
+
+@c This file is part of the GWDG Archive Interface User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) Security considerations
+
+@node Security considerations, Invoking gwirdsif/gwirdcli, Getting Started,  Top
+@chapter Security considerations
+
+@c ** (2)
+
+@cindex long-term archiving
+@cindex archiving, long-term 
+@cindex security
+@c
+@command{gwrdifpk} is a package for @emph{long-term} archiving.  This implies that security is an 
+important criterion;  a company or institution offering this service must be able to guarantee that 
+archived data will remain retrievable and uncorrupted for years:  10, 20, 50 or even longer.
+Therefore, every effort must be made to ensure both the correct operation of all components belonging 
+to the package and to prevent as far as possible malicious tampering with the data, the components of
+package itself, or the systems on which it runs.
+
+@cindex internet
+@cindex internet applications
+@cindex applications, internet
+@cindex Apache
+@cindex HTTPD, Apache 
+@cindex Apache HTTPD 
+@cindex Tomcat, Apache
+@cindex Apache Tomcat
+@cindex root privileges
+@cindex privileges, root
+@cindex web applications
+@cindex applications, web
+@c
+Unless a private network is available, which is unlikely to be the case,
+communication between the server and the clients will take place via the
+internet.  While many internet applications operate on the basis of web servers,
+such as the Apache products HTTPD or Tomcat, this has the disadvantage that such
+webservers may make the application vulnerable to attack, even if the
+application itself is programmed in a secure manner (as far as this is
+possible): If the web server itself is compromised, it is likely that any
+applications that run under its control will be compromised as well.  This will
+certainly be true if an attacker obtains @dfn{root privileges} on the machine where
+the webserver is running.
+
+@cindex web applications
+@cindex applications, web
+@cindex buffer overflow
+@cindex overflow, buffer
+@c
+Thus, @command{gwrdifpk} is @emph{not} a web application and does not depend on
+a webserver.  In production use, the server program accepts contacts from clients via a
+single designated port (5557 by default).  Ideally, this would be the only port
+open to the ``outside world'' on the machine where the server program runs.
+Then, the @command{gwirdsif} process would be the only one that could be
+attacked from outside.  Since all input is read piecewise into fixed-size
+buffers and excessive input should always cause an error, buffer overflows at
+least should not be possible.  However, it should be noted that while the author
+takes all possible care to minimize the risk of attack, he is @emph{not} an
+expert in computer security and that it would certainly be desirable to have
+such an expert evaluate the code of @command{gwrdifpk}.  Please note also the
+license conditions of @command{gwrdifpk}, especially the Disclaimer of 
+Warranty.  @xref{GPL, GPL, GNU Free Documentation License}.
+
+@menu
+* Cryptography::
+* Decrypting MySQL passwords::
+* X.509 Certificates::
+* Cryptographic operations on iRODS objects::
+@end menu
+
+@c ** (2)
+
+@node Cryptography, Decrypting MySQL passwords, , Security considerations
+
+@section Cryptography
+
+@cindex cryptography
+@cindex GPG (GNU Privacy Guard)
+@cindex GNU Privacy Guard (GPG)
+@c
+Cryptography is an indispensable tool for keeping data secret.  
+It is used by GnuTLS to keep the communication between server and client
+secret.  This is done ``behind the scenes'', using @dfn{X.509 certificates}.
+@xref{X.509 certificates}.
+That is, @command{gwrdifpk} simply calls functions from the GnuTLS 
+library and the latter takes care of verifying the certificates and managing 
+the communication.
+
+@cindex cryptography
+@cindex GPG (GNU Privacy Guard)
+@cindex GNU Privacy Guard (GPG)
+@cindex Transaction Authentication Numbers (TANs)
+@cindex TANs (Transaction Authentication Numbers)
+@c
+@command{gwrdifpk} uses cryptography directly to encrypt and decrypt the ``scrambled'' 
+iRODS passwords 
+@xref{Setting up iRODS users}, and @ref{Options for GPG (GNU Privacy Guard)}.
+It also uses it for decrypting the passwords for the MySQL databases.  
+Finally, cryptography is also used for encrypting lists of @dfn{Transaction Authentication Numbers} 
+(TANs), except that this feature is currently disabled (as of 2013.09.23.).  @xref{Other user commands}.
+
+@cindex cryptography
+@cindex GPG (GNU Privacy Guard)
+@cindex GNU Privacy Guard (GPG)
+@cindex C API 
+@cindex API, C
+@findex popen
+@findex system
+@c
+@command{gwrdifpk} uses the GNU Privacy Guard (GPG) for encrypting and decrypting data, 
+listing keys, and for any other purposes requiring cryptography.  @xref{Prerequisites}.  
+@command{gpg} (lowercase) is a command-line tool and the GPG package does @emph{not} 
+provide a C API.  The libraries that belong to the package are for implementing 
+cryptographic software, not for making the functionality of @command{gpg} available to 
+applications.  Therefore, in @command{gwrdifpk}, @command{gpg} is called in a shell 
+via @command{popen}@footnote{It could also be called via @command{system}, but as of 2013.09.23., 
+only @command{popen} is used.} 
+
+@cindex OpenPGP
+@cindex Pretty Good Privacy (PGP)
+@cindex PGP (Pretty Good Privacy)
+@cindex passphrase, GPG secret key
+@cindex GPG secret key, passphrase
+@cindex secret key, GPG, passphrase
+@cindex security risk
+@cindex risk, security
+@cindex root privileges
+@cindex privileges, root
+@c
+By default, @command{gwrdifpk} uses an OpenPGP (PGP @math{=} Pretty Good Privacy) 
+@dfn{secret key} @emph{without} a passphrase.  This is definitely a security risk, but 
+necessary, if it is intended that the server program @command{gwirdsif} be restarted 
+automatically after having been terminated, intentionally or because of an error.  
+In addition, for testing purposes, it would be very inconvenient to have to type in a 
+passphrase every time the server is started.  However, it does mean that @command{gwrdifpk} 
+is only as secure as the file system on which the secret key is stored:  If an attacker gains 
+root privileges, he or she has access to the secret key and can use it for decryption and 
+signing.
+
+@cindex passphrase, GPG secret key
+@cindex GPG secret key, passphrase
+@cindex secret key, GPG, passphrase
+@cindex shellscripts
+@c
+However, it is possible to use a secret key with a passphrase.  In this case, 
+@command{gwirdsif} must be invoked with the @option{--gpg-passphrase} argument.  
+The user will then be prompted for the passphrase.  @command{gwrdifpk} includes 
+a shellscript @file{start_gwirdsif_with_passphrase.sh} for invoking @command{gwirdsif}
+this way conveniently.
+@xref{Options for GPG (GNU Privacy Guard)}, and @ref{GPG keys (Shellscripts and Utilities)}.
+
+This is certainly safer than using a secret key without a passphrase, but if @command{gwirdsif} 
+terminates for any reason, it cannot be started unless the passphrase can be entered somehow, 
+by a person or automatically.  However, one would have to ensure that any automatic system would 
+not be vulnerable to an attack similar to the one described above for a secret key without a 
+passphrase, otherwise, there would be no security benefit with respect to the latter.
+
+@c ** (2)
+
+@node Decrypting MySQL passwords, X.509 Certificates, Cryptography, Security considerations
+
+@section Decrypting MySQL passwords
+
+To use an encrypted MySQL password, @command{gwirdsif} or @command{gwirdcli} must be invoked
+using the command-line option @option{--mysql-password-filename}.
+The username may be specified with the @option{--mysql-username} option, otherwise, the 
+username of the user who invoked the program is used.
+@xref{Database options}.
+
+@c ** (2)
+
+@node X.509 Certificates, Cryptographic operations on iRODS objects, Decrypting MySQL passwords, Security considerations
+
+@section X.509 Certificates
+
+@xref{X.509 Certificate Types}, and @ref{Certificates database table}.
+
+@c ** (2) Cryptographic operations on iRODS objects
+
+@node Cryptographic operations on iRODS objects, , X.509 Certificates, Security considerations
+
+@section Cryptographic operations on iRODS objects
+
+See also @ref{User commands based on icommands}.
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+
+@c For use in indirect buffers:
+@c
+@c (progn (texinfo-mode) (outline-minor-mode t) (setq outline-regexp "@c *\\*+") (ignore (quote 
+@c )) (set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi"))
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

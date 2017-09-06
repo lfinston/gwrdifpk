@@ -1,0 +1,533 @@
+@c glblvrcn.texi
+@c [...]/gwrdifpk/doc/glblvrcn.texi
+
+@c Created by Laurence D. Finston (LDF) Wed Oct  2 13:51:19 CEST 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) Global constants and variables
+
+@node Global constants and variables, class Scan_Parse_Parameter_Type, Using gwirdcli, Top
+@chapter Global constants and variables
+
+@cindex namespaces
+@cindex namespace gwrdifpk
+@cindex gwrdifpk, namespace
+@c
+The global constants and variables are declared within the @dfn{namespace} @code{gwrdifpk}.
+
+@menu
+* Global constants::
+* Global variables::
+@end menu
+
+@c ** (2) Global constants
+
+@node Global constants, Global variables, , Global constants and variables
+
+@section Global constants
+
+@cindex global constants
+@cindex constants, global
+@cindex library
+@c
+The global constants are declared and initialized in @file{glblcnst.web}.  
+Unlike the global variables (see below), they can be included in the @samp{gwrdifpk} library, 
+because they are constant, i.e., their values never change.  Their values can therefore 
+be shared by any number of running processes, with no danger of them being overwritten.
+
+@cindex global constants
+@cindex constants, global
+@c
+All of the global constants listed below are declared @code{extern const}.
+
+@deftypevr  {Global constants} int DEFAULT_PORT_NUM_ANON                
+@deftypevrx {}                 string DEFAULT_PORT_STR_ANON
+Values:  @code{5556} and @code{"5556"}, respectively.
+@end deftypevr
+
+@deftypevr {Global constants} string DEFAULT_PORT_STR_X_509            
+@deftypevrx {}                int DEFAULT_PORT_NUM_X_509               
+Values:  5557 and "5557", respectively.
+@end deftypevr
+
+@deftypevr {Global constant} string DEFAULT_SOCKET_DIRECTORY         
+Value:  @code{"/tmp"}
+@end deftypevr
+
+@deftypevr {Global constant} size_t MYSQL_PASSWORD_LENGTH            
+Value:  @code{256}
+@end deftypevr
+
+@deftypevr {Global constant} string DEFAULT_MYSQL_PASSWORD_FILENAME  
+Value:  @code{"mysql_password.gpg.asc"}
+@end deftypevr
+
+@deftypevr {Global constant} string DEFAULT_LISTEN_CLIENT_PORT_STR 
+Value @code{"5558"}
+@end deftypevr
+
+@deftypevr {Global constant} int DEFAULT_LISTEN_CLIENT_PORT 
+Value:  @code{5558}
+@end deftypevr
+
+@deftypevr {Global constant} int DEFAULT_PULL_REQUEST_INTERVAL 
+Value:  259200, i.e., three days in seconds 
+@end deftypevr
+
+@menu
+* Response and error codes::
+@end menu 
+
+@c *** (3) Response and error codes
+
+@node Response and error codes, , , Global constants
+
+@subsection Response and error codes
+
+@deftypevr {Global constants} {extern const int} GW_SUCCESS
+@deftypevrx {}                {extern const int} GW_ERROR
+@deftypevrx {}                {extern const int} GW_WARNING
+@deftypevrx {}                {extern const int} GW_SERVER_SIDE_DATABASE_ERROR
+@deftypevrx {}                {extern const int} GW_NO_PRIVILEGE_ERROR
+@deftypevrx {}                {extern const int} GW_HANDLE_NOT_FOUND   
+@deftypevrx {}                {extern const int} GW_HANDLE_NOT_MARKED_FOR_DELETION
+@deftypevrx {}                {extern const int} GW_HANDLE_ALREADY_MARKED_FOR_DELETION
+@deftypevrx {}                {extern const int} GW_HANDLE_VALUE_ERROR
+@deftypevrx {}                {extern const int} GW_INVALID_HANDLE_VALUE_SPECIFIER
+@deftypevrx {}                {extern const int} GW_HANDLE_VALUE_NOT_FOUND
+@deftypevrx {}                {extern const int} GW_LAST_HANDLE_VALUE   
+@deftypevrx {}                {extern const int} GW_HS_ADMIN_HANDLE_VALUE
+@deftypevrx {}                {extern const int} GW_LAST_HS_ADMIN_HANDLE_VALUE   
+@deftypevrx {}                {extern const int} GW_HANDLE_VALUE_NOT_MARKED_FOR_DELETION
+@deftypevrx {}                {extern const int} GW_HANDLE_VALUE_ALREADY_MARKED_FOR_DELETION
+@deftypevrx {}                {extern const int} GW_IRODS_OBJECT_NOT_FOUND
+@deftypevrx {}                {extern const int} GW_IRODS_OBJECT_NOT_MARKED_FOR_DELETION
+@deftypevrx {}                {extern const int} GW_IRODS_OBJECT_ALREADY_MARKED_FOR_DELETION
+@deftypevrx {}                {extern const int} GW_DC_METADATA_NOT_FOUND
+@deftypevrx {}                {extern const int} GW_DC_METADATA_NOT_MARKED_FOR_DELETION
+@deftypevrx {}                {extern const int} GW_DC_METADATA_ALREADY_MARKED_FOR_DELETION
+@c
+@cindex response code
+@cindex error code
+@cindex code, response
+@cindex code, error
+@c
+These constants are declared in @file{gwrdifpk-1.0/src/rspercds.web}.
+They are numbered consecutively, whereby @code{GW_SUCCESS} = 0 
+and @code{GW_ERROR} = 1.  Otherwise, the specific values are not significant, as long as they 
+are distinct and @math{> 1}.
+They are sent from the server to the client and used in the client-side parser function 
+@code{zzparse}.  @xref{Scanning and parsing}.  The function @code{gwstrerror} can be 
+used to output a human-readable message for a given response or error code.
+@xref{Other functions}. 
+@end deftypevr
+
+
+
+
+@c ** (2) Global variables
+
+@node Global variables, , Global constants, Global constants and variables
+
+@section Global variables
+
+@cindex object code
+@cindex code, object
+@cindex file, object
+@cindex object file
+@c
+The global variables are declared and initialized in @file{glblvrbl.web}.  
+Unlike the global constants (see above), they cannot be included in a library, 
+because if they are shared among several processes, each variable would contain the 
+value stored in it by the last process that assigned to it.  Therefore, every program 
+that uses the global variables links with the @dfn{object file} (or file of object code) 
+@file{glblvrbl.o} so that each instance of each program has its own copy of all of the global 
+variables.
+
+@cindex class
+@cindex C++ class
+@cindex class, C++
+@c
+Another way of solving this problem would be to put all of the global variables into a class 
+and declare an instance of this class in each program.  There are advantages and disadvantages to 
+both of these approaches.
+
+@cindex command-line options
+@cindex options, command-line
+@cindex global variables 
+@cindex variables, global 
+@c
+Many of the global variables described below are set by the @dfn{command-line} options 
+specified by the user when invoking @command{gwirdsif} or @command{gwirdcli}.
+@xref{Invoking gwirdsif/gwirdcli}. 
+
+@deftypevr {Global variables} {unsigned int} purge_server_logs_thread_ctr     
+@deftypevrx {}                {unsigned int} purge_database_thread_ctr        
+@deftypevrx {}                {unsigned int} purge_irods_archive_thread_ctr   
+@deftypevrx {}                {unsigned int} purge_dc_metadata_thread_ctr
+@end deftypevr
+
+
+@deftypevr {Global variables} {unsigned int} listen_local_thread_ctr          
+@deftypevrx {}                {unsigned int} listen_remote_anon_thread_ctr    
+@deftypevrx {}                {unsigned int} listen_remote_X_509_thread_ctr   
+@end deftypevr
+
+@deftypevr {Global variable} {unsigned int} pull_request_thread_ctr
+@end deftypevr
+
+@deftypevr {Global variable} {unsigned int} save_global_thread_ctr           
+Initialized to 7, i.e., the value of @code{listen_remote_X_509_thread_ctr + 1}. 
+@end deftypevr
+
+@deftypevr {Global variable} {unsigned int} global_thread_ctr                
+Initialized to 6, i.e., the value of @code{listen_remote_X_509_thread_ctr}.
+The first thread created other than the ones named above 
+(``purge server'', ``purge database'' @dots{} ``listen_remote_X_509_thread_ctr'' 
+will be thread number 7.
+@end deftypevr
+
+
+@deftypevr {Global variable} bool global_thread_ctr_wrapped_around       
+Initialized to @code{false}.  Currently only used by @command{gwirdsif}, 
+because @command{gwirdcli} doesn't use threads.  (This may change in the future.)
+
+@cindex test procedures
+@cindex procedures, test
+@c
+This variable keeps track of whether @code{global_thread_ctr} has wrapped around.  
+Since the maximum value of an @code{unsigned int} is very large 
+(@code{UINT_MAX} @math{\equiv 4,294,967,295} on the author's PC), it is extremely unlikely 
+that @code{global_thread_ctr} would ever wrap 
+around, even if @command{gwirdsif} were to run uninterrupted for a very long time.  
+However, it is not impossible and a test procedure could be programmed to 
+make it happen.  Otherwise, if @code{global_thread_ctr_wrapped_around} were 
+ever to be set to @code{true}, it would be an indication that something has probably 
+gone wrong.
+@end deftypevr
+
+@deftypevr {Global variable} pthread_mutex_t thread_ctr_id_map_mutex
+@end deftypevr
+
+
+@deftypevr {Global variables} pthread_t purge_server_logs_thread_id   
+@deftypevrx {} pthread_t purge_database_thread_id      
+@deftypevrx {} pthread_t purge_irods_archive_thread_id 
+@deftypevrx {} pthread_t purge_dc_metadata_thread_id
+@end deftypevr
+
+
+
+@deftypevr {Global variables} pthread_mutex_t thread_ctr_mutex
+@deftypevrx {}                pthread_mutex_t cerr_mutex
+@deftypevrx {}                pthread_mutex_t cout_mutex
+@deftypevrx {}                pthread_mutex_t log_strm_mutex
+@deftypevrx {}                pthread_mutex_t err_log_strm_mutex
+@deftypevrx {}                pthread_mutex_t sql_mutex
+@deftypevrx {}                pthread_mutex_t sql_lock_tables_mutex
+@deftypevrx {}                pthread_mutex_t session_data_mutex
+@deftypevrx {}                pthread_mutex_t gpg_passphrase_fifo_mutex
+
+@end deftypevr
+
+@deftypevr {Global variables}  {map<unsigned int, pthread_t>} thread_ctr_id_map
+@deftypevrx {} {map<pthread_t, unsigned int>} thread_id_ctr_map
+@end deftypevr
+
+
+@deftypevr {Global variables} ofstream output_file_strm
+@deftypevrx {} ofstream log_strm
+@deftypevrx {} ofstream err_log_strm
+@end deftypevr
+
+
+@deftypevr {Global variable} string server_ip_address
+@end deftypevr
+
+@deftypevr {Global variables} string input_filename
+@deftypevrx {} string output_filename
+@end deftypevr
+
+@deftypevr {Global variables} string port_str_anon  
+@deftypevrx {} string port_str_x_509 
+@end deftypevr
+
+@deftypevr {Global variables} int port_num_anon     
+@deftypevrx {} int port_num_x_509    
+@end deftypevr
+
+@deftypevr {Global variable} bool save_temp_files 
+@end deftypevr
+
+
+@deftypevr {Global variables} {map<string, string>} dn_fields
+@deftypevrx {}                {map<string, string>} dn_username_map
+@end deftypevr
+
+@deftypevr {Global variables} string DEFAULT_CERT_FILENAME
+@deftypevrx {}                string DEFAULT_KEY_FILENAME
+@deftypevrx {}                string DEFAULT_CA_FILENAME
+@deftypevrx {}                string DEFAULT_CRL_FILENAME
+@end deftypevr
+
+@deftypevr {Global variables} string log_filename       
+@deftypevrx {} string err_log_filename   
+@end deftypevr
+
+@deftypevr {Global variables} int trace_value 
+@deftypevrx {} bool scanner_trace 
+@deftypevrx {} bool parser_trace  
+@end deftypevr
+
+@deftypevr {Global variables} string gwirdsif_hostname
+@end deftypevr
+
+@deftypevr {Global variables} bool icommands       
+@deftypevrx {} bool irods_functions 
+@deftypevrx {} bool jargon_trunk    
+@deftypevrx {} bool jargon_core     
+@code{icommands} is @code{true} by default and the others are @code{false}.
+@end deftypevr
+
+@deftypevr {Global variables} int irods_server_pid 
+@end deftypevr
+
+@deftypevr {Global variables} string irods_server_dir
+@end deftypevr
+
+@deftypevr {Global variables} string config_dir
+@end deftypevr
+
+@deftypevr {Global variables} {char[64]} admin_data
+@deftypevrx {} {unsigned int} admin_data_length
+@end deftypevr
+
+@deftypevr {Global variables} bool end_server_enabled 
+@deftypevrx {} bool sleep_server_enabled 
+@deftypevrx {} bool sleep_client_enabled 
+@deftypevrx {} bool signal_server_enabled 
+@deftypevrx {} bool signal_client_enabled 
+@end deftypevr
+
+
+@deftypevr {Global variables} {unsigned int} purge_logs_interval 
+604800U  1 week in seconds
+@end deftypevr
+
+@deftypevr {Global variables} {unsigned int} purge_database_interval 
+3600U    1 hour in seconds    
+@end deftypevr
+
+@deftypevr {Global variables} {unsigned int} purge_database_limit    
+172800U  2 days in seconds  
+@end deftypevr
+
+@deftypevr {Global variables} pthread_mutex_t purge_server_database_mutex
+@deftypevrx {} pthread_cond_t  purge_server_database_cond
+@end deftypevr
+
+@deftypevr {Global variables} pthread_mutex_t purge_dc_metadata_mutex
+@deftypevrx {} pthread_cond_t  purge_dc_metadata_cond
+@end deftypevr
+
+
+
+
+@deftypevr {Global variables} pthread_mutex_t purge_irods_archive_mutex
+@deftypevrx {} pthread_cond_t  purge_irods_archive_cond
+@end deftypevr
+
+@deftypevr {Global variables} {unsigned int} purge_irods_archive_interval 
+3600U    1 hour in seconds  
+@end deftypevr  
+
+@deftypevr {Global variable} {unsigned int} purge_irods_archive_limit    
+172800U  2 days in seconds  
+@end deftypevr
+
+
+@deftypevr {Global variable} {unsigned int} purge_logs_limit 
+14U  14 days 
+@end deftypevr
+
+@deftypevr {Global variable} {unsigned int} purge_dc_metadata_interval
+3600U    1 hour in seconds  
+@end deftypevr
+
+@deftypevr {Global variable} {unsigned int} purge_dc_metadata_limit
+172800U  2 days in seconds  
+@end deftypevr
+
+@deftypevr {Global variable} string socket_dir
+@end deftypevr
+
+@deftypevr {Global variable} string socket_path
+@end deftypevr
+
+@deftypevr {Global variable} string log_dir
+@end deftypevr
+
+
+@deftypevr {Global variable} {struct sigaction} default_sigint_action
+@end deftypevr
+
+@deftypevr {Global variable} {struct sigaction} default_sigterm_action
+@end deftypevr
+
+@deftypevr {Global variable} bool terminate_on_end_input 
+true  Used by gwirdcli only.
+@end deftypevr
+
+
+@deftypevr {Global variable} string command_str
+@end deftypevr
+
+@deftypevr {Global variable} int global_debug_level 
+Default 0.
+@end deftypevr
+
+@deftypevr {Global variable} {unsigned int} suppress_prompt 
+Default 0U.
+@end deftypevr
+
+@deftypevr {Global variable} string mysql_username
+@end deftypevr
+
+@deftypevr {Global variable} string mysql_password_filename
+@end deftypevr
+
+@deftypevr {Global variable} {char*} mysql_password 
+Default 0.
+@end deftypevr
+
+
+@deftypevr {Global variable} {vector<string>} cert_filenames
+@end deftypevr
+
+@deftypevr {Global variable} {vector<string>} key_filenames
+@end deftypevr
+
+
+@deftypevr {Global variable} {vector<string>} ca_filenames   
+@end deftypevr
+
+@deftypevr {Global variable} {vector<string>} crl_filenames  
+@end deftypevr
+
+@deftypevr {Global variable} string session_id  
+@end deftypevr
+
+@deftypevr {Global variable} string homedir
+@end deftypevr
+
+@deftypevr {Global variable} string gwirdsif_dir
+@end deftypevr
+
+@deftypevr {Global variable} string gpg_homedir
+@end deftypevr
+
+@deftypevr {Global variable} {char*} gpg_passphrase 
+Default 0.
+@end deftypevr
+
+
+@deftypevr {Global variable}  size_t gpg_passphrase_length 
+Default 0.
+@end deftypevr
+
+@deftypevr {Global variable} {char*} gpg_key_id 
+Default 0.
+@end deftypevr
+
+
+@deftypevr {Global variable} int gpg_passphrase_fifo_fd 
+Default 0.
+@end deftypevr
+
+
+@deftypevr {Global variable} string gpg_passphrase_fifo_name
+@end deftypevr
+
+
+@deftypevr {Global variable} {vector<string>} session_id_vector
+@end deftypevr
+
+@deftypevr {Global variable} bool is_gwrdwbap 
+Initialized to @code{false}.
+@end deftypevr
+
+@deftypevr {Global variable} bool is_gwirdcli 
+Initialized to @code{false}.
+@end deftypevr
+
+@deftypevr {Global variable} bool is_gwirdsif 
+Initialized to @code{false}.
+@end deftypevr
+
+@deftypevr {Global variable} bool is_gwirdpcl
+Initialized to @code{false}.
+@end deftypevr
+
+@deftypevr {Global variable} string remote_hostname
+@end deftypevr
+
+@deftypevr {Global variable} bool remote_connection 
+Initialized to @code{false}.
+@end deftypevr
+
+@deftypevr {Global variable} bool anonymous 
+Initialized to @code{false}.
+@end deftypevr
+
+
+@deftypevr {Global variable} bool standalone_handle 
+Initialized to @code{true}.  This is for testing purposes!  
+For production use, this variable should be initialized to @code{false}.
+@end deftypevr                                
+
+@deftypevr {Global variable} {multimap<string, int>} signal_number_map
+@end deftypevr
+
+@deftypevr {Global variable} {map<int, string>} signal_name_map
+@end deftypevr
+
+@deftypevr {Global variable} {map<int, string>} gw_code_map
+Declared in @file{gwrdifpk-1.0/src/rspercds.web}.
+@xref{Response and error codes}.
+It is initialized (filled) by the function @code{init_gw_code_map} and used by the 
+function @code{gwstrerror}.
+@xref{Other functions}.
+@end deftypevr
+
+@deftypevr {Global variable} int listen_client_port 
+@end deftypevr
+
+@deftypevr {Global variable} string listen_client_port_str
+@end deftypevr
+
+@deftypevr {Global variable} int pull_request_interval 
+@end deftypevr
+
+@deftypevr {Global variable} bool listen_client     
+@end deftypevr
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+
