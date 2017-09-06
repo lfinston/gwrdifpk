@@ -1,0 +1,43 @@
+%% README
+%% Created by Laurence D. Finston (LDF) Thu Jul  5 12:40:54 CEST 2012
+
+%% * (1) Top
+
+%% ** (2) Building the package
+
+LDF 2012.07.05.
+LDF 2013.05.30.
+
+   libtoolize
+   aclocal 
+   autoconf
+   autoheader 
+   automake --add-missing --copy 
+   configure --prefix=`pwd` 
+   make 
+   make install
+
+Notes:
+
+automake:   The options `--add-missing' and `--copy' only need to be used the first time.
+
+configure:  If the `--prefix' argument isn't used, the `install' target of `make' tries
+            to install the executable files under `/usr/local/bin/'.  A directory other than the 
+            current directory may be used.  The argument must be an absolute path.
+
+
+%% ** (2)
+
+
+
+%% * (1) Local Variables for Emacs 
+
+%% Local Variables: 
+%% eval:(display-time) 
+%% eval:(read-abbrev-file) 
+%% indent-tabs-mode:nil 
+%% eval:(outline-minor-mode) 
+%% outline-regexp:"%% *\\*+" 
+%% End: 
+
+%% * (1) End of README
