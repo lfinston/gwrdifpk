@@ -1,0 +1,841 @@
+@q stparobj.web @>
+@q [...]/gwrdifpk/src/stparobj.web  @>
+
+@q Created by Laurence D. Finston (LDF) Thu Sep  5 17:18:31 CEST 2013  @>
+
+@q * (1) Top @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+@q ** (2) Include files@>
+
+@ Include files.
+\initials{LDF 2013.09.04.}
+
+@<Include files@>=
+
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <pthread.h>  /* POSIX threads  */
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
+
+#include <mysql.h>
+
+#include <expat.h>
+
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <fstream>
+#include <sstream>   
+#include <string>
+#include <getopt.h>
+
+#include <map>
+#include <vector>
+#include <deque>
+#include <set>
+#include <stack>
+#include <utility>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif 
+
+
+#include "rspercds.h++"
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "helper.h++"
+#include "tanfncs.h++"
+#include "pidfncs.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "usrinftp.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+
+#include "stpclopt.h++"
+
+@q ** (2) Create database tables for archive objects (iRODS objects) (gwirdsif).  @>
+
+@ Create database tables for archive objects (iRODS objects) (gwirdsif).
+\initials{LDF 2013.09.05.}
+
+@q *** (3) Declaration  @>
+
+@<|create_tables_archive| declaration@>=
+
+int
+create_tables_archive(Scan_Parse_Parameter_Type &param);
+
+
+@q *** (3) Definition @>
+@
+@<|create_tables_archive| definition@>=
+
+int
+create_tables_archive(Scan_Parse_Parameter_Type &param)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status;
+   stringstream sql_strm;
+
+   stringstream temp_strm;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+         cerr << "Entering `create_tables_archive'."
+              << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   MYSQL_RES* result = 0;
+   MYSQL_ROW curr_row;
+
+   size_t result_array_size = 16;
+
+   MYSQL_RES *result_array[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+   unsigned int row_ctr   = 0;
+   unsigned int field_ctr = 0;
+   long int affected_rows = 0;
+
+   vector<string> query_vector;
+
+   vector<unsigned int *> row_ctr_vector;
+   vector<unsigned int *> field_ctr_vector;
+   vector<long int *>     affected_rows_vector;
+
+   vector<string> comment_vector;
+
+   string comma_str;
+
+@q **** (4) @>
+
+       sql_strm << "use " << gwirdsif_database_name;
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+@q **** (4) @>
+@
+@<|create_tables_archive| definition@>=
+
+       sql_strm << "create table Irods_Objects"
+                << endl 
+                << "("
+                << endl 
+                <<     "irods_object_id bigint unsigned primary key not null,"
+                << endl 
+                <<     "user_id int not null references Users(user_id),"
+                << endl 
+                <<     "irods_server_id int unsigned not null "
+                << "references Irods_Servers(irods_server_id),"
+                << endl 
+                <<     "irods_object_path varchar(1024) not null default '',"
+                << endl 
+                <<     "marked_for_deletion_from_archive boolean not null default 0,"
+                << endl 
+                <<     "deleted_from_archive boolean not null default 0,"
+                << endl 
+                <<     "delete_from_archive_timestamp timestamp not null default 0,"
+                << endl 
+                <<     "marked_for_deletion_from_gwirdsif_db boolean not null default 0,"
+                << endl 
+                <<     "delete_from_gwirdsif_db_timestamp timestamp not null default 0,"
+                << endl 
+                <<     "created timestamp not null default 0,"
+                << endl 
+                <<     "last_modified timestamp not null default 0"
+                << endl 
+                << ")";
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+@q ***** (5) @>
+@
+@<|create_tables_archive| definition@>=
+
+       sql_strm << "insert into Irods_Objects"
+                << endl                
+                << "(irods_object_id, user_id, irods_server_id, irods_object_path)"
+                << endl                
+                << "values"
+                << endl                
+                << "(0, 0, 0, 'NULL IRODS OBJECT PATH')";
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(new long int(0L));
+       comment_vector.push_back("insert Irods_Objects");
+
+       sql_strm.str("");
+
+@q **** (4) @>
+@
+@<|create_tables_archive| definition@>=
+
+       sql_strm << "create table Irods_AVUs"
+                << endl
+                << "("
+                << endl
+                << "   irods_avu_id bigint unsigned primary key not null,"
+                << endl
+                << "   irods_object_id bigint unsigned references Irods_Objects(irods_object_id),"
+                << endl
+                << "   attribute varchar(512),"
+                << endl
+                << "   value varchar(512),"
+                << endl
+                << "   units varchar(16),"
+                << endl
+                << "   time_set timestamp default 0"
+                << endl
+                << ")";
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+
+@q ***** (5) @>
+@
+@<|create_tables_archive| definition@>=
+
+       sql_strm << "insert into Irods_AVUs"
+                << endl
+                << "("
+                << endl
+                << "   irods_avu_id,"
+                << endl
+                << "   irods_object_id,"
+                << endl
+                << "   attribute,"
+                << endl
+                << "   value,"
+                << endl
+                << "   units,"
+                << endl
+                << "   time_set)"
+                << endl
+                << "values"
+                << endl
+                << "(0, 0, 'NULL_ATTRIBUTE', 'NULL_VALUE', 'NULL_UNITS', 0)";
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(new long int(0L));
+       comment_vector.push_back("insert Irods_AVUs");
+
+       sql_strm.str("");
+
+@q **** (4) @>
+@
+@<|create_tables_archive| definition@>=
+
+
+       sql_strm << "create table Irods_Objects_Handles"
+                << endl                
+                << "("
+                << endl                
+                << "    irods_object_id bigint unsigned references Irods_Objects(irods_object_id),"
+                << endl                
+                << "    handle_id bigint unsigned "
+                << "references handlesystem_standalone.handes(handle_id)"
+                << endl                
+                << ")";
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+
+@q ***** (5) Irods_Objects_Handles.  @>
+
+@ \.{Irods\_Objects\_Handles}.
+\initials{LDF 2013.09.06.}
+
+@<|create_tables_archive| definition@>=
+
+       sql_strm << "insert into Irods_Objects_Handles"
+                << endl                
+                << "(irods_object_id, handle_id)"
+                << endl                
+                << "values"
+                << endl                
+                << "(0, 0)";
+
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(new long int(0L));
+       comment_vector.push_back("insert Irods_Objects_Handles");
+
+       sql_strm.str("");
+
+@q **** (4) Irods_Servers.  @>
+
+@ \.{Irods\_Servers}.
+\initials{LDF 2013.09.06.}
+
+@<|create_tables_archive| definition@>=
+
+       sql_strm << "create table Irods_Servers"
+                << endl                
+                << "("
+                << endl                
+                << "   irods_server_id int unsigned primary key not null,"
+                << endl                
+                << "   irods_server_name varchar(1024) not null default '',"
+                << endl                
+                << "   irods_server_ip_address varchar(1024),"
+                << endl                
+                << "   irods_server_port int unsigned not null,"
+                << endl                
+                << "   irods_server_admin varchar(1024)        "
+                << endl                
+                << ")";
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+@q ***** (5) @>
+@
+@<|create_tables_archive| definition@>=
+
+       sql_strm << "insert into Irods_Servers"
+                << endl                
+                << "(irods_server_id, irods_server_name, irods_server_ip_address, "
+                << endl                
+                << " irods_server_port, irods_server_admin)"
+                << endl                
+                << "values"
+                << endl                
+                << "(0, 'NULL_IRODS_SERVER_NAME', 'NULL_IRODS_SERVER_IP_ADDRESS', "
+                << endl                
+                << " 0, 'NULL_IRODS_SERVER_ADMIN')";
+
+@q ***** (5) @>
+@
+@<|create_tables_archive| definition@>=
+
+       if (admin_vector.size() > 0)
+       {    
+@q ****** (6) @>
+
+            string hostname;
+            string ip_address;
+
+            char buffer[1024];
+            memset(buffer, 0, 1024);
+
+@q ****** (6) @>
+
+            FILE *fp = popen("hostname --long && hostname --ip-address", "r");
+
+            if (fp == 0)
+            {
+                 cerr << "ERROR!  In `create_tables_archive': `popen' failed, "
+                      << "returning -1:"
+                      << endl;
+
+                 if (errno != 0)
+                     cerr << "Error number:  " << errno
+                          << endl
+                           << "Error:         " << strerror(errno)
+                           << endl,
+
+                 cerr << "Can't insert row for host into `Irods_Servers'."
+                      << endl
+                      << "Continuing."
+                      << endl;
+
+            }  /* |if (fp == 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                 cerr << "In `create_tables_archive': `popen' succeeded."
+                       << endl;
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|create_tables_archive| definition@>=
+
+            status = fread(buffer, 1, 1024, fp);
+
+            if (status == 0)
+            {
+                 cerr << "ERROR!  In `create_tables_archive': `fread' failed, "
+                      << "returning 0."
+                      << endl
+                      << "Failed to read output of `hostname' command from pipe."
+                      << endl 
+                      << "Can't insert row for host into `Irods_Servers'."
+                      << endl
+                      << "Continuing."
+                      << endl;
+
+            }
+
+@q ****** (6) @>
+
+            else if (status == 1024)
+            {
+                 cerr << "ERROR!  In `create_tables_archive': `fread' read 1024 bytes:  "
+                      << "Maximum permitted == 1023."
+                      << endl
+                      << "Output of `hostname' command in pipe exceeds limit."
+                      << endl 
+                      << "Can't insert row for host into `Irods_Servers'."
+                      << endl
+                      << "Continuing."
+                      << endl;
+
+            }
+
+@q ****** (6) @>
+
+            else
+            {
+@q ******* (7) @>
+
+
+                 temp_strm.str("");
+
+                 temp_strm.clear();
+                 temp_strm << buffer;
+
+                 temp_strm.clear();
+                 temp_strm >> hostname;
+                 temp_strm >> ip_address;
+
+                 temp_strm.clear();
+                 temp_strm.str("");
+
+#if DEBUG_COMPILE
+                 if (DEBUG)
+                 {
+                     cerr << "In `create_tables_archive': `hostname' command in pipe succeeded:"
+                           << endl
+                           << "Host name  == " << hostname << endl
+                           << "IP address == " << ip_address << endl;
+
+                 }        /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+@<|create_tables_archive| definition@>=
+
+                 if (hostname.size() > 0 && ip_address.size() > 0)
+                 {
+
+                      sql_strm << "," 
+                               << endl
+                               << "(1, '" << hostname << "', '" << ip_address << "', " 
+                               << endl
+                               << irods_server_port << ", "
+                               << endl
+                               << " (select username from Users where user_id = 1))";
+
+
+                 }  /* |if|  */
+
+@q ******* (7) @>
+
+                 else
+                 {
+                      cerr << "WARNING!  `hostname' and/or `ip_address' is empty:"
+                           << endl
+                           << "`hostname'   == " << hostname
+                           << endl 
+                           << "`ip_address' == " << ip_address
+                           << endl
+                           << "Not inserting row into `Irods_Servers' for host."
+                           << endl
+                           << "Continuing."
+                           << endl;
+ 
+                 }  /* |else|  */
+
+@q ******* (7) @>
+
+            }  /* |else|  */
+
+@q ****** (6) @>
+@
+@<|create_tables_archive| definition@>=
+
+            pclose(fp);
+            fp = 0;
+
+@q ****** (6) @>
+
+       }  /* |if (admin_vector.size() > 0)|  */
+
+@q ***** (5) @>
+@
+@<|create_tables_archive| definition@>=
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(new long int(0L));
+       comment_vector.push_back("insert Irods_Servers");
+
+       sql_strm.str("");
+
+@q ***** (5) @>
+
+@q **** (4) @>
+@
+@<|create_tables_archive| definition@>=
+
+       sql_strm << "create view Irods_Info as"
+                << endl
+                << "select IO.irods_object_id, IA.irods_avu_id, IO.user_id,"
+                << endl
+                << "IO.irods_object_path, IA.attribute,"
+                << endl
+                << "IA.value, IA.units, IA.time_set as 'AVU timeset',"
+                << endl
+                << "IO.created as 'irods object created', "
+                << "IO.last_modified as 'irods object last modified',"
+                << endl
+                << "IO.marked_for_deletion_from_archive "
+                << "as 'irods_object_marked_for_deletion_from_archive',"
+                << endl
+                << "IO.marked_for_deletion_from_gwirdsif_db "
+                << "as 'irods_object_marked_for_deletion_from_gwirdsif_db',"
+                << endl
+                << "IO.deleted_from_archive as 'irods_object_deleted_from_archive',"
+                << endl
+                << "IO.delete_from_archive_timestamp "
+                << "as 'irods_object_delete_from_archive_timestamp',"
+                << endl
+                << "IO.delete_from_gwirdsif_db_timestamp "
+                << "as 'irods_object_delete_from_gwirdsif_db_timestamp'"
+                << endl
+                << "from Irods_Objects as IO, Irods_AVUs as IA"
+                << endl
+                << "where IO.irods_object_id = IA.irods_object_id"
+                << endl
+                << "and IO.irods_object_id > 0 and IA.irods_avu_id > 0"
+                << endl
+                << "order by IO.irods_object_id, IA.irods_avu_id";
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+@q **** (4) @>
+@
+@<|create_tables_archive| definition@>=
+
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          cerr << "query_vector.size() == " << query_vector.size() << endl;
+
+          for (vector<string>::iterator iter = query_vector.begin();
+               iter != query_vector.end();
+               ++iter)
+          {
+              cerr << *iter << endl;
+
+          }  /* |for|  */
+
+          cerr << endl;
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */           
+
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2013.09.04.}
+Added this section.
+\ENDLOG
+
+@<|create_tables_archive| definition@>=
+
+      for (vector<string>::iterator iter = query_vector.begin();
+           iter != query_vector.end();
+           ++iter)
+      {
+
+          out_strm << *iter << ";" << endl << endl;
+
+      }
+
+@q **** (4) @>
+@
+@<|create_tables_archive| definition@>=
+
+      status = param.submit_mysql_queries(query_vector, 
+                                           result_array,
+                                           row_ctr_vector, 
+                                           field_ctr_vector, 
+                                           affected_rows_vector, 
+                                           false);
+
+      if (status != 0)
+      {
+           cerr << "ERROR!  In `create_tables_archive':  `submit_mysql_queries' failed, "
+                << "returning " << status << "."
+                << endl
+                << "Exiting `create_tables_archive' unsuccessfully with return value 1."
+                << endl;
+
+           delete_and_clear(result_array, 
+                            result_array_size, 
+                            row_ctr_vector, 
+                            field_ctr_vector,
+                            affected_rows_vector,
+                            query_vector);
+
+
+           out_strm << "/* Failed  */" 
+                    << endl << endl
+                    << "/* ***************************************"
+                    << "****************************** */"
+                << endl << endl;
+
+           return 1;
+
+      }  /* |if (status != 0)|  */
+
+@q **** (4) @>
+@
+@<|create_tables_archive| definition@>=
+
+#if DEBUG_COMPILE
+      else if (DEBUG)
+      {
+          cerr << "In `create_tables_archive':  `submit_mysql_queries' succeeded, returning 0."
+               << endl
+               << "Created tables in `" << gwirdsif_database_name << "' database successfully."
+               << endl;
+
+          int i = 0;
+          int j = 0;
+
+          for (vector<long int *>::iterator iter = affected_rows_vector.begin();
+               iter != affected_rows_vector.end();
+                ++iter)
+          {
+               if (*iter != 0)
+               {
+ 
+                  temp_strm.str("");
+                  temp_strm << "[" << i << "]";
+
+                  cerr << "*affected_rows_vector" << setw(4) << left << temp_strm.str() 
+                       << " == " 
+                       << *affected_rows_vector[i];
+
+                   if (comment_vector.size() > j)
+                      cerr  << "  " << comment_vector[j++];
+
+                   cerr << endl;
+               }
+
+               ++i;
+
+
+          }  /* |for|  */
+
+          temp_strm.str("");
+
+          cerr << endl;
+
+      }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|create_tables_archive| definition@>=
+
+       out_strm << "/* Succeeded  */" 
+                << endl << endl
+                << "/* ********************************************************************* */"
+                << endl << endl
+                << "/* !! TODO:  */"
+                << endl << endl;
+
+       delete_and_clear(result_array, 
+                        result_array_size, 
+                        row_ctr_vector, 
+                        field_ctr_vector,
+                        affected_rows_vector,
+                        query_vector);
+
+       sql_strm.str("");
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+         cerr << "Exiting `create_tables_archive' successfully with return value 0."
+              << endl;
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       return 0;
+
+}  /* End of |create_tables_archive| definition  */
+
+@q ** (2) Garbage@>
+
+@ Garbage.  This section needs to exist, because it's included below.
+It can be used for temporarily (or permanently) commenting-out code.
+\initials{LDF 2013.09.05.}
+
+@<Garbage@>=
+#if 0
+   /* Empty  */
+#endif 
+
+@q ** (2) This is what's compiled.  @>
+
+@ This is what's compiled.  
+\initials{LDF 2013.09.03.}
+
+@c
+using namespace std;
+@<Include files@>@;@/
+using namespace gwrdifpk;
+@<|create_tables_archive| definition@>@;@/
+
+#if 0 
+@<Garbage@>@;@/
+#endif 
+
+@q ** (2) This is what's written to the header file `stparobj.h'.  @>
+
+@ This is what's written to the header file \filename{stparobj.h}.
+\initials{LDF 2013.09.03.}
+
+@(stparobj.h@>=
+#ifndef STPAROBJ_H
+#define STPAROBJ_H 1
+@<|create_tables_archive| declaration@>@;@/
+#endif 
+
+@q (progn (cweb-mode) (outline-minor-mode))                                @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+
+

@@ -1,0 +1,2408 @@
+@q x509cert.web  @>
+@q [...]/Finston/gwrdifpk/src/x509cert.web  @>
+
+@q Created by Laurence D. Finston (LDF) Tue Dec 22 09:49:19 CET 2009 @>
+
+@q Copied from the `dbsrvcli' (OptiNum-Grid) package for use in `gwrdifpk'.  @>
+@q Laurence D. Finston (LDF) Fri May  3 17:04:56 CEST 2013                   @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+@q * (0) Types for X.509 Certificates (x509cert.web).  @>
+
+@*  Types for X\PERIOD 509 Certificates (x509cert\PERIOD web).
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <errno.h>
+#include <math.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+#include <limits.h>
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+
+#include <expat.h>
+
+
+
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <fstream>
+#include <sstream>   
+#include <string>
+#include <set>
+#include <vector>
+#include <deque>
+#include <stack>
+
+#include <pthread.h>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#include <mysql.h>
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "hndlvltp.h++"
+#include "rspnstp.h++"
+#include "irdsavtp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif 
+
+@q ** (2) |X509_Cert_Type| declaration.  @>
+
+@ {\bf X509\_Cert\_Type} declaration.
+\initials{LDF 2009.12.22.}
+
+\LOG
+\initials{LDF 2009.12.22.}
+Added this |struct| declaration.
+
+\initials{LDF 2009.12.28.}
+Now conditionally compiling this |struct| declaration.  This is necessary, because
+|struct X509_Cert_Type| must be known when \filename{scprpmtp.h++} is included.  
+This means that \filename{x509cert.h++} must be included before \filename{scprpmtp.h++}
+is and this |struct| declaration is compiled before this code is reached.  If this 
+code is then compiled, this causes an error because of the multiple declaration.  
+The forward declaration of |X509_Cert_Type| in \filename{glblvrbl.h++} does not suffice,
+because a |X509_Cert_Type| object is used in |Scan_Parse_Parameter_Type::get_database_username|.
+I don't like doing this in such a roundabout way, but I prefer it to putting the 
+function declarations in separate files.  I can't think of any better alternatives.
+
+\initials{LDF 2009.12.29.}
+Added |unsigned int user_id|.
+
+\initials{LDF 2012.02.09.}
+Changed |X509_Cert_Type| from a |struct| to a |class|.  Added |friend| declarations.
+All data members and member functions are |private|.
+@:TODO@> !! TODO:  Add functions for accessing data members and see if I can get rid 
+of some of the |friend| declarations.
+
+\initials{LDF 2013.05.08.}
+Added |friend| declaration for |extract_dn_fields|.
+
+\initials{LDF 2013.05.15.}
+Added data members |unsigned int certificate_id|, |unsigned int issuer_cert_id|,
+|bool is_ca| and |bool is_proxy|.
+
+\initials{LDF 2013.05.22.}
+Added |friend| declaration for |get_user_info_func|.
+\ENDLOG
+
+@<|class X509_Cert_Type| declaration@>=
+ 
+class X509_Cert_Type
+{
+
+
+   friend class Scan_Parse_Parameter_Type;
+
+   friend class Distinguished_Name_Type;
+
+   friend class User_Info_Type;
+
+   friend int verify_certificate (gnutls_session_t session, 
+                                  X509_Cert_Type *x509_cert_ptr,  
+                                  const char *hostname);
+
+   friend int extract_dn_fields(gnutls_x509_crt_t &cert, 
+                                X509_Cert_Type *x509_cert, 
+                                bool subject, 
+                                Scan_Parse_Parameter_Type *param);
+
+   friend int yyparse(yyscan_t);
+
+   friend int get_user_info_func(Scan_Parse_Parameter_Type*, const char*);
+
+   string organization;
+   string organizationalUnitName;
+   string commonName;
+   string countryName;
+
+   string localityName;
+   string stateOrProvinceName;
+ 
+   unsigned long int serialNumber;
+
+   time_t Validity_notBefore;
+   time_t Validity_notAfter;
+
+   X509_Cert_Type* issuer_cert;
+
+   string user_name;
+   unsigned int user_id;
+
+   unsigned int certificate_id;
+
+   unsigned int issuer_cert_id;
+
+   bool is_ca;
+   bool is_proxy;
+
+public:
+
+   @<|X509_Cert_Type| function declarations@>@;@/ 
+
+};
+
+
+@q ** (2) |X509_Cert_Type| functions.  @>
+@ {\bf X509\_Cert\_Type} functions.
+\initials{LDF 2009.12.22.}
+
+\LOG
+\initials{LDF 2009.12.22.}
+Added this section.
+\ENDLOG
+
+@q *** (3) Constructors and Setting Functions.  @>
+
+@ Constructors and Setting Functions.
+\initials{LDF 2009.12.22.}
+
+\LOG
+\initials{LDF 2009.12.22.}
+Added this section.
+\ENDLOG
+
+@q **** (4) Default constructor.  @>
+@ Default constructor.
+\initials{LDF 2009.12.22.}
+
+\LOG
+\initials{LDF 2009.12.22.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|X509_Cert_Type| function declarations@>=
+
+X509_Cert_Type(void);
+
+@q ***** (5) Definition  @>
+@
+@<|X509_Cert_Type| constructor definitions@>=
+
+X509_Cert_Type::X509_Cert_Type(void)
+{
+
+     issuer_cert  =  0;
+
+     serialNumber =  0;
+
+     certificate_id = issuer_cert_id = user_id =  0;
+
+     user_name    = "";
+
+     Validity_notBefore = 0;
+
+     Validity_notAfter  = 0;
+
+     is_ca = is_proxy = false;
+
+     return;
+
+}  /* End of |X509_Cert_Type| default constructor definition  */
+
+
+@q **** (4) Copy constructor.  @>
+@ Copy constructor.
+\initials{LDF 2013.05.15.}
+
+\LOG
+\initials{LDF 2013.05.15.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|X509_Cert_Type| function declarations@>=
+
+X509_Cert_Type(const X509_Cert_Type& cert);
+
+@q ***** (5) Definition  @>
+@
+@<|X509_Cert_Type| constructor definitions@>=
+
+X509_Cert_Type::X509_Cert_Type(const X509_Cert_Type& cert)
+{
+
+   organization           = cert.organization;
+   organizationalUnitName = cert.organizationalUnitName;
+   commonName             = cert.commonName;
+   countryName            = cert.countryName;
+   localityName           = cert.localityName;
+   stateOrProvinceName    = cert.stateOrProvinceName;
+   serialNumber           = cert.serialNumber;
+   Validity_notBefore     = cert.Validity_notBefore;
+   Validity_notAfter      = cert.Validity_notAfter;
+   user_name              = cert.user_name;
+   user_id                = cert.user_id;
+   is_ca                  = cert.is_ca;
+   is_proxy               = cert.is_proxy;
+   issuer_cert            = cert.issuer_cert;
+   certificate_id         = cert.certificate_id;
+   issuer_cert_id         = cert.issuer_cert_id;
+
+   return;
+
+}  /* End of |X509_Cert_Type| copy constructor definition  */
+
+
+@q **** (4) Constructor with arguments.  @>
+@ Constructor with arguments.
+\initials{LDF 2009.12.22.}
+
+\LOG
+\initials{LDF 2009.12.22.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|X509_Cert_Type| function declarations@>=
+
+X509_Cert_Type(unsigned long int sserialNumber, 
+               X509_Cert_Type* iissuer_cert = 0,
+               string oorganization = "", 
+               string oorganizationalUnitName = "",
+               string ccommonName = "",
+               string ccountryName = "",
+               string llocalityName = "",
+               string sstateOrProvinceName = "",
+               unsigned int uuser_id = 0,
+               string uuser_name = "",
+               time_t VValidity_notBefore = 0,
+               time_t VValidity_notAfter  = 0,
+               bool iis_ca = false,
+               bool iis_proxy = false,
+               unsigned int ccertificate_id = 0,
+               unsigned int iissuer_cert_id = 0);
+
+@q ***** (5) Definition  @>
+@
+@<|X509_Cert_Type| constructor definitions@>=
+
+X509_Cert_Type::X509_Cert_Type(unsigned long int sserialNumber, 
+                               X509_Cert_Type* iissuer_cert,
+                               string oorganization, 
+                               string oorganizationalUnitName,
+                               string ccommonName,
+                               string ccountryName,
+                               string llocalityName,
+                               string sstateOrProvinceName,
+                               unsigned int uuser_id,
+                               string uuser_name,
+                               time_t VValidity_notBefore,
+                               time_t VValidity_notAfter,
+                               bool iis_ca,
+                               bool iis_proxy,
+                               unsigned int ccertificate_id,
+                               unsigned int iissuer_cert_id)
+   : serialNumber(sserialNumber), 
+     issuer_cert(iissuer_cert),
+     organization(oorganization),
+     organizationalUnitName(oorganizationalUnitName),
+     commonName(ccommonName),
+     countryName(ccountryName),
+     localityName(llocalityName),
+     stateOrProvinceName(sstateOrProvinceName),
+     user_id(uuser_id),
+     user_name(uuser_name),
+     Validity_notBefore(VValidity_notBefore),
+     Validity_notAfter(VValidity_notAfter),
+     is_ca(iis_ca),
+     is_proxy(iis_proxy),
+     certificate_id(ccertificate_id),
+     issuer_cert_id(iissuer_cert_id)
+{
+
+     return;
+
+}  /* End of |X509_Cert_Type| non-default constructor definition  */
+
+@q **** (4) Setting function with multiple arguments.  @>
+@ Setting function with multiple arguments.
+\initials{LDF 2009.12.22.}
+
+\LOG
+\initials{LDF 2009.12.22.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|X509_Cert_Type| function declarations@>=
+int
+set(unsigned long int sserialNumber, 
+    X509_Cert_Type*   iissuer_cert            =  0,
+    string            oorganization           = "", 
+    string            oorganizationalUnitName = "",
+    string            ccommonName             = "",
+    string            ccountryName            = "",
+    string            llocalityName           = "",  
+    string            sstateOrProvinceName    = "",
+    unsigned int      uuser_id                =  0,
+    string            uuser_name              = "",
+    time_t            VValidity_notBefore     =  0,
+    time_t            VValidity_notAfter      =  0,
+    bool              iis_ca                  = false,
+    bool              iis_proxy               = false,
+    unsigned int      ccertificate_id         = 0,
+    unsigned int      iissuer_cert_id         = 0);
+
+@q ***** (5) Definition  @>
+@
+@<|X509_Cert_Type::set| definitions@>=
+int
+X509_Cert_Type::set(unsigned long int sserialNumber, 
+                    X509_Cert_Type*   iissuer_cert,
+                    string            oorganization, 
+                    string            oorganizationalUnitName,
+                    string            ccommonName,
+                    string            ccountryName,
+                    string            llocalityName,
+                    string            sstateOrProvinceName,
+                    unsigned int      uuser_id,
+                    string            uuser_name,
+                    time_t            VValidity_notBefore,
+                    time_t            VValidity_notAfter,
+                    bool              iis_ca,
+                    bool              iis_proxy,
+                    unsigned int      ccertificate_id,
+                    unsigned int      iissuer_cert_id)
+{
+
+     serialNumber           = sserialNumber; 
+     issuer_cert            = iissuer_cert;
+     organization           = oorganization;
+     organizationalUnitName = oorganizationalUnitName;
+     commonName             = ccommonName;
+     countryName            = ccountryName;
+     localityName           = llocalityName;
+     stateOrProvinceName    = sstateOrProvinceName;
+     user_id                = uuser_id;
+     user_name              = uuser_name;
+     Validity_notBefore     = VValidity_notBefore;
+     Validity_notAfter      = VValidity_notAfter;
+     is_ca                  = iis_ca;
+     is_proxy               = iis_proxy;
+     certificate_id         = ccertificate_id;
+     issuer_cert_id         = iissuer_cert_id;
+
+     return 0;
+
+}  /* End of |X509_Cert_Type::set| definition  */
+
+@q **** (4) Setting function with |MYSQL_ROW&| argument.  @>
+@ Setting function with |MYSQL_ROW&| argument.
+\initials{LDF 2013.05.15.}
+
+@q This is the \.{SELECT} command for retrieving the row, whereby the \.{WHERE} clause @>
+@q should be added to and an \.{ORDER} clause, and perhaps others may need to be added: @>
+@q \par @>
+@q \.{"select C.certificate_id, C.user_id, U.username, C.issuer_cert_id, C.is_ca,  @>
+@q C.is_proxy, C.serialNumber, C.organization, C.organizationalUnitName,  @>
+@q C.commonName, C.countryName, C.localityName, C.stateOrProvinceName,  @>
+@q C.Validity_notBefore, C.Validity_notAfter  @>
+@q from gwirdsif.Certificates as C, Users as U  @>
+@q where C.user_id = U.user_id"}.\hfil\break  @>
+@q \initials{LDF 2013.05.19.} @>
+
+\LOG
+\initials{LDF 2013.05.15.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|X509_Cert_Type| function declarations@>=
+int
+set(MYSQL_ROW& row, string thread_ctr_str = "");
+
+@q ***** (5) Definition  @>
+@
+@<|X509_Cert_Type::set| definitions@>=
+
+int
+X509_Cert_Type::set(MYSQL_ROW& row, string thread_ctr_str)
+{
+@q ****** (6) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status;
+
+   unsigned long int temp_val = 0;
+
+   time_t temp_time_val = 0;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "Entering `X509_Cert_Type::set'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   int field_ctr = 0;
+
+@q ****** (6) certificate_id  @>
+@ |certificate_id|.
+
+@<|X509_Cert_Type::set| definitions@>=
+
+@q ******* (7) @>
+
+   if (row[field_ctr] && strlen(row[field_ctr]) > 0)
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == " << row[field_ctr] << " (certificate_id)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       errno = 0;
+       temp_val = strtoul(row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "ERROR!  In `X509_Cert_Type::set':"
+                << endl 
+                << "`strtoul' failed, returning `ULONG_MAX':"
+                << endl
+                << strerror(errno)
+                << endl
+                << "Failed to retrieve `certificate_id'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;
+
+       }  /* |if (temp_val == ULONG_MAX)|  */
+        
+       certificate_id = temp_val;
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl
+                << "`certificate_id' == " << certificate_id
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+     
+
+@q ******** (8) @>
+
+   }  /* |if (row[field_ctr] && strlen(row[field_ctr]) > 0)|  */
+
+@q ******* (7) @>
+
+   else /* |row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|  */
+   {
+@q ******** (8) @>
+
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == 0 "
+                << "or `strlen(row[field_ctr])' == 0 (certificate_id)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "ERROR!  In `X509_Cert_Type::set':"
+            << endl 
+            << "`row[" << field_ctr << "]' == 0 "
+            << "or `strlen(row[field_ctr])' == 0 (certificate_id)"
+            << endl
+            << "Failed to retrieve `certificate_id'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+@q ******** (8) @>
+
+   }  /* |else| (|row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|)  */
+
+@q ******* (7) @>
+
+@q ****** (6) user_id @>
+@ |user_id|.
+@<|X509_Cert_Type::set| definitions@>=
+
+   ++field_ctr;
+
+   if (row[field_ctr] && strlen(row[field_ctr]) > 0)
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == " << row[field_ctr] << " (user_id)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       errno = 0;
+       temp_val = strtoul(row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "ERROR!  In `X509_Cert_Type::set':"
+                << endl 
+                << "`strtoul' failed, returning `ULONG_MAX':"
+                << endl
+                << strerror(errno)
+                << endl
+                << "Failed to retrieve `user_id'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;
+
+
+       }  /* |if (temp_val == ULONG_MAX)|  */
+        
+       user_id = temp_val;
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl
+                << "`user_id' == " << user_id
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******** (8) @>
+
+   }  /* |if (row[field_ctr] && strlen(row[field_ctr]) > 0)|  */
+
+@q ******* (7) @>
+
+   else /* |row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|  */
+   {
+@q ******** (8) @>
+
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == 0 or `strlen(row[field_ctr])' == 0 (user_id)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "ERROR!  In `X509_Cert_Type::set':"
+            << endl 
+            << "`row[" << field_ctr << "]' == 0 or `strlen(row[field_ctr])' == 0 (user_id)"
+            << endl
+            << "Failed to retrieve `user_id'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+
+@q ******** (8) @>
+
+   }  /* |else| (|row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|)  */
+
+
+@q ****** (6) user_name @>
+@ |user_name|.
+@<|X509_Cert_Type::set| definitions@>=
+
+   ++field_ctr;
+
+   if (row[field_ctr] && strlen(row[field_ctr]) > 0)
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == " << row[field_ctr] << " (user_name)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       user_name = row[field_ctr];
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl
+                << "`user_name' == " << user_name
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******** (8) @>
+
+   }  /* |if (row[field_ctr] && strlen(row[field_ctr]) > 0)|  */
+
+@q ******* (7) @>
+
+   else /* |row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|  */
+   {
+@q ******** (8) @>
+
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == 0 or `strlen(row[field_ctr])' == 0 (user_name)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "ERROR!  In `X509_Cert_Type::set':"
+            << endl 
+            << "`row[" << field_ctr << "]' == 0 or `strlen(row[field_ctr])' == 0 (user_name)"
+            << endl
+            << "Failed to retrieve `user_name'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+
+@q ******** (8) @>
+
+   }  /* |else| (|row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|)  */
+
+@q ****** (6) issuer_cert_id  @>
+@ |issuer_cert_id|.
+@<|X509_Cert_Type::set| definitions@>=
+
+   ++field_ctr;
+
+   if (row[field_ctr] && strlen(row[field_ctr]) > 0)
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == " << row[field_ctr] << " (issuer_cert_id)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       errno = 0;
+       temp_val = strtoul(row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "ERROR!  In `X509_Cert_Type::set':"
+                << endl 
+                << "`strtoul' failed, returning `ULONG_MAX':"
+                << endl
+                << strerror(errno)
+                << endl
+                << "Failed to retrieve `issuer_cert_id'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;
+
+
+       }  /* |if (temp_val == ULONG_MAX)|  */
+        
+       issuer_cert_id = temp_val;
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl
+                << "`issuer_cert_id' == " << issuer_cert_id
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******** (8) @>
+
+   }  /* |if (row[field_ctr] && strlen(row[field_ctr]) > 0)|  */
+
+@q ******* (7) @>
+
+   else /* |row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|  */
+   {
+@q ******** (8) @>
+
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == 0 "
+                << "or `strlen(row[field_ctr])' == 0 (issuer_cert_id)"
+                << endl
+                << "Setting `issuer_cert_id' to 0."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       issuer_cert_id = 0;
+
+@q ******** (8) @>
+
+   }  /* |else| (|row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|)  */
+
+
+@q ****** (6) is_ca @>
+@ |is_ca|.
+@<|X509_Cert_Type::set| definitions@>=
+
+   ++field_ctr;
+
+   if (row[field_ctr] && strlen(row[field_ctr]) > 0)
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == " << row[field_ctr] << " (is_ca)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       errno = 0;
+       temp_val = strtoul(row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "ERROR!  In `X509_Cert_Type::set':"
+                << endl 
+                << "`strtoul' failed, returning `ULONG_MAX':"
+                << endl
+                << strerror(errno)
+                << endl
+                << "Failed to retrieve `is_ca'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;
+
+
+       }  /* |if (temp_val == ULONG_MAX)|  */
+        
+       is_ca = temp_val;
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl
+                << "`is_ca' == " << is_ca
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+
+@q ******** (8) @>
+
+   }  /* |if (row[field_ctr] && strlen(row[field_ctr]) > 0)|  */
+
+@q ******* (7) @>
+
+   else /* |row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|  */
+   {
+@q ******** (8) @>
+
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == 0 or `strlen(row[field_ctr])' == 0 (is_ca)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       is_ca = false;
+
+@q ******** (8) @>
+
+   }  /* |else| (|row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|)  */
+
+
+@q ****** (6) is_proxy @>
+@ |is_proxy|.
+@<|X509_Cert_Type::set| definitions@>=
+
+   ++field_ctr;
+
+   if (row[field_ctr] && strlen(row[field_ctr]) > 0)
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == " << row[field_ctr] << " (is_proxy)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       errno = 0;
+       temp_val = strtoul(row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "ERROR!  In `X509_Cert_Type::set':"
+                << endl 
+                << "`strtoul' failed, returning `ULONG_MAX':"
+                << endl
+                << strerror(errno)
+                << endl
+                << "Failed to retrieve `is_proxy'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;
+
+
+       }  /* |if (temp_val == ULONG_MAX)|  */
+        
+       is_proxy = temp_val;
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl
+                << "`is_proxy' == " << is_proxy
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******** (8) @>
+
+   }  /* |if (row[field_ctr] && strlen(row[field_ctr]) > 0)|  */
+
+@q ******* (7) @>
+
+   else /* |row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|  */
+   {
+@q ******** (8) @>
+
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == 0 or `strlen(row[field_ctr])' == 0 (is_proxy)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+@q ******** (8) @>
+
+       is_proxy = false;
+
+   }  /* |else| (|row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|)  */
+
+
+@q ****** (6) serialNumber @>
+@ |serialNumber|.
+@<|X509_Cert_Type::set| definitions@>=
+
+   ++field_ctr;
+
+   if (row[field_ctr] && strlen(row[field_ctr]) > 0)
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == " << row[field_ctr] << " (serialNumber)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       errno = 0;
+       temp_val = strtoul(row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "ERROR!  In `X509_Cert_Type::set':"
+                << endl 
+                << "`strtoul' failed, returning `ULONG_MAX':"
+                << endl
+                << strerror(errno)
+                << endl
+                << "Failed to retrieve `serialNumber'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;
+
+
+       }  /* |if (temp_val == ULONG_MAX)|  */
+        
+       serialNumber = temp_val;
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl
+                << "`serialNumber' == " << serialNumber
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+
+@q ******** (8) @>
+
+   }  /* |if (row[field_ctr] && strlen(row[field_ctr]) > 0)|  */
+
+@q ******* (7) @>
+
+   else /* |row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|  */
+   {
+@q ******** (8) @>
+
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == 0 "
+                << "or `strlen(row[field_ctr])' == 0 (serialNumber)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "ERROR!  In `X509_Cert_Type::set':"
+            << endl 
+            << "`row[" << field_ctr << "]' == 0 or `strlen(row[field_ctr])' == 0 (serialNumber)"
+            << endl
+            << "Failed to retrieve `serialNumber'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+@q ******** (8) @>
+
+   }  /* |else| (|row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|)  */
+
+@q ****** (6) organization @>
+@ |organization|.
+@<|X509_Cert_Type::set| definitions@>=
+
+   ++field_ctr;
+
+   if (row[field_ctr] && strlen(row[field_ctr]) > 0)
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == " << row[field_ctr] << " (organization)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       organization = row[field_ctr];
+
+@q ******** (8) @>
+
+   }  /* |if (row[field_ctr] && strlen(row[field_ctr]) > 0)|  */
+
+@q ******* (7) @>
+
+   else /* |row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|  */
+   {
+@q ******** (8) @>
+
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == 0 "
+                << "or `strlen(row[field_ctr])' == 0 (organization)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "ERROR!  In `X509_Cert_Type::set':"
+            << endl 
+            << "`row[" << field_ctr << "]' == 0 or `strlen(row[field_ctr])' == 0 (organization)"
+            << endl
+            << "Failed to retrieve `organization'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+
+@q ******** (8) @>
+
+   }  /* |else| (|row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|)  */
+
+@q ****** (6) organizationalUnitName  @>
+@ |organizationalUnitName|.
+@<|X509_Cert_Type::set| definitions@>=
+
+
+   ++field_ctr;
+
+   if (row[field_ctr] && strlen(row[field_ctr]) > 0)
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == " 
+                << row[field_ctr] << " (organizationalUnitName)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+
+       organizationalUnitName = row[field_ctr];
+
+@q ******** (8) @>
+
+   }  /* |if (row[field_ctr] && strlen(row[field_ctr]) > 0)|  */
+
+@q ******* (7) @>
+
+   else /* |row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|  */
+   {
+@q ******** (8) @>
+
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == 0 or `strlen(row[field_ctr])' == 0 "
+                << "(organizationalUnitName)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+@q ******** (8) @>
+
+       organizationalUnitName = "";  /* This is allowed.  \initials{LDF 2013.05.15.}  */
+
+   }  /* |else| (|row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|)  */
+
+
+@q ****** (6) commonName @>
+@ |commonName|.
+@<|X509_Cert_Type::set| definitions@>=
+
+   ++field_ctr;
+
+   if (row[field_ctr] && strlen(row[field_ctr]) > 0)
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == " << row[field_ctr] << " (commonName)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+
+       commonName = row[field_ctr];
+
+@q ******** (8) @>
+
+   }  /* |if (row[field_ctr] && strlen(row[field_ctr]) > 0)|  */
+
+@q ******* (7) @>
+
+   else /* |row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|  */
+   {
+@q ******** (8) @>
+
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == 0 or `strlen(row[field_ctr])' == 0 (commonName)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "ERROR!  In `X509_Cert_Type::set':"
+            << endl 
+            << "`row[" << field_ctr << "]' == 0 or `strlen(row[field_ctr])' == 0 (commonName)"
+            << endl
+            << "Failed to retrieve `commonName'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+
+@q ******** (8) @>
+
+   }  /* |else| (|row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|)  */
+
+
+@q ****** (6) countryName @>
+@ |countryName|.
+@<|X509_Cert_Type::set| definitions@>=
+
+   ++field_ctr;
+
+   if (row[field_ctr] && strlen(row[field_ctr]) > 0)
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == " << row[field_ctr] << " (countryName)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       countryName = row[field_ctr];
+
+@q ******** (8) @>
+
+   }  /* |if (row[field_ctr] && strlen(row[field_ctr]) > 0)|  */
+
+@q ******* (7) @>
+
+   else /* |row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|  */
+   {
+@q ******** (8) @>
+
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == 0 or `strlen(row[field_ctr])' == 0 (countryName)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "ERROR!  In `X509_Cert_Type::set':"
+            << endl 
+            << "`row[" << field_ctr << "]' == 0 or `strlen(row[field_ctr])' == 0 (countryName)"
+            << endl
+            << "Failed to retrieve `countryName'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+@q ******** (8) @>
+
+   }  /* |else| (|row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|)  */
+
+
+@q ****** (6) localityName  @>
+@ |localityName|.
+@<|X509_Cert_Type::set| definitions@>=
+
+   ++field_ctr;
+
+   if (row[field_ctr] && strlen(row[field_ctr]) > 0)
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == " << row[field_ctr] << " (localityName)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+
+       localityName = row[field_ctr];
+
+@q ******** (8) @>
+
+   }  /* |if (row[field_ctr] && strlen(row[field_ctr]) > 0)|  */
+
+@q ******* (7) @>
+
+   else /* |row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|  */
+   {
+@q ******** (8) @>
+
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == 0 or "
+                << "`strlen(row[field_ctr])' == 0 (localityName)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       localityName = "";  /* This is allowed.  \initials{LDF 2013.05.15.}  */
+
+@q ******** (8) @>
+
+   }  /* |else| (|row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|)  */
+
+
+@q ****** (6) stateOrProvinceName @>
+@ |stateOrProvinceName|.
+@<|X509_Cert_Type::set| definitions@>=
+
+
+   ++field_ctr;
+
+   if (row[field_ctr] && strlen(row[field_ctr]) > 0)
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == " << row[field_ctr] << " (stateOrProvinceName)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+      stateOrProvinceName = row[field_ctr];
+
+
+@q ******** (8) @>
+
+   }  /* |if (row[field_ctr] && strlen(row[field_ctr]) > 0)|  */
+
+@q ******* (7) @>
+
+   else /* |row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|  */
+   {
+@q ******** (8) @>
+
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == 0 or `strlen(row[field_ctr])' == 0 "
+                << "(stateOrProvinceName)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       stateOrProvinceName  = "";  /* This is allowed.  \initials{LDF 2013.05.15.}  */
+
+@q ******** (8) @>
+
+   }  /* |else| (|row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|)  */
+
+@q ****** (6) Validity_notBefore @>
+@ |Validity_notBefore|.
+
+@<|X509_Cert_Type::set| definitions@>=
+
+
+   ++field_ctr;
+
+   if (row[field_ctr] && strlen(row[field_ctr]) > 0)
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == " << row[field_ctr] << " (Validity_notBefore)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       status = get_seconds_since_epoch(row[field_ctr], temp_time_val);
+
+       if (status != 0)
+       {
+
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "ERROR!  In `X509_Cert_Type::set':"
+                << endl 
+                << "`get_seconds_since_epoch' failed, returning " << status << "."
+                << endl
+                << "Failed to retrieve `Validity_notBefore'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;
+
+       }  /* |if (status != 0)|  */
+
+       Validity_notBefore = temp_time_val;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+            << endl 
+            << "`Validity_notBefore' == " << Validity_notBefore
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ******** (8) @>
+
+   }  /* |if (row[field_ctr] && strlen(row[field_ctr]) > 0)|  */
+
+@q ******* (7) @>
+
+   else /* |row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|  */
+   {
+@q ******** (8) @>
+
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == 0 or `strlen(row[field_ctr])' == 0 "
+                << "(Validity_notBefore)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "ERROR!  In `X509_Cert_Type::set':"
+            << endl 
+            << "`row[" << field_ctr << "]' == 0 or "
+            << "`strlen(row[field_ctr])' == 0 (Validity_notBefore)"
+            << endl
+            << "Failed to retrieve `Validity_notBefore'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+
+
+@q ******** (8) @>
+
+   }  /* |else| (|row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|)  */
+
+
+@q ****** (6) Validity_notAfter @>
+
+@ |Validity_notAfter|.
+@<|X509_Cert_Type::set| definitions@>=
+
+   ++field_ctr;
+
+   if (row[field_ctr] && strlen(row[field_ctr]) > 0)
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == " << row[field_ctr] << " (Validity_notAfter)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+       status = get_seconds_since_epoch(row[field_ctr], temp_time_val);
+
+       if (status != 0)
+       {
+
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "ERROR!  In `X509_Cert_Type::set':"
+                << endl 
+                << "`get_seconds_since_epoch' failed, returning " << status << "."
+                << endl
+                << "Failed to retrieve `Validity_notAfter'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;
+
+       }  /* |if (status != 0)|  */
+
+       Validity_notAfter = temp_time_val;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+            << endl 
+            << "`Validity_notAfter' == " << Validity_notAfter
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ******** (8) @>
+
+   }  /* |if (row[field_ctr] && strlen(row[field_ctr]) > 0)|  */
+
+@q ******* (7) @>
+
+   else /* |row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|  */
+   {
+@q ******** (8) @>
+
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `X509_Cert_Type::set':"
+                << endl 
+                << "`row[" << field_ctr << "]' == 0 or `strlen(row[field_ctr])' == 0 "
+                << "(Validity_notAfter)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+@q ******** (8) @>
+
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "ERROR!  In `X509_Cert_Type::set':"
+            << endl 
+            << "`row[" << field_ctr << "]' == 0 or "
+            << "`strlen(row[field_ctr])' == 0 (Validity_notAfter)"
+            << endl
+            << "Failed to retrieve `Validity_notAfter'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |else| (|row[field_ctr] == 0 || strlen(row[field_ctr]) == 0|)  */
+
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "Exiting `X509_Cert_Type::set' successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+    return 0;
+
+}  /* End of |X509_Cert_Type::set| definition  */
+
+@q *** (3) Assignment operator.  @>
+@ Assignment operator.
+\initials{LDF 2013.05.15.}
+
+\LOG
+\initials{LDF 2013.05.15.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|X509_Cert_Type| function declarations@>=
+void
+operator=(const X509_Cert_Type& cert);
+
+@q **** (4) Definition  @>
+@
+@<|X509_Cert_Type::operator=| definition@>=
+void
+X509_Cert_Type::operator=(const X509_Cert_Type& cert)
+{
+
+   organization           = cert.organization;
+   organizationalUnitName = cert.organizationalUnitName;
+   commonName             = cert.commonName;
+   countryName            = cert.countryName;
+   localityName           = cert.localityName;
+   stateOrProvinceName    = cert.stateOrProvinceName;
+   serialNumber           = cert.serialNumber;
+   Validity_notBefore     = cert.Validity_notBefore;
+   Validity_notAfter      = cert.Validity_notAfter;
+   user_name              = cert.user_name;
+   user_id                = cert.user_id;
+   is_ca                  = cert.is_ca;
+   is_proxy               = cert.is_proxy;
+   issuer_cert            = cert.issuer_cert;
+   certificate_id         = cert.certificate_id;
+   issuer_cert_id         = cert.issuer_cert_id;
+
+   return;
+
+}  /* End of |X509_Cert_Type| assignment operator definition  */
+
+@q *** (3) Clear.  @>
+@ Clear.
+\initials{LDF 2013.05.15.}
+
+@q **** (4) Declaration  @>
+
+@<|X509_Cert_Type| function declarations@>=
+void
+clear(void);
+
+@q **** (4) Definition  @>
+@
+@<|X509_Cert_Type::clear| definition@>=
+void
+X509_Cert_Type::clear(void)
+{
+
+   user_id = 0U;
+
+   organization = organizationalUnitName = commonName = countryName = user_name 
+      = localityName = stateOrProvinceName = ""; 
+ 
+   serialNumber = 0UL;
+
+   Validity_notBefore = Validity_notAfter = static_cast<time_t>(0);
+
+   issuer_cert = 0;
+
+   is_ca = is_proxy = false;
+
+   certificate_id = issuer_cert_id = 0;
+
+   return;
+
+}  /* End of |X509_Cert_Type::clear| definition  */
+
+@q *** (3) Get from database.  @>
+@ Get from database.
+\initials{LDF 2013.05.17.}
+
+\LOG
+\initials{LDF 2013.05.17.}
+Added this function.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|X509_Cert_Type| function declarations@>=
+int
+get_from_database(MYSQL *mysql_ptr, unsigned int uuser_id, string thread_ctr_str = "");
+
+@q *** (3) Definition  @>
+@
+@<|X509_Cert_Type::get_from_database| definition@>=
+int
+X509_Cert_Type::get_from_database(MYSQL *mysql_ptr, unsigned int uuser_id, string thread_ctr_str)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status = 0;
+
+   unsigned long temp_val = 0UL;
+
+   user_id = uuser_id;
+
+   stringstream sql_strm;
+
+   MYSQL_RES *result = 0;
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+   MYSQL_ROW curr_row;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "Entering `X509_Cert_Type::get_from_database'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|X509_Cert_Type::get_from_database| definition@>=
+
+   sql_strm << "select C.certificate_id, C.user_id, U.username, C.issuer_cert_id, C.is_ca, "
+            << "C.is_proxy, C.serialNumber, C.organization, C.organizationalUnitName, "
+            << "C.commonName, C.countryName, C.localityName, C.stateOrProvinceName, "
+            << "C.Validity_notBefore, C.Validity_notAfter "
+            << "from gwirdsif.Certificates as C, Users as U "
+            << "where C.user_id = U.user_id and C.user_id = " << uuser_id << " "
+            << "order by C.certificate_id desc";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "In `X509_Cert_Type::get_from_database':"
+            << endl
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   status = submit_mysql_query(sql_strm.str(), 
+                               result, 
+                               mysql_ptr, 
+                               &row_ctr, 
+                               &field_ctr,
+                               0,
+                               thread_ctr_str);
+
+@q **** (4) @>
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str 
+            << "ERROR!  In `X509_Cert_Type::get_from_database':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Failed to retrieve X.509 certificate data from database table "
+            << "`gwirdsif.Certificates' for user " << user_id << "."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+ 
+       if (result)
+          mysql_free_result(result);
+
+       return 1;
+    
+
+   }  /* |if (status != 0)|  */
+
+@q **** (4) @>
+@
+@<|X509_Cert_Type::get_from_database| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str 
+            << "In `X509_Cert_Type::get_from_database':"
+            << endl
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "Retrieved X.509 certificate data from database table "
+            << "`gwirdsif.Certificates' for user " << user_id << " successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|X509_Cert_Type::get_from_database| definition@>=
+
+   if (row_ctr == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str 
+            << "ERROR!  In `X509_Cert_Type::get_from_database':"
+            << endl
+            << "`row_ctr' == 0."
+            << endl
+            << "Failed to retrieve X.509 certificate data from database table "
+            << "`gwirdsif.Certificates' for user " << user_id << "."
+            << endl
+            << "Exiting function unsuccessfully with return value 3."
+            << endl;
+       unlock_cerr_mutex(); 
+ 
+       if (result)
+          mysql_free_result(result);
+
+       return 3;
+
+   }  /* |if (row_ctr == 0)|  */
+
+@q **** (4) @>
+@
+@<|X509_Cert_Type::get_from_database| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str 
+            << "In `X509_Cert_Type::get_from_database':"
+            << endl
+            << "`row_ctr' == " << row_ctr
+            << endl
+            << "`field_ctr' == " << field_ctr
+            << endl;
+
+       if (row_ctr > 1)
+          cerr  << "`row_ctr' == " << row_ctr << " > 1.  Will retrieve the certificate data "
+                << "with the highest value for `gwirdsif.Certificates.certificate_id'."
+                << endl;
+
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|X509_Cert_Type::get_from_database| definition@>=
+
+   if ((curr_row = mysql_fetch_row(result)) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "ERROR!  In `X509_Cert_Type::get_from_database':"
+            << endl 
+            << "`mysql_fetch_row' failed:"
+            << endl
+            << mysql_error(mysql_ptr)
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result);
+
+       return 1;
+
+   }  /* |if (curr_row = mysql_fetch_row(result) == 0)|  */
+
+#if DEBUG_COMPILE 
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "In `X509_Cert_Type::get_from_database':"
+            << endl 
+            << "`mysql_fetch_row' succeeded."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|X509_Cert_Type::get_from_database| definition@>=
+
+   status = set(curr_row, thread_ctr_str);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "ERROR!  In `X509_Cert_Type::get_from_database':"
+            << endl 
+            << "`X509_Cert_Type::set' failed, returning " << status << "."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result);
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+
+#if DEBUG_COMPILE 
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "In `X509_Cert_Type::get_from_database':"
+            << endl 
+            << "`X509_Cert_Type::set' succeeded, returning 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|X509_Cert_Type::get_from_database| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str 
+            << "Exiting `X509_Cert_Type::get_from_database' successfully with return value 0."
+            << endl;
+
+        show("*this:");
+
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   if (result)
+      mysql_free_result(result);
+
+   return 0;
+
+
+}  /* End of |X509_Cert_Type::get_from_database| definition  */
+
+
+
+@q *** (3) Show.  @>
+@ Show.
+\initials{LDF 2009.12.22.}
+
+\LOG
+\initials{LDF 2009.12.22.}
+Added this function.
+
+\initials{LDF 2009.12.29.}
+Added optional argument |bool show_issuer|.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|X509_Cert_Type| function declarations@>=
+void
+show(string s = "", stringstream *strm = 0, bool show_issuer = false) const;
+
+@q *** (3) Definition  @>
+@
+@<|X509_Cert_Type::show| definition@>=
+void
+X509_Cert_Type::show(string s, stringstream *strm, bool show_issuer) const
+{
+
+@q **** (4) @>
+
+   if (s == "")
+      s = "X509_Cert_Type:";
+    
+    stringstream temp_strm;
+
+    temp_strm << setfill('.')
+              << s 
+              << endl
+              << setw(34) << std::left 
+              << "     serialNumber:" << hex << serialNumber << " (hexadecimal)"
+              << dec 
+              << endl
+              << setw(34) << std::left
+              << "     organization:" << organization
+              << endl
+              << setw(34) << std::left
+              << "     organizationalUnitName:" << organizationalUnitName
+              << endl
+              << setw(34) << std::left
+              << "     commonName:" << commonName
+              << endl
+              << setw(34) << std::left
+              << "     countryName:" << countryName
+              << endl
+              << setw(34) << std::left
+              << "     localityName:" << localityName
+              << endl
+              << setw(34) << std::left
+              << "     stateOrProvinceName:" << stateOrProvinceName
+              << endl 
+              << setw(34) << std::left
+              << "     user_id:" << user_id
+              << endl
+              << setw(34) << std::left
+              << "     certificate_id:" << certificate_id
+              << endl
+              << setw(34) << std::left
+              << "     issuer_cert_id:" << issuer_cert_id
+              << endl
+              << setw(34) << std::left
+              << "     user_name:" << user_name
+              << endl 
+              << setw(34) << std::left
+              << "     is_ca:" << is_ca
+              << endl 
+              << setw(34) << std::left
+              << "     is_proxy:" << is_proxy
+              << endl;
+
+@q **** (4) @>
+
+     char outstr[200];
+     struct tm tmp;
+     struct tm* tmp_ptr = &tmp;
+
+@q ***** (5) @>
+
+     temp_strm << setw(34) << std::left
+          << "     Activation time:";
+
+     if (Validity_notBefore > 0) 
+        gmtime_r(&Validity_notBefore, tmp_ptr);     
+     else
+        tmp_ptr = 0;
+
+     if (!(   tmp_ptr == 0 
+           || strftime(outstr, sizeof(outstr), "%Y-%m-%d %H:%M:%S UTC", tmp_ptr) == 0)) 
+
+        temp_strm << outstr << endl;
+     else 
+         temp_strm << "Unknown" << endl;
+
+@q ***** (5) @>
+
+     temp_strm << setw(34) << std::left
+          << "     Expiration time:";
+
+     if (Validity_notAfter > 0) 
+        gmtime_r(&Validity_notAfter, tmp_ptr);     
+     else
+        tmp_ptr = 0;
+
+     if (!(   tmp_ptr == 0 
+           || strftime(outstr, sizeof(outstr), "%Y-%m-%d %H:%M:%S UTC", tmp_ptr) == 0)) 
+
+        temp_strm << outstr << endl;
+     else 
+         temp_strm << "Unknown" << endl;
+
+@q ***** (5) @>
+
+@q **** (4) @>
+
+    if (show_issuer)
+    {
+         if (issuer_cert)
+            issuer_cert->show("issuer:", strm, false);
+         else
+            temp_strm << "`issuer' is null." << endl;
+
+    }  /* |if (show_issuer)|  */
+
+   temp_strm << setfill(' ');
+
+   if (strm)
+      *strm << temp_strm.str();
+   else
+      cerr << temp_strm.str();
+
+   return;
+
+}  /* End of |X509_Cert_Type::show| definition  */
+
+@q *** (3) Output.  @>
+@ Output.
+\initials{LDF 2013.05.15.}
+
+This function outputs information about the |X509_Cert_Type| object in the
+format needed for sending it to the client program \.{gwirdcli}.
+\initials{LDF 2013.05.15.}
+
+\LOG
+\initials{LDF 2013.05.15.}
+Added this function.
+
+\initials{LDF 2013.05.19.}
+Made this function |const|.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|X509_Cert_Type| function declarations@>=
+string
+output(void) const;
+
+@q *** (3) Definition  @>
+@
+@<|X509_Cert_Type::output| definition@>=
+string
+X509_Cert_Type::output(void) const
+{
+
+   stringstream temp_strm;
+
+
+   temp_strm << "CERTIFICATE_ID "             << certificate_id         << "U "  
+             << "USER_ID "                    << user_id                << "U "
+             << "USER_NAME \""                << user_name              << "\" "
+             << "ISSUER_CERT_ID "             << issuer_cert_id         << "U "
+             << "IS_CA "                      << is_ca                  << " "
+             << "IS_PROXY "                   << is_proxy               << " "
+             << "ORGANIZATION \""             << organization           << "\" "
+             << "ORGANIZATIONAL_UNIT_NAME \"" << organizationalUnitName << "\" "
+             << "COMMON_NAME \""              << commonName             << "\" "
+             << "COUNTRY_NAME \""             << countryName            << "\" "
+             << "LOCALITY_NAME \""            << localityName           << "\" "
+             << "STATE_OR_PROVINCE_NAME \""   << stateOrProvinceName    << "\" "
+             << "SERIAL_NUMBER "              << serialNumber           << "UL "
+             << "VALIDITY_NOT_BEFORE "        << Validity_notBefore     << "UL "
+             << "VALIDITY_NOT_AFTER "         << Validity_notAfter      << "UL ";
+
+   return temp_strm.str();
+
+}  /* End of |X509_Cert_Type::output| definition  */
+
+
+@q ** (2) Garbage.  @>
+@
+@<Garbage@>=
+
+@q ** (2) Putting Types for X.509 Certificates together.@>
+
+@ Putting Types for X\PERIOD 509 Certificates together.
+
+@c
+using namespace std;
+@<Include files@>@;@/
+using namespace gwrdifpk;
+typedef void* yyscan_t;
+@<|class X509_Cert_Type| declaration@>@;@/ 
+@<|X509_Cert_Type| constructor definitions@>@;@/
+@<|X509_Cert_Type::set| definitions@>@;@/
+@<|X509_Cert_Type::operator=| definition@>@;@/
+@<|X509_Cert_Type::clear| definition@>@;@/
+@<|X509_Cert_Type::get_from_database| definition@>@;@/
+@<|X509_Cert_Type::output| definition@>@;@/
+@<|X509_Cert_Type::show| definition@>@;@/
+
+#if 0 /* 1 */ 
+@<Garbage@>@;@/
+#endif 
+
+@
+@(x509cert.h@>=
+#ifndef X509CERT_H
+#define X509CERT_H 1
+typedef void* yyscan_t;
+class Scan_Parse_Parameter_Type;
+@<|class X509_Cert_Type| declaration@>@;@/ 
+#endif 
+
+@q (progn (cweb-mode) (outline-minor-mode))                              @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

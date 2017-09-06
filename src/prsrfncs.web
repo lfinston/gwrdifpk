@@ -1,0 +1,1481 @@
+@q prsrfncs.web@>
+@q Created by Laurence D. Finston (LDF) Wed Mar  6 11:01:27 CET 2013  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q * (1) Functions for use in the parsers.  @>
+@* Functions for use in the parsers.
+\initials{LDF 2013.03.06.}
+
+@q ** (2) Include files.@>
+@ Include files.
+
+@<Include files@>=
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <limits.h>
+#include <ctype.h>
+
+#include <algorithm>
+#include <bitset>
+#include <fstream>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <iterator>
+#include <time.h>
+#include <math.h>
+#include <sstream>   
+#include <map>
+#include <vector>
+#include <deque>
+#include <stack>
+#include <set>
+
+#include <pthread.h>
+
+#if HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+
+#include <mysql.h>
+
+#include <expat.h>
+
+#undef NAME_LEN
+#undef LOCAL_HOST
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "pidfncs.h++" 
+#include "tanfncs.h++" 
+#include "parser.h++"  
+#include "prsrclnt.h++" 
+#include "scanner.h++"
+#include "scnrclnt.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+#include "usrinftp.h++"
+
+@q ** (2) @>
+
+@q *** (3) |client_sending_file_rule_func|.  @>
+@ |client_sending_file_rule_func|.
+\initials{LDF 2013.03.06.}
+
+\LOG
+\initials{LDF 2013.03.06.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration @>
+
+@<Parser function declarations@>=
+
+int
+client_sending_file_rule_func(Scan_Parse_Parameter_Type *param, string filename, int reference);
+
+@q **** (4) Definition @>
+@
+@<|client_sending_file_rule_func| definition@>=
+int
+client_sending_file_rule_func(Scan_Parse_Parameter_Type *param, 
+               string filename, 
+               int reference,
+               unsigned int options)
+{
+@q ***** (5) @>
+
+   int status;
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   string thread_str;
+
+   stringstream temp_strm;
+
+   if (param->thread_ctr > 0)
+   {
+      temp_strm << "[Thread " << param->thread_ctr << "] ";
+      thread_str = temp_strm.str();
+      temp_strm.str("");
+   }
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `client_sending_file_rule_func'."
+            << endl
+            << "`options' == " << options << " " << oct << options << " (octal)"
+            << dec
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|client_sending_file_rule_func| definition@>=
+
+   bool is_compressed_tar_file = (options & 2U) ? true : false;
+   bool compressed_gzip        = (options & 4U) ? true : false;
+   bool compressed_bzip2       = (options & 8U) ? true : false;
+
+
+
+#if DEBUG_COMPILE 
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `client_sending_file_rule_func':"
+            << endl
+            << "`filename'                        == " << filename
+            << endl 
+            << "`reference'                       == " << reference
+            << endl
+            << "`param->temp_gpg_key_fingerprint' == " << param->temp_gpg_key_fingerprint
+            << endl
+            << "`is_compressed_tar_file'          == " << is_compressed_tar_file
+            << endl
+            << "`compressed_gzip'                 == " << compressed_gzip
+            << endl
+            << "`compressed_bzip2'                == " << compressed_bzip2
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   Response_Type response;
+   string new_local_filename;
+   string temp_filename;
+
+@q ***** (5) @>
+@
+@<|client_sending_file_rule_func| definition@>=
+
+   pthread_mutex_lock(&param->response_map_mutex);
+
+   map<unsigned int, Response_Type>::iterator iter = param->response_map.find(reference);
+
+   if (iter == param->response_map.end())
+   {
+        lock_cerr_mutex(); 
+        cerr << thread_str << "ERROR!"
+             << endl 
+             << "In `client_sending_file_rule_func':"
+             << endl
+             << "Failed to find reference " << reference << " in `param->response_map'."
+             << endl
+             << "Can't ``put'' file `" << filename << "'."
+             << endl 
+             << "Exiting function unsuccessfully with return value 1."
+             << endl;
+        unlock_cerr_mutex(); 
+
+        ++param->errors_occurred;
+
+        pthread_mutex_unlock(&param->response_map_mutex);
+
+        return 1;
+
+   }  /* |if (iter == param->response_map.end())|  */
+
+#if DEBUG_COMPILE 
+   else if (DEBUG)
+   {
+        lock_cerr_mutex(); 
+        cerr << thread_str
+             << "In `client_sending_file_rule_func':"
+             << endl
+             << "Found reference " << reference << " in `param->response_map':"
+             << endl;
+
+        iter->second.show();
+
+        unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2014.01.10.}
+Now assigning |response.gpg_key_fingerprint = param->temp_gpg_key_fingerprint| if the former
+is empty.
+\ENDLOG 
+
+@<|client_sending_file_rule_func| definition@>=
+
+   pthread_mutex_unlock(&param->response_map_mutex);
+
+   response = iter->second;
+
+   if (response.gpg_key_fingerprint.empty())
+       response.gpg_key_fingerprint = param->temp_gpg_key_fingerprint;
+
+   /* Not passing |response.local_filename| to |Scan_Parse_Parameter_Type::receive_file|!
+      A temporary file should be created.  Then we use |response.local_filename|
+      in the ``\.{put}'' command.
+      \initials{LDF 2012.11.22.}  */
+
+   status = param->receive_file("", 
+                                "",  
+                                false,
+                                0,
+                                &temp_filename);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "ERROR!  In `client_sending_file_rule_func':"
+            << endl
+            << "`Scan_Parse_Parameter_Type::receive_file' failed, returning " << status << "."
+            << endl
+            << "Exiting function unsuccessfully with return value 1." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE 
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "In `client_sending_file_rule_func':"
+            << endl
+            << "`Scan_Parse_Parameter_Type::receive_file' succeeded, returning 0."
+            << endl 
+            << "`temp_filename' == " << temp_filename
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>    
+@
+@<|client_sending_file_rule_func| definition@>=
+
+   response.temporary_filename = temp_filename;
+
+#if 0 /* 1 */  
+   response.show("response:");
+#endif 
+
+@q ***** (5) @>
+@
+@<|client_sending_file_rule_func| definition@>=
+
+   if (is_compressed_tar_file)
+      response.options |= 16384U;
+
+   if (compressed_gzip)
+      response.options |= 4096U;
+  
+   else if (compressed_bzip2)
+      response.options |= 8192U;
+
+   if (response.type == Response_Type::RECEIVE_PUT_FILE_TYPE)
+   {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+        if (DEBUG)
+        {
+             lock_cerr_mutex(); 
+             cerr << thread_str
+                  << "In `client_sending_file_rule_func':"
+                  << endl 
+                  << "`response.type'    == `Response_Type::RECEIVE_PUT_FILE_TYPE'."
+                  << endl
+                  << "`response.options' == " << response.options << " " 
+                  << oct << response.options << " (octal)" << dec
+                  << endl;
+             unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+     
+
+        status = param->put(response);
+
+        if (status != 0)
+        {
+             lock_cerr_mutex(); 
+             cerr << thread_str << "ERROR!"
+                  << endl 
+                  << "In `client_sending_file_rule_func':"
+                  << endl
+                  << "`Scan_Parse_Parameter_Type::put' failed, returning " << status << "."
+                  << endl 
+                  << "Exiting function unsuccessfully with return value 1." 
+                  << endl;
+             unlock_cerr_mutex(); 
+
+             ++param->errors_occurred; 
+
+             return 1;
+
+        }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE 
+        else if (DEBUG)
+        {
+             lock_cerr_mutex(); 
+             cerr << thread_str
+                  << "In `client_sending_file_rule_func':"
+                  << endl
+                  << "`Scan_Parse_Parameter_Type::put' succeeded, returning 0."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+        param->temp_file_vector.push_back(response.temporary_filename);
+
+        pthread_mutex_lock(&param->response_map_mutex);
+        param->response_map.erase(iter);
+        pthread_mutex_unlock(&param->response_map_mutex);
+
+@q ****** (6) @>
+
+   }  /* |if (response.type == Response_Type::RECEIVE_PUT_FILE_TYPE)|  */
+
+@q ***** (5) @>
+
+   else if (response.type == Response_Type::RECEIVE_METADATA_FILE_TYPE)
+   {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+        if (DEBUG)
+        {
+             lock_cerr_mutex(); 
+             cerr << thread_str
+                  << "In `client_sending_file_rule_func':"
+                  << endl
+                  << "`response.type' == `Response_Type::RECEIVE_METADATA_FILE_TYPE'."
+                  << endl;
+             unlock_cerr_mutex(); 
+            
+        }  /* |if (DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+ 
+@q ****** (6) @>
+
+        status = param->add_metadata(response);
+
+        if (status != 0)
+        {
+             lock_cerr_mutex(); 
+             cerr << thread_str << "ERROR!"
+                  << endl 
+                  << "In `client_sending_file_rule_func':"
+                  << endl
+                  << "`Scan_Parse_Parameter_Type::add_metadata' failed, returning " 
+                  << status << "."
+                  << endl 
+                  << "Exiting function unsuccessfully with return value 1." 
+                  << endl;
+             unlock_cerr_mutex(); 
+
+             ++param->errors_occurred; 
+
+             return 1;
+
+        }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE 
+        else if (DEBUG)
+        {
+             lock_cerr_mutex(); 
+             cerr << thread_str
+                  << "In `client_sending_file_rule_func':"
+                  << endl
+                  << "`Scan_Parse_Parameter_Type::add_metadata' succeeded, returning 0."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        param->temp_file_vector.push_back(response.temporary_filename);
+
+        pthread_mutex_lock(&param->response_map_mutex);
+        param->response_map.erase(iter);
+        pthread_mutex_unlock(&param->response_map_mutex);       
+
+
+@q ****** (6) @>
+
+   }  /* |else if (response.type == Response_Type::RECEIVE_METADATA_FILE_TYPE)|  */
+
+@q ***** (5) @>
+
+   else
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "WARNING!  In `client_sending_file_rule_func':"
+            << endl 
+            << "`response.type' == `" << Response_Type::typename_map[response.type] << "'."
+            << endl
+            << "This case hasn't been accounted for."
+            << endl
+            << "Exiting function unsuccessfully with return value 2."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 2;
+
+   }  /* |else|  */
+
+@q ***** (5) @>
+@
+@<|client_sending_file_rule_func| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `client_sending_file_rule_func' successfully with "
+            << "return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+   
+   return 0;
+
+}  /* End of |client_sending_file_rule_func| definition  */
+
+
+@q *** (3) |distinguished_name_rule_func|.  @>
+@ |distinguished_name_rule_func|.
+\initials{LDF 2013.05.22.}
+
+\LOG
+\initials{LDF 2013.05.22.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration @>
+
+@<Parser function declarations@>=
+
+int
+distinguished_name_rule_func(Scan_Parse_Parameter_Type *param, const char *distinguished_name_str);
+
+@q **** (4) Definition @>
+@
+@<|distinguished_name_rule_func| definition@>=
+int
+distinguished_name_rule_func(Scan_Parse_Parameter_Type *param, const char *distinguished_name_str)
+{
+@q ***** (5) @>
+
+   int status;
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   Response_Type response;
+   response.type = Response_Type::COMMAND_ONLY_TYPE;
+
+   string thread_str;
+
+   stringstream temp_strm;
+
+   User_Info_Type user_info;
+
+   if (param->thread_ctr > 0)
+   {
+      temp_strm << "[Thread " << param->thread_ctr << "] ";
+      thread_str = temp_strm.str();
+      temp_strm.str("");
+   }
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `distinguished_name_rule_func'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|distinguished_name_rule_func| definition@>=
+
+@ |param->user_id <= 0|.  User not already set.  This can only occur when the connection from 
+the client uses one of the methods {\it without\/} authentication, i.e., a local connection via
+a socket or a TLS connection using GnuTLS' ``anonymous'' authentication.  These possibilities 
+are for {\bf testing only!}
+\initials{LDF 2013.05.14.}
+
+@<|distinguished_name_rule_func| definition@>=
+
+     if (param->user_id <= 0)
+     {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+         if (DEBUG)
+         {
+             lock_cerr_mutex(); 
+             cerr << "[Thread " << param->thread_ctr << "] In `distinguished_name_rule_func':"
+                  << endl
+                  << "`param->user_id' == " << param->user_id << " (<= 0)"
+                  << endl
+                  << "Calling `Scan_Parse_Parameter_Type::get_user'."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+         }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+         status =  param->get_user(0, distinguished_name_str);
+
+         if (status != 0)
+         {
+             lock_cerr_mutex(); 
+             cerr << "[Thread " << param->thread_ctr 
+                  << "] ERROR!  In `distinguished_name_rule_func':"
+                  << endl
+                  << "`Scan_Parse_Parameter_Type::get_user' failed, returning "
+                  << status << "."
+                  << endl 
+                  << "Can't set user.  Exiting function with return value 2 "
+                  << "(authentication error)."
+                  << endl; 
+             unlock_cerr_mutex(); 
+
+             return 2;
+
+         }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+         else if (DEBUG)
+         {
+             lock_cerr_mutex(); 
+             cerr << "[Thread " << param->thread_ctr 
+                  << "] In `distinguished_name_rule_func':"
+                  << endl
+                  << "`Scan_Parse_Parameter_Type::get_user' succeeded."
+                  << endl 
+                  << "`param->user_id' == " << param->user_id
+                  << endl 
+                  << "`param->username' == " << param->username
+                  << endl
+                  << "`param->irods_password_encrypted' ==" 
+                  << endl 
+                  << param->irods_password_encrypted
+                  << endl 
+                  << "`param->irods_homedir' == " << param->irods_homedir
+                  << endl 
+                  << "`param->irods_zone' == " << param->irods_zone
+                  << endl 
+                  << "`param->irods_default_resource' == " << param->irods_default_resource
+                  << endl;
+             unlock_cerr_mutex(); 
+
+         }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+         status = param->set_user_info(user_info);
+
+         if (status != 0)
+         {
+@q ******* (7) @>
+
+             lock_cerr_mutex(); 
+             cerr << "[Thread " << param->thread_ctr 
+                  << "] ERROR!  In `distinguished_name_rule_func':"
+                  << endl
+                  << "`Scan_Parse_Parameter_Type::set_user_info' failed, returning "
+                  << status << "."
+                  << endl 
+                  << "Failed to check Distinguished Name `" << distinguished_name_str << "'."
+                  << endl
+                  << "Exiting function unsuccessfully with return value 2 (authentication error)."
+                  << endl; 
+             unlock_cerr_mutex(); 
+
+
+             ++param->warnings_occurred;
+
+             return 2;
+
+@q ******* (7) @>
+
+         }  /* |if (status != 0)|  */
+   
+@q ****** (6) @>
+
+         else
+         {
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread " << param->thread_ctr 
+                      << "] In `distinguished_name_rule_func':"
+                      << endl
+                      << "`Scan_Parse_Parameter_Type::set_user_info' succeeded:"
+                      << endl;
+
+                 user_info.show("user_info:");
+
+                 bitset<sizeof(unsigned int) * 8> temp_bitset(param->privileges);
+                 bitset<sizeof(unsigned int) * 8> show_distinguished_names_bitset(
+                             Scan_Parse_Parameter_Type::SHOW_DISTINGUISHED_NAMES_PRIVILEGE);
+
+                 cerr << "temp_bitset ==                     " << temp_bitset << endl
+                      << "show_distinguished_names_bitset == " 
+                      << show_distinguished_names_bitset << endl
+                      << "(param->privileges & "
+                      << "Scan_Parse_Parameter_Type::SHOW_DISTINGUISHED_NAMES_PRIVILEGE) == " 
+                      << (param->privileges & 
+                             Scan_Parse_Parameter_Type::SHOW_DISTINGUISHED_NAMES_PRIVILEGE)
+                      << endl;
+
+                 unlock_cerr_mutex(); 
+
+
+            }  /* |if (DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+         }  /* |else|  */
+
+@q ****** (6) @>
+
+     }  /* |if (param->user_id <= 0)|  */
+ 
+@q ***** (5) @>
+
+@ |param->user_id > 0|.  User already set.  In this case, we call 
+|Scan_Parse_Parameter_Type::get_user| with a |User_Info_Type| argument in order 
+to get the user info corresponding to the Distinguished Name in |distinguished_name_str|.
+It doesn't matter how the user was set;  it could have been set from a certificate 
+or this rule may have been matched previously, if a connection without authentication 
+is being used.  @:NOTE@> !! PLEASE NOTE:  Connections without authentication are for 
+{\bf testing only!}
+\initials{LDF 2013.05.14.}
+
+@<|distinguished_name_rule_func| definition@>=
+
+     else /* |param->user_id > 0|  */
+     {
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2013.05.19.}
+Added this section.
+\ENDLOG
+
+@<|distinguished_name_rule_func| definition@>=
+
+         Distinguished_Name_Type d;
+         d.set(distinguished_name_str);
+
+#if DEBUG_COMPILE
+         if (DEBUG)
+         {
+             lock_cerr_mutex(); 
+             param->distinguished_name.show("param->distinguished_name:");
+
+             d.show("d:");
+
+             cerr << "(d == param->distinguished_name) == " 
+                  << (d == param->distinguished_name)
+                  << endl;
+             unlock_cerr_mutex(); 
+
+         }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+         if (DEBUG)
+         {
+             lock_cerr_mutex(); 
+             cerr << "[Thread " << param->thread_ctr << "] In `distinguished_name_rule_func':"
+                  << endl
+                  << "`param->user_id' == " << param->user_id << " (> 0)"
+                  << endl
+                  << "User already set."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+         }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+
+         if (param->distinguished_name == distinguished_name_str)  
+         {
+              /* User requesting information about his or her own Distinguished Name.
+                 \initials{LDF 2013.05.19.}  */
+
+              status = param->set_user_info(user_info);
+         }
+         else 
+         {
+             status = param->get_user(0, distinguished_name_str, "", &user_info);
+         }
+
+@q ****** (6) @>
+
+         if (status != 0)
+         {
+@q ******* (7) @>
+
+             lock_cerr_mutex(); 
+             cerr << "[Thread " << param->thread_ctr 
+                  << "] WARNING!  In `distinguished_name_rule_func':"
+                  << endl;
+
+             if (param->distinguished_name == distinguished_name_str)  
+                 cerr << "`Scan_Parse_Parameter_Type::set_user_info' failed, returning ";
+             else
+                 cerr << "`Scan_Parse_Parameter_Type::get_user' failed, returning ";
+
+             cerr << status << "."
+                  << endl 
+                  << "Failed to check Distinguished Name `" << distinguished_name_str << "'."
+                  << endl
+                  << "Exiting function unsuccessfully with return value 1."
+                  << endl; 
+             unlock_cerr_mutex(); 
+
+             temp_strm.str("");
+             temp_strm << "DISTINGUISHED_NAME RESPONSE 1 \"" << distinguished_name_str << "\" "
+                       << "-1 ";
+
+             if (param->distinguished_name == distinguished_name_str)  
+                 temp_strm << "\"(Failed to set user info)\"";
+             else
+                 temp_strm << "\"(Username not found)\"";
+
+             response.command = temp_strm.str();
+             temp_strm.str("");
+
+             param->response_deque.push_back(response);
+
+             ++param->warnings_occurred;
+
+             return 1;
+
+@q ******* (7) @>
+
+         }  /* |if (status != 0)|  */
+   
+@q ****** (6) @>
+
+         else
+         {
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread " << param->thread_ctr 
+                      << "] In `distinguished_name_rule_func':"
+                      << endl
+                      << "`Scan_Parse_Parameter_Type::get_user' or "
+                      << "`Scan_Parse_Parameter_Type::set_user_info' succeeded:"
+                      << endl;
+                 user_info.show("user_info:");
+
+                 bitset<sizeof(unsigned int) * 8> temp_bitset(param->privileges);
+                 bitset<sizeof(unsigned int) * 8> show_distinguished_names_bitset(
+                             Scan_Parse_Parameter_Type::SHOW_DISTINGUISHED_NAMES_PRIVILEGE);
+
+                 cerr << "temp_bitset ==                     " << temp_bitset << endl
+                      << "show_distinguished_names_bitset == " 
+                      << show_distinguished_names_bitset << endl
+                      << "(param->privileges & "
+                      << "Scan_Parse_Parameter_Type::SHOW_DISTINGUISHED_NAMES_PRIVILEGE) == " 
+                      << (param->privileges & 
+                             Scan_Parse_Parameter_Type::SHOW_DISTINGUISHED_NAMES_PRIVILEGE)
+                      << endl;
+
+                 unlock_cerr_mutex(); 
+
+
+            }  /* |if (DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+             if (   param->user_id == user_info.user_id
+                 || (param->privileges 
+                       & Scan_Parse_Parameter_Type::SHOW_DISTINGUISHED_NAMES_PRIVILEGE)
+                          > 0U)
+             {
+                 temp_strm.str("");
+                 temp_strm << "DISTINGUISHED_NAME RESPONSE 0 \"" << distinguished_name_str << "\" "
+                           << user_info.user_id << " \"" << user_info.username << "\""; 
+
+                 response.command = temp_strm.str();
+                 temp_strm.str("");
+
+                 param->response_deque.push_back(response);
+
+
+             }  /* |if|  */
+
+@q ******* (7) @>
+
+             else
+             {
+
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread " << param->thread_ctr 
+                      << "] WARNING!  In `distinguished_name_rule_func':"
+                      << endl
+                      << "User " << param->username << " (ID " << param->user_id << ") "
+                      << "not permitted to check the Distinguished Names of other users."
+                      << endl
+                      << "Exiting function unsuccessfully with return value 1."
+                      << endl; 
+                 unlock_cerr_mutex(); 
+
+                 temp_strm.str("");
+                 temp_strm << "DISTINGUISHED_NAME RESPONSE 1 \"" << distinguished_name_str << "\" "
+                           << "-1 \"(Action not permitted)\"";
+
+                 response.command = temp_strm.str();
+                 temp_strm.str("");
+
+                 param->response_deque.push_back(response);
+
+                 ++param->warnings_occurred;
+ 
+                 return 1;
+
+             }  /* |else|  */
+
+@q ******* (7) @>
+
+         }  /* |else|  */
+
+@q ****** (6) @>
+
+     }  /* |else| (|param->user_id > 0|)  */
+
+@q ***** (5) @>
+@
+@<|distinguished_name_rule_func| definition@>=
+
+     if (param->user_id_map.find(user_info.username) == param->user_id_map.end())
+        param->user_id_map[user_info.username] = user_info.user_id;
+   
+     if (param->user_info_map.find(user_info.user_id) == param->user_info_map.end())
+        param->user_info_map[user_info.user_id] = user_info;
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.07.18.}
+Now putting |User_Info_Type user_info| onto |global_user_info_map|.
+\ENDLOG 
+
+@<|distinguished_name_rule_func| definition@>=
+
+     pthread_mutex_lock(&global_user_info_map_mutex);
+     global_user_info_map[user_info.user_id] = user_info;
+     pthread_mutex_unlock(&global_user_info_map_mutex);
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `distinguished_name_rule_func' successfully with "
+            << "return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |distinguished_name_rule_func| definition   */
+
+@q *** (3) |get_user_info_func|.  @>
+@ |get_user_info_func|.
+\initials{LDF 2013.05.22.}
+
+\LOG
+\initials{LDF 2013.05.22.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration @>
+
+@<Parser function declarations@>=
+
+int
+get_user_info_func(Scan_Parse_Parameter_Type *param, const char *curr_username = 0);
+
+@q **** (4) Definition @>
+@
+@<|get_user_info_func| definition@>=
+int
+get_user_info_func(Scan_Parse_Parameter_Type *param, const char *curr_username)
+{
+@q ***** (5) @>
+
+   int status;
+   bool DEBUG = false;  /* |true|  */ 
+
+   set_debug_level(DEBUG, 0, 0); 
+
+   Response_Type response;
+   response.type = Response_Type::COMMAND_ONLY_TYPE;
+
+   string thread_str;
+
+   stringstream temp_strm;
+
+   User_Info_Type user_info;
+
+   if (param->thread_ctr > 0)
+   {
+      temp_strm << "[Thread " << param->thread_ctr << "] ";
+      thread_str = temp_strm.str();
+      temp_strm.str("");
+   }
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `get_user_info_func'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|get_user_info_func| definition@>=
+
+   string username;
+
+   if (curr_username == 0)
+      username = param->username;
+   else 
+      username = curr_username;
+
+   User_Info_Type *user_info_ptr = 0;
+
+   map<string, int>::const_iterator iter = param->user_id_map.find(username);
+
+   int curr_id = 0;
+
+   if (iter != param->user_id_map.end())
+   {
+        curr_id = iter->second;
+
+        map<int, User_Info_Type>::iterator iter_1 
+           = param->user_info_map.find(curr_id);
+
+        if (iter_1 != param->user_info_map.end())
+           user_info_ptr = &iter_1->second;
+
+   }  /* |if|  */
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `get_user_info_func':"
+            << endl;
+
+       if (user_info_ptr != 0)
+       {
+           cerr << "`user_info_ptr' != 0.  Found `User_Info':"
+                << endl
+                << user_info_ptr->user_id << ", " << user_info_ptr->username 
+                << endl;
+           
+
+       }
+       else
+          cerr << "`user_info_ptr' == 0."
+               << endl;
+
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+@ Current user has requested info about a different user, 
+but doesn't have the ``show user info'' privilege.
+Send a failure notice to the client.
+\initials{LDF 2013.05.19.}
+
+@<|get_user_info_func| definition@>=
+
+   if (param->username != username 
+       && (param->privileges & Scan_Parse_Parameter_Type::SHOW_USER_INFO_PRIVILEGE) == 0U) 
+   {
+
+       temp_strm.str("");
+       temp_strm << "GET_USER_INFO RESPONSE 1";
+       response.command = temp_strm.str();
+
+       lock_cerr_mutex(); 
+       cerr << "[Thread " << param->thread_ctr << "] "
+            << "ERROR!  In `get_user_info_func':"
+            << endl
+            << "Current user has requested info about a different user, but doesn't have "
+            << "the \"show user info\" privilege."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       temp_strm.str("");
+       temp_strm << "GET_USER_INFO RESPONSE 1";
+       response.command = temp_strm.str();
+
+       param->response_deque.push_back(response);
+
+       ++param->errors_occurred;
+
+       return 1;
+
+   }  /* |if|  */
+
+@q ***** (5) @>
+@
+@<|get_user_info_func| definition@>=
+
+   if (user_info_ptr == 0)
+   {
+@q ****** (6) @>
+
+         if (username == param->username)
+         {
+
+             status = param->set_user_info(user_info);
+
+             if (status != 0)
+             {
+                lock_cerr_mutex(); 
+                cerr << "[Thread " << param->thread_ctr << "] "
+                     << "ERROR!  In `get_user_info_func':"
+                     << endl
+                     << "`Scan_Parse_Parameter_Type::set_user_info' failed, returning " 
+                     << status << "."
+                     << endl
+                     << "Exiting function unsuccessfully with return value 1."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                temp_strm.str("");
+                temp_strm << "GET_USER_INFO RESPONSE 1";
+                response.command = temp_strm.str();
+
+                param->response_deque.push_back(response);
+
+                ++param->errors_occurred;
+            
+                return 1;
+
+             }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread " << param->thread_ctr << "] "
+                     << "In `get_user_info_func':"
+                     << endl
+                     << "`Scan_Parse_Parameter_Type::set_user_info' succeeded, returning 0."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif /* |DEBUG_COMPILE|  */         
+
+
+         }  /* |if (username == param->username)|  */
+
+@q ****** (6) @>
+@
+@<|get_user_info_func| definition@>=
+
+         else if (param->privileges & Scan_Parse_Parameter_Type::SHOW_USER_INFO_PRIVILEGE)
+         {
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread " << param->thread_ctr << "] "
+                     << "In `get_user_info_func':"
+                     << endl
+                     << "User " << param->user_id << " has the \"show user info\" privilege."
+                     << endl 
+                     << "Calling `Scan_Parse_Parameter_Type::get_user' to retrieve user info"
+                     << endl 
+                     << "for user \"" << username << "\"."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */          
+ 
+        /* !! TODO: LDF 2013.05.19.  
+           For admins, maybe make a way of querying for all users at once.
+        */
+
+            status = param->get_user(0, 0, string(username), &user_info);
+
+@q ******* (7) @>
+
+            if (status != 0)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread " << param->thread_ctr << "] "
+                     << "ERROR!  In `get_user_info_func':"
+                     << endl
+                     << "`Scan_Parse_Parameter_Type::get_user' failed, returning " << status << "."
+                     << endl
+                     << "Exiting function unsuccessfully with return value 1."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                temp_strm.str("");
+                temp_strm << "GET_USER_INFO RESPONSE 1";
+                response.command = temp_strm.str();
+
+                param->response_deque.push_back(response);
+
+                ++param->errors_occurred;
+
+                return 1;
+
+
+            }  /* |if (status != 0)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread " << param->thread_ctr << "] "
+                     << "In `get_user_info_func':"
+                     << endl
+                     << "`Scan_Parse_Parameter_Type::get_user' succeeded, returning 0."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif /* |DEBUG_COMPILE|  */         
+
+@q ******* (7) @>
+@
+\LOG
+\initials{LDF 2013.07.18.}
+Added this section.
+\ENDLOG
+
+@<|get_user_info_func| definition@>=
+
+            pthread_mutex_lock(&global_user_info_map_mutex);
+            global_user_info_map[user_info.user_id] = user_info;
+            pthread_mutex_unlock(&global_user_info_map_mutex);
+
+@q ******* (7) @>
+@
+@<|get_user_info_func| definition@>=
+
+         }  /* |else if|  */
+
+@q ****** (6) @>
+
+         else
+         {
+             lock_cerr_mutex(); 
+             cerr << "[Thread " << param->thread_ctr << "] "
+                  << "ERROR!  In `get_user_info_func':"
+                  << endl
+                  << "This can't happen!  User requesting info about other user, but "
+                  << "doesn't have the \"show user info\" privilege." 
+                  << endl
+                  << "This case should have been caught above."
+                  << endl
+                  << "Exiting function unsuccessfully with return value 1."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+             temp_strm.str("");
+             temp_strm << "GET_USER_INFO RESPONSE 1";
+             response.command = temp_strm.str();
+
+             param->response_deque.push_back(response);
+
+             ++param->errors_occurred;
+
+             return 1;
+
+         }  /* |else|  */
+
+@q ****** (6) @>
+
+   }  /* |if (user_info_ptr == 0)|  */
+
+@q ***** (5) @>
+@
+@<|get_user_info_func| definition@>=
+
+   if (user_info_ptr == 0)
+   {
+       user_info_ptr = &user_info;
+
+       param->user_id_map[user_info.username] = user_info.user_id;
+       param->user_info_map[user_info.user_id] = user_info;
+
+   }
+
+@q ***** (5) @>
+@
+@<|get_user_info_func| definition@>=
+
+   temp_strm.str("");
+
+   temp_strm << "GET_USER_INFO RESPONSE 0 USER_ID " << user_info_ptr->user_id << "U "
+             << "USER_NAME \"" << user_info_ptr->username << "\" "
+             << "CERTIFICATE_ID " << user_info_ptr->certificate.certificate_id << "U " 
+             << "SERIAL_NUMBER " << user_info_ptr->certificate.serialNumber << "U " 
+             << "COMMON_NAME \"" << user_info_ptr->certificate.commonName << "\" "
+             << "LOCALITY_NAME \"" << user_info_ptr->certificate.localityName << "\" "
+             << "STATE_OR_PROVINCE_NAME " 
+             << "\"" << user_info_ptr->certificate.stateOrProvinceName << "\" "
+             << "COUNTRY_NAME \"" << user_info_ptr->certificate.countryName << "\" "
+             << "ORGANIZATION \"" << user_info_ptr->certificate.organization << "\" "
+             << "ORGANIZATIONAL_UNIT_NAME " 
+             << "\"" << user_info_ptr->certificate.organizationalUnitName << "\" "
+             << "ISSUER_CERT_ID " 
+             << user_info_ptr->certificate.issuer_cert_id << "U "
+             << "VALIDITY_NOT_BEFORE "<< user_info_ptr->certificate.Validity_notBefore << "UL "
+             << "VALIDITY_NOT_AFTER "<< user_info_ptr->certificate.Validity_notAfter << "UL "
+             << "IS_CA "<< user_info_ptr->certificate.is_ca << " "
+             << "IS_PROXY " << user_info_ptr->certificate.is_proxy << " "
+             << "PRIVILEGES " << user_info_ptr->privileges << "U "
+             << "IRODS_HOMEDIR \"" << user_info_ptr->irods_homedir << "\" "
+             << "IRODS_ZONE \"" << user_info_ptr->irods_zone << "\" "
+             << "IRODS_DEFAULT_RESOURCE \"" << user_info_ptr->irods_default_resource << "\" ";
+
+@ The current iRODS directory is only known for the current user, because 
+it's not stored in the database.  Doing this would require locking and unlocking
+the database whenever a user changes his or her current iRODS directory (i.e., with 
+the \.{CD} command), and when querying the database for the user info, because the
+other user might be communicating with the server at the same time.
+\initials{LDF 2013.05.22.}
+
+@<|get_user_info_func| definition@>=
+
+   if (user_info_ptr->user_id == param->user_id)
+       temp_strm << "IRODS_CURRENT_DIR \"" << param->irods_current_dir << "\" ";
+
+   temp_strm << "DEFAULT_HANDLE_PREFIX_ID " << user_info_ptr->default_handle_prefix_id << "U "
+             << "DEFAULT_HANDLE_PREFIX \""  << user_info_ptr->default_handle_prefix << "\" "
+             << "DEFAULT_INSTITUTE_ID "     << user_info_ptr->default_institute_id << "U "
+             << "DEFAULT_INSTITUTE_NAME \"" << user_info_ptr->default_institute_name << "\" ";
+
+       
+   response.command = temp_strm.str();
+
+   param->response_deque.push_back(response);
+
+   temp_strm.str("");
+
+@q ***** (5) @>
+@
+@<|get_user_info_func| definition@>=
+
+#if DEBUG_COMPILE 
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[Thread " << param->thread_ctr << "] "
+            << "In `get_user_info_func':"
+            << endl;
+
+       bitset<sizeof(unsigned int) * 8> b(user_info_ptr->privileges);
+
+       cerr << "privileges bitset: == " << b << endl;
+
+       user_info_ptr->show("user_info:");
+
+       cerr << "`response.command' == "
+            << endl
+            << response.command
+            << endl;
+
+#if 0 
+       param->show("*param:");
+#endif 
+
+       unlock_cerr_mutex(); 
+   }  /* |if (DEBUG)|  */       
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|get_user_info_func| definition@>=
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `get_user_info_func' successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |get_user_info_func| definition  */
+
+
+@q ** (2) Putting parser functions together.  @>
+
+@ Putting parser functions together.
+\initials{LDF 2013.03.06.}
+
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+@<Parser function declarations@>@;@/
+@<|client_sending_file_rule_func| definition@>@;@/
+@<|distinguished_name_rule_func| definition@>@;@/
+@<|get_user_info_func| definition@>@;@/
+
+@q *** (3) This is what's written to the header file `prsrfncs.h'.  @>
+
+@ This is what's written to the header file \filename{prsrfncs.h}.  
+\initials{LDF 2008.12.05.}
+
+@(prsrfncs.h@>=
+#ifndef PRSRFNCS_H
+#define PRSRFNCS_H 1
+using namespace std;
+using namespace gwrdifpk;
+@<Parser function declarations@>@;@/
+#endif 
+
+@q (progn (cweb-mode) (outline-minor-mode))                           @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

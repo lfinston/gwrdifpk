@@ -1,0 +1,5159 @@
+@q cmdlnopt.web @>
+@q Created by Laurence D. Finston (LDF) Mon Jul  2 10:15:34 CEST 2012  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q * (1) Command line option processing@>
+@* Command line option processing.
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this file.
+\ENDLOG
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/mman.h>
+
+#include <getopt.h> 
+#include <limits.h> 
+
+#include <errno.h> 
+
+#include <fstream>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <string>
+#include <string.h>
+#include <time.h>
+#include <math.h>
+#include <sstream>   
+
+#include <deque>
+#include <vector>
+
+#include <pthread.h>
+
+#include <mysql.h>
+
+#if HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "utilfncs.h++"
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif 
+
+@q * (0) Command-Line Options Processing.  @>
+@ Command-Line Options Processing.  
+\initials{LDF 2012.07.02.}
+
+@q ** (2) Process Command Line Options @>
+@ Process Command Line Options.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this function.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|process_command_line_options| declaration@>=
+
+int
+process_command_line_options(int argc, char* argv[]);
+
+@q *** (3) Definition  @>
+@
+@<|process_command_line_options| definition@>=
+int
+process_command_line_options(int argc, char* argv[])
+{
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0);
+
+   int status = 0;
+
+@q **** (4) @>
+
+   int option_ctr;
+   int digit_optind = 0;
+
+   size_t pos;
+   char *temp_str = 0;
+
+@q *** (3) Index constants.@>
+@ Index constants.
+\initials{LDF 2012.07.02.}
+
+@:NOTE@> !! PLEASE NOTE:  The \.{*-client-enable} and \.{*-client-disable} options are also used 
+by the server!  If a given option is disabled, the server will not send the corresponding command
+to the client.  If it is enabled on the server-side but disabled on the client-side, the server
+will send the command but the client will not execute it.  (It is not known on the server-side 
+whether an option is enabled or disabled on the client-side.)
+\initials{LDF 2013.05.03.}
+
+\LOG
+\initials{LDF 2013.04.03.}
+Added |const unsigned short END_SERVER_ENABLE_INDEX| and code for handling the 
+\.{--end-server-enable} option.
+
+\initials{LDF 2013.04.09.}
+Added |const unsigned short END_SERVER_ENABLE| and code for handling the 
+\.{--purge-sleep-value} option.
+
+\initials{LDF 2013.04.10.}
+Added |const unsigned short SOCKET_DIRECTORY_INDEX| and              
+|const unsigned short LOG_DIRECTORY_INDEX| and code for handling the 
+options \.{--socket-directory} and \.{--log-directory}.
+
+\initials{LDF 2013.04.19.}
+Added |const unsigned short SLEEP_SERVER_ENABLE_INDEX| and
+|const unsigned short SERVER_TEST_ENABLE_INDEX|.
+
+\initials{LDF 2013.04.19.}
+Changed |PURGE_SLEEP_VALUE_INDEX| to |PURGE_INTERVAL_INDEX|.
+Changed the corresponding option from \.{--purge-sleep-value} to 
+\.{--purge-interval}.
+
+\initials{LDF 2013.04.19.}
+Added |const unsigned short PURGE_LIMIT_INDEX|.
+
+\initials{LDF 2013.04.25.}
+Added |const unsigned short PURGE_INTERVAL_SECONDS_INDEX|.
+
+\initials{LDF 2013.05.02.}
+Added the |const unsigned short| variables 
+|CLIENT_TEST_ENABLE_INDEX|,
+|SIGNAL_SERVER_ENABLE_INDEX|, 
+|SIGNAL_CLIENT_ENABLE_INDEX|,
+|SLEEP_SERVER_DISABLE_INDEX|,
+|SIGNAL_SERVER_DISABLE_INDEX|,
+|SIGNAL_CLIENT_DISABLE_INDEX|,
+|SERVER_TEST_DISABLE_INDEX|,
+|CLIENT_TEST_DISABLE_INDEX|,
+|SLEEP_CLIENT_ENABLE_INDEX|
+and        
+|SLEEP_CLIENT_DISABLE_INDEX|.        
+
+\initials{LDF 2013.06.07.}
+Added |const unsigned short IRODS_SERVER_DIRECTORY_INDEX|.
+
+\initials{LDF 2013.07.11.}
+Added |const unsigned short COMMANDS_INDEX|.
+
+\initials{LDF 2013.08.08.}
+Added |const unsigned short PURGE_IRODS_ARCHIVE_INTERVAL_INDEX|
+and |const unsigned short PURGE_IRODS_ARCHIVE_LIMIT_INDEX|.
+
+\initials{LDF 2013.09.19.}
+Added the |const unsigned short| variables 
+|GPG_KEY_ID_INDEX|, |PASSPHRASE_GPG_INDEX| and 
+|const unsigned short GPG_PASSPHRASE_INDEX|.
+
+\initials{LDF 2013.09.24.}
+Added the |const unsigned short| variables |MYSQL_PASSWORD_FILENAME_INDEX|
+and |MYSQL_USERNAME_INDEX|
+
+\initials{LDF 2013.11.21.}
+Added the |const unsigned short| variables 
+|PURGE_DC_METADATA_INTERVAL_INDEX| and |PURGE_DC_METADATA_LIMIT_INDEX|.
+
+\initials{LDF 2014.01.07.}
+Added |const unsigned short GPG_HOMEDIR_INDEX|.
+
+\initials{LDF 2014.01.27.}
+Added the |const unsigned short| variables 
+|LISTEN_CLIENT_INDEX| and |LISTEN_CLIENT_PORT_INDEX|.
+
+\initials{LDF 2014.01.27.}
+Removed |const unsigned short LISTEN_CLIENT_INDEX|.
+|LISTEN_CLIENT_PORT_INDEX| can be used for the case that no port is specified.
+
+\initials{LDF 2014.01.31.}
+Added |const unsigned short PULL_REQUEST_INTERVAL_INDEX|.
+
+\initials{LDF 2014.02.01.}
+Added |const unsigned short READ_CLIENT_COMMAND_FILE_INDEX|.
+\ENDLOG 
+
+@q **** (4) Code  @> 
+
+@<|process_command_line_options| definition@>=
+
+  const unsigned short BISON_TRACE_INDEX                    =  0;
+  const unsigned short PARSER_TRACE_INDEX                   =  1;
+  const unsigned short FLEX_TRACE_INDEX                     =  2; 
+  const unsigned short SCANNER_TRACE_INDEX                  =  3;
+  const unsigned short INPUT_FILENAME_INDEX                 =  4;
+  const unsigned short OUTPUT_FILENAME_INDEX                =  5;
+  const unsigned short SAVE_TEMP_FILES_INDEX                =  6;
+  const unsigned short CERT_FILENAME_INDEX                  =  7;
+  const unsigned short KEY_FILENAME_INDEX                   =  8;
+  const unsigned short CA_FILENAME_INDEX                    =  9;
+  const unsigned short CRL_FILENAME_INDEX                   = 10;
+  const unsigned short CERT_FORMAT_INDEX                    = 11;
+  const unsigned short LOG_FILENAME_INDEX                   = 12;
+  const unsigned short ERR_LOG_FILENAME_INDEX               = 13;
+  const unsigned short SESSION_ID_INDEX                     = 14;
+  const unsigned short HELP_INDEX                           = 15;
+  const unsigned short TRACE_INDEX                          = 16;
+  const unsigned short VERSION_INDEX                        = 17;
+  const unsigned short I_COMMANDS_INDEX                     = 18;
+  const unsigned short ICOMMANDS_INDEX                      = 19;
+  const unsigned short JARGON_TRUNK_INDEX                   = 20;
+  const unsigned short JARGON_CORE_INDEX                    = 21;
+  const unsigned short REMOTE_HOSTNAME_INDEX                = 22;
+  const unsigned short ANONYMOUS_INDEX                      = 23;
+  const unsigned short STANDALONE_HANDLE_INDEX              = 24;
+  const unsigned short END_SERVER_ENABLE_INDEX              = 25;
+  const unsigned short SLEEP_SERVER_ENABLE_INDEX            = 26;
+  const unsigned short SLEEP_SERVER_DISABLE_INDEX           = 27;
+  const unsigned short SLEEP_CLIENT_ENABLE_INDEX            = 28;
+  const unsigned short SLEEP_CLIENT_DISABLE_INDEX           = 29;
+  const unsigned short SIGNAL_SERVER_ENABLE_INDEX           = 30;
+  const unsigned short SIGNAL_SERVER_DISABLE_INDEX          = 31;
+  const unsigned short SIGNAL_CLIENT_ENABLE_INDEX           = 32;
+  const unsigned short SIGNAL_CLIENT_DISABLE_INDEX          = 33;
+  const unsigned short SERVER_TEST_ENABLE_INDEX             = 34;
+  const unsigned short SERVER_TEST_DISABLE_INDEX            = 35;
+  const unsigned short CLIENT_TEST_ENABLE_INDEX             = 36;
+  const unsigned short CLIENT_TEST_DISABLE_INDEX            = 37; 
+  const unsigned short PURGE_LOGS_INTERVAL_INDEX            = 38;
+  const unsigned short PURGE_LOGS_INTERVAL_SECONDS_INDEX    = 39;
+  const unsigned short PURGE_LOGS_LIMIT_INDEX               = 40;
+  const unsigned short SOCKET_DIRECTORY_INDEX               = 41;
+  const unsigned short LOG_DIRECTORY_INDEX                  = 42;
+  const unsigned short IRODS_SERVER_DIRECTORY_INDEX         = 43;
+  const unsigned short CONFIG_DIRECTORY_INDEX               = 44;
+  const unsigned short TERMINATE_ON_END_INPUT_INDEX         = 45;
+  const unsigned short NO_TERMINATE_ON_END_INPUT_INDEX      = 46;
+  const unsigned short COMMANDS_INDEX                       = 47;
+  const unsigned short PURGE_DATABASE_INTERVAL_INDEX        = 48;
+  const unsigned short PURGE_DATABASE_LIMIT_INDEX           = 49;
+  const unsigned short PURGE_IRODS_ARCHIVE_INTERVAL_INDEX   = 50;
+  const unsigned short PURGE_IRODS_ARCHIVE_LIMIT_INDEX      = 51;
+  const unsigned short PURGE_DC_METADATA_INTERVAL_INDEX     = 52;
+  const unsigned short PURGE_DC_METADATA_LIMIT_INDEX        = 53;
+  const unsigned short DEBUG_LEVEL_INDEX                    = 54;
+  const unsigned short SUPPRESS_PROMPT_INDEX                = 55;
+  const unsigned short ANON_PORT_INDEX                      = 56;
+  const unsigned short X509_PORT_INDEX                      = 57;
+  const unsigned short GPG_KEY_ID_INDEX                     = 58;
+  const unsigned short PASSPHRASE_GPG_INDEX                 = 59;
+  const unsigned short GPG_PASSPHRASE_INDEX                 = 60;
+  const unsigned short GPG_HOMEDIR_INDEX                    = 61;
+  const unsigned short MYSQL_USERNAME_INDEX                 = 62;
+  const unsigned short MYSQL_PASSWORD_FILENAME_INDEX        = 63;
+  const unsigned short LISTEN_CLIENT_PORT_INDEX             = 64;
+  const unsigned short PULL_REQUEST_INTERVAL_INDEX          = 65;
+  const unsigned short READ_CLIENT_COMMAND_FILE_INDEX       = 66;
+@q **** (4) @>
+
+@q *** (3) Option struct.@>
+@ Option struct.
+\initials{LDF 2012.07.02.}
+
+@<|process_command_line_options| definition@>=
+
+  static struct option long_options[] = {
+    {"bison-trace",  2, 0, 0},
+    {"parser-trace",  2, 0, 0},
+    {"flex-trace",  0, 0, 0},
+    {"scanner-trace",  0, 0, 0},
+    {"input-filename",  1, 0, 0},
+    {"output-filename",  1, 0, 0},
+    {"save-temp-files",  0, 0, 0},
+    {"cert-filename", 1, 0, 0},
+    {"key-filename", 1, 0, 0},
+    {"ca-filename", 1, 0, 0},
+    {"crl-filename", 1, 0, 0},
+    {"cert-format", 1, 0, 0},
+    {"log-filename", 1, 0, 0},
+    {"error-log-filename", 1, 0, 0},
+    {"session-id", 1, 0, 0},
+    {"help", 0, 0, 0},
+    {"trace", 2, 0, 0},
+    {"version", 0, 0, 0},
+    {"i-commands", 0, 0, 0},
+    {"icommands", 0, 0, 0},
+    {"jargon-trunk", 0, 0, 0},
+    {"jargon-core", 0, 0, 0},
+    {"remote-hostname", 1, 0, 0},
+    {"anonymous", 0, 0, 0},
+    {"standalone-handle", 0, 0, 0},
+    {"end-server-enable", 0, 0, 0},
+    {"sleep-server-enable", 0, 0, 0},
+    {"sleep-server-disable", 0, 0, 0},
+    {"sleep-client-enable", 0, 0, 0},
+    {"sleep-client-disable", 0, 0, 0},
+    {"signal-server-enable", 0, 0, 0},
+    {"signal-server-disable", 0, 0, 0},
+    {"signal-client-enable", 0, 0, 0},
+    {"signal-client-disable", 0, 0, 0},
+    {"server-test-enable", 0, 0, 0},
+    {"server-test-disable", 0, 0, 0},
+    {"client-test-enable", 0, 0, 0},
+    {"client-test-disable", 0, 0, 0},
+    {"purge-logs-interval", 1, 0, 0},
+    {"purge-logs-interval-seconds", 1, 0, 0},
+    {"purge-logs-limit", 1, 0, 0},
+    {"socket-directory", 1, 0, 0},
+    {"log-directory", 1, 0, 0},
+    {"irods-server-directory", 1, 0, 0},
+    {"config-directory", 1, 0, 0},
+    {"terminate-on-end-input", 2, 0, 0},
+    {"no-terminate-on-end-input", 0, 0, 0},
+    {"commands", 1, 0, 0},
+    {"purge-database-interval", 1, 0, 0},
+    {"purge-database-limit", 1, 0, 0},
+    {"purge-irods-archive-interval", 1, 0, 0},
+    {"purge-irods-archive-limit", 1, 0, 0},
+    {"purge-dc-metadata-interval", 1, 0, 0},
+    {"purge-dc-metadata-limit", 1, 0, 0},
+    {"debug-level", 1, 0, 0},
+    {"suppress-prompt", 2, 0, 0},
+    {"anon-port", 1, 0, 0},
+    {"x509-port", 1, 0, 0},
+    {"gpg-key-id", 2, 0, 0},
+    {"passphrase-gpg", 2, 0, 0},
+    {"gpg-passphrase", 0, 0, 0},
+    {"gpg-homedir", 1, 0, 0},
+    {"mysql-username", 1, 0, 0},
+    {"mysql-password-filename", 2, 0, 0},
+    {"listen-client-port", 2, 0, 0},
+    {"pull-request-interval", 2, 0, 0},
+    {"read-client-command-file", 1, 0, 0},
+    {0, 0, 0, 0}
+  };
+
+  int option_index = 0;
+
+  int this_option_optind = optind ? optind : 1;
+
+@q *** (3) Loop for handling options.@>
+@ Loop for handling options.
+\initials{LDF 2012.07.02.}
+
+@<|process_command_line_options| definition@>=
+
+  while (1) 
+  {
+
+@q **** (4) @>
+
+    option_ctr = getopt_long_only (argc,  
+                                   argv, "",
+                                   long_options, 
+                                   &option_index);
+#if DEBUG_COMPILE 
+    if (DEBUG)
+    {
+        lock_cerr_mutex();
+        cerr << "[Initial Thread] option_ctr == " << option_ctr << endl
+             << "option_index == " << option_index << endl;
+        unlock_cerr_mutex();
+
+        if (optarg)
+        {
+          lock_cerr_mutex();
+          cerr << "optarg == " << optarg << endl;
+          unlock_cerr_mutex();
+
+        }  /* |if (optarg)|  */
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+
+    if (option_ctr == -1)
+      {
+#if DEBUG_COMPILE 
+        if (DEBUG)
+        {
+           lock_cerr_mutex();
+           cerr << "[Initial Thread] No more option arguments." << endl;
+           unlock_cerr_mutex();
+        }
+#endif  /* |DEBUG_COMPILE|  */ 
+        break;
+      }
+
+@q **** (4) Option.  @>
+@ Option.  
+\initials{LDF 2008.09.09.}
+
+@<|process_command_line_options| definition@>=
+
+    else if (option_ctr == 0)
+    {
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE 
+      if (DEBUG)
+        {
+          lock_cerr_mutex();
+          cerr << "[Initial Thread] option " << long_options[option_index].name;
+
+          if (optarg)
+          {
+            cerr << " with arg " << optarg;
+          }
+
+          cerr << endl;
+          unlock_cerr_mutex();
+        }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) input-filename.  @>
+@ \.{input-filename}.
+\initials{LDF 2009.09.28.}
+
+\LOG
+\initials{LDF 2009.09.28.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        if (option_index == INPUT_FILENAME_INDEX)        
+        {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               lock_cerr_mutex();
+               cerr << "[Initial Thread] `option_index' "
+                    << "== `INPUT_FILENAME_INDEX'" 
+                    << endl;
+ 
+               if (optarg)
+                  cerr << "optarg == " << optarg << endl;
+               unlock_cerr_mutex();
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            input_filename = optarg;
+ 
+@q ****** (6) @>
+
+
+        } /* |if (option_index == INPUT_FILENAME_INDEX)|  */
+
+@q ***** (5) output-filename.@>
+
+@ \.{output-filename}.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == OUTPUT_FILENAME_INDEX)
+        {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               lock_cerr_mutex();
+               cerr << "[Initial Thread] `option_index' == "
+                    << "`OUTPUT_FILENAME_INDEX'" 
+                    << endl;
+ 
+               if (optarg)
+                  cerr << "optarg == " << optarg << endl;
+               unlock_cerr_mutex();
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            output_filename = optarg;
+
+            output_file_strm.open(output_filename.c_str());
+
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == OUTPUT_FILENAME_INDEX)|  */
+
+@q ***** (5) bison-trace or parser-trace.@>
+@ \.{bison-trace} or \.{parser-trace}.
+\initials{LDF 2012.07.02.}
+
+\setbox0=\hbox{$\le 0$}
+\vskip.5\baselineskip
+\noindent
+Optional arguments:
+\vskip.5\baselineskip
+\halign{\hbox to \wd0{\hss#}:\quad&#\hfil\cr
+\omit\hbox{None:\quad}&Debugging output automatically generated by Bison\cr
+\hbox{$\le 0$}&No debugging output\cr
+1&Programmed debugging output from actions only\cr
+\hbox{$>1$}&Automatically generated and programmed debugging output\cr
+\omit\hbox{Invalid (non-integer) argument:\quad}&No debugging output\cr
+}
+\noindent
+\initials{LDF 2012.07.02.}
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == BISON_TRACE_INDEX || option_index == PARSER_TRACE_INDEX)
+        {
+       
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+                lock_cerr_mutex();   
+                cerr << "[Initial Thread] `option_index' == `BISON_TRACE_INDEX' or " 
+                     << "`PARSER_TRACE_INDEX'."
+                     << endl;
+                unlock_cerr_mutex();
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            if (optarg == 0 || (strlen(optarg) > 0 && atoi(optarg) > 1))
+            {
+                xxdebug = 1;
+                yydebug = 1;
+                zzdebug = 1;
+            }
+
+            if (optarg && strlen(optarg) > 0 && atoi(optarg) >= 1)
+                parser_trace = true;
+            
+
+        } /* |else if (   option_index == BISON_TRACE_INDEX 
+                       || option_index == PARSER_TRACE_INDEX)|  */
+
+@q ***** (5) flex-trace.@>
+@ \.{flex-trace}.
+\initials{LDF 2012.07.02.}
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == FLEX_TRACE_INDEX || option_index == SCANNER_TRACE_INDEX)
+        {
+       
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+                lock_cerr_mutex();   
+                cerr << "[Initial Thread] `option_index' == `FLEX_TRACE_INDEX' or "
+                     << "`SCANNER_TRACE_INDEX'."
+                     << endl
+                     << "Setting `scanner_trace' to `true'." 
+                     << endl;
+                unlock_cerr_mutex();
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            scanner_trace = true;
+
+        } /* |else if (   option_index == FLEX_TRACE_INDEX 
+                       || option_index == SCANNER_TRACE_INDEX)|  */
+
+@q ***** (5) save-temp-files.@>
+@ \.{save-temp-files}.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this section.
+\ENDLOG
+
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == SAVE_TEMP_FILES_INDEX)
+        {
+       
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+                lock_cerr_mutex();   
+                cerr << "[Initial Thread] `option_index' == `SAVE_TEMP_FILES_INDEX'" 
+                     << endl;
+                unlock_cerr_mutex();
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            save_temp_files = true;
+
+        } /* |else if (option_index == SAVE_TEMP_FILES_INDEX)|  */
+
+@q ***** (5) cert-filename.  @>
+@ \.{cert-filename}.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == CERT_FILENAME_INDEX)        
+        {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               lock_cerr_mutex();
+               cerr << "[Initial Thread] `option_index' "
+                    << "== `CERT_FILENAME_INDEX'" 
+                    << endl;
+ 
+               if (optarg)
+                  cerr << "optarg == " << optarg << endl;
+               unlock_cerr_mutex();
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            if (optarg) 
+            {
+               cert_filenames.push_back(optarg);
+            }
+
+@q ****** (6) @>
+
+@ This code won't be reached, because the missing argument will cause 
+|option_index| to have the value |'?'| (ambiguous match).
+\initials{LDF 2012.07.02.}
+
+@<|process_command_line_options| definition@>=
+
+            else
+            {
+               lock_cerr_mutex();
+               cerr << "[Initial Thread] WARNING!  In `process_command_line_options':"
+                    << endl 
+                    << "Option `--cert-filenames' requires an argument."
+                    << endl 
+                    << "Continuing."
+                    << endl;
+               unlock_cerr_mutex(); 
+            }
+ 
+@q ****** (6) @>
+
+
+        } /* |else if (option_index == CERT_FILENAME_INDEX)|  */
+
+@q ***** (5) key-filename.  @>
+@ \.{key-filename}.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == KEY_FILENAME_INDEX)        
+        {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               lock_cerr_mutex();
+               cerr << "[Initial Thread] `option_index' "
+                    << "== `KEY_FILENAME_INDEX'" 
+                    << endl;
+ 
+               if (optarg)
+                  cerr << "optarg == " << optarg << endl;
+               unlock_cerr_mutex();
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+            if (optarg) 
+            {
+               key_filenames.push_back(optarg);
+            }
+
+@q ****** (6) @>
+
+@ This code won't be reached, because the missing argument will cause 
+|option_index| to have the value |'?'| (ambiguous match).
+\initials{LDF 2012.07.02.}
+
+@<|process_command_line_options| definition@>=
+
+            else
+            {
+               lock_cerr_mutex();
+               cerr << "[Initial Thread] WARNING!  In `process_command_line_options':"
+                    << endl 
+                    << "Option `--key-filenames' requires an argument."
+                    << endl 
+                    << "Continuing."
+                    << endl;
+               unlock_cerr_mutex(); 
+            }
+ 
+@q ****** (6) @>
+
+
+        } /* |else if (option_index == KEY_FILENAME_INDEX)|  */
+
+@q ***** (5) ca-filename.  @>
+@ \.{ca-filename}.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == CA_FILENAME_INDEX)        
+        {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               lock_cerr_mutex();
+               cerr << "[Initial Thread] `option_index' "
+                    << "== `CA_FILENAME_INDEX'" 
+                    << endl;
+ 
+               if (optarg)
+                  cerr << "optarg == " << optarg << endl;
+               unlock_cerr_mutex();
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            ca_filenames.push_back(optarg);
+
+
+        } /* |else if (option_index == CA_FILENAME_INDEX)|  */
+
+@q ***** (5) crl-filename.  @>
+@ \.{crl-filename}.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == CRL_FILENAME_INDEX)        
+        {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               lock_cerr_mutex();
+               cerr << "[Initial Thread] `option_index' "
+                    << "== `CRL_FILENAME_INDEX'" 
+                    << endl;
+ 
+               if (optarg)
+                  cerr << "optarg == " << optarg << endl;
+               unlock_cerr_mutex();
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+ 
+@q ****** (6) @>
+
+
+        } /* |else if (option_index == CRL_FILENAME_INDEX)|  */
+
+@q ***** (5) cert-format.  @>
+@ \.{cert-format}.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == CERT_FORMAT_INDEX)        
+        {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               lock_cerr_mutex();
+               cerr << "[Initial Thread] `option_index' "
+                    << "== `CERT_FORMAT_INDEX'" 
+                    << endl;
+ 
+               if (optarg)
+                  cerr << "optarg == " << optarg << endl;
+               unlock_cerr_mutex();
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+ 
+@q ****** (6) @>
+
+
+        } /* |else if (option_index == CERT_FORMAT_INDEX)|  */
+
+@q ***** (5) log-filename.  @>
+@ \.{log-filename}.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == LOG_FILENAME_INDEX)
+        {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               lock_cerr_mutex();
+               cerr << "[Initial Thread] `option_index' "
+                    << "== `LOG_FILENAME_INDEX'." 
+                    << endl;
+               unlock_cerr_mutex();
+
+            } /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            log_filename = optarg;
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == LOG_FILENAME_INDEX)|  */
+
+
+@q ***** (5) error-log-filename.  @>
+@ \.{error-log-filename}.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == ERR_LOG_FILENAME_INDEX)
+        {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               lock_cerr_mutex();
+               cerr << "[Initial Thread] `option_index' "
+                    << "== `ERR_LOG_FILENAME_INDEX'." 
+                    << endl;
+               unlock_cerr_mutex();
+
+            } /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            err_log_filename = optarg;
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == ERR_LOG_FILENAME_INDEX)|  */
+
+@q ***** (5) session-id.  @>
+@ \.{session-id}.
+\initials{LDF 2012.07.02.}
+
+|session_id| is only set by means of a command-line option for the client.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == SESSION_ID_INDEX)        
+        {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               lock_cerr_mutex();
+               cerr << "[Initial Thread] `option_index' "
+                    << "== `SESSION_ID_INDEX'" 
+                    << endl;
+               unlock_cerr_mutex();
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            session_id = optarg;
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+                lock_cerr_mutex(); 
+                cerr << "`session_id' == " << session_id
+                     << endl;
+                unlock_cerr_mutex(); 
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == SESSION_ID_INDEX)|  */
+
+@q ***** (5) help.  @>
+@ \.{help}.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == HELP_INDEX)        
+        {
+
+@q ****** (6) @>
+
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               lock_cerr_mutex();
+               cerr << "[Initial Thread] `option_index' "
+                    << "== `HELP_INDEX'" 
+                    << endl;
+               unlock_cerr_mutex();
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            /* !! TODO: LDF 2012.01.10.  Add explanatory text.  */
+
+@q ****** (6) @>
+
+            lock_cout_mutex(); 
+            cout << "Usage:  optdbcli [OPTION] ..." 
+                 << endl;
+            unlock_cout_mutex(); 
+
+
+@q ****** (6) @>
+@ @:TODO@> !! TODO:  Add |atexit| for destroying mutexes, closing 
+output files, etc.
+\initials{LDF 2012.07.02.}
+
+@<|process_command_line_options| definition@>=
+
+            exit(0);
+
+        } /* |else if (option_index == HELP_INDEX)|  */
+
+@q ***** (5) trace.  @>
+@ \.{trace}.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == TRACE_INDEX)        
+        {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               lock_cerr_mutex();
+               cerr << "[Initial Thread] `option_index' "
+                    << "== `TRACE_INDEX'" 
+                    << endl;
+
+               if(optarg)
+                  cerr << "optarg == " << optarg << endl;
+               else
+                  cerr << "No argument." << endl;
+
+               unlock_cerr_mutex();
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+ 
+            bool invalid_arg = false;
+
+
+            if (optarg)
+            {
+
+                if (!(isdigit(optarg[0]) || optarg[0] == '-'))
+                  invalid_arg = true;
+
+                else
+                {
+                    for (int i = 1; i < strlen(optarg); ++i)
+                    {
+                        if (!isdigit(optarg[i]))
+                        {
+                            invalid_arg = true;
+                            break;
+                        }
+                        
+                    }  /* |for|  */
+
+                }  /* |else|  */
+
+            }  /* |if|  */
+
+
+            if (optarg && !invalid_arg)
+            {
+                errno = 0;
+                trace_value = strtol(optarg, 0, 10);
+
+
+            }
+
+            if (optarg && (invalid_arg || errno != 0 || trace_value == LONG_MAX  
+                || trace_value == LONG_MIN))
+            {
+
+            
+
+                lock_cerr_mutex(); 
+                cerr << "WARNING!  In `process_command_line_options':"
+                     << endl
+                     << "Invalid argument to `trace' option:  " << optarg
+                     << endl;
+
+
+                if (errno != 0)
+                {
+                    cerr << "errno == " << errno << endl;
+                    perror("strtol error");
+                }
+
+                cerr << "Setting `trace_value' to 0 and continuing."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                trace_value = 0;
+            
+            }  /* |if|  */
+
+
+            if (!optarg)
+                trace_value = 1;
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "trace_value == " << trace_value << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */
+               
+        }  /* |else if (option_index == TRACE_INDEX)|  */
+
+@q ***** (5) version.  @>
+@ \.{version}.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == VERSION_INDEX)        
+        {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG) 
+            {
+               lock_cerr_mutex();
+               cerr << "[Initial Thread] `option_index' "
+                    << "== `VERSION_INDEX'" 
+                    << endl;
+               unlock_cerr_mutex();
+            }
+#endif  /* |DEBUG_COMPILE|  */
+
+            lock_cout_mutex(); 
+            cout << "gwirdsif 1.0"
+                    << endl
+                    << "GWDG IRODS Interface Server"
+                    << endl
+                    << "Author:  Laurence D. Finston"
+                    << endl 
+                    << "Copyright (C) 2014 Gesellschaft fuer wissenschaftliche "
+                    << "Datenverarbeitung mbH "
+                    << "Goettingen"
+                    << endl;
+            unlock_cout_mutex(); 
+
+            exit(0);
+
+        }  /* |else if (option_index == VERSION_INDEX)|  */
+
+
+@q ***** (5) i-commands and icommands.  @>
+@ \.{i-commands} and \.{icommands}.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == I_COMMANDS_INDEX || option_index == ICOMMANDS_INDEX)        
+        {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG) 
+            {
+               lock_cerr_mutex();
+               cerr << "[Initial Thread] `option_index' "
+                    << "== `I_COMMANDS_INDEX' or `ICOMMANDS_INDEX'." 
+                    << endl
+                    << "Setting `icommands' to `true'."
+                    << endl;
+               unlock_cerr_mutex();
+            }
+#endif  /* |DEBUG_COMPILE|  */
+
+            icommands       = true;
+            jargon_trunk    = false;
+            jargon_core     = false;
+            irods_functions = false;
+
+        } /* |else if (option_index == I_COMMANDS_INDEX || option_index == ICOMMANDS_INDEX)|  */
+
+
+@q ***** (5) jargon-trunk.  @>
+@ \.{jargon-trunk}.
+\initials{LDF 2012.07.03.}
+
+\LOG
+\initials{LDF 2012.07.03.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == JARGON_TRUNK_INDEX)        
+        {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG) 
+            {
+               lock_cerr_mutex();
+               cerr << "[Initial Thread] `option_index' "
+                    << "== `JARGON_TRUNK_INDEX'." 
+                    << endl
+                    << "Setting `jargon_trunk' to `true'."
+                    << endl;
+               unlock_cerr_mutex();
+            }
+#endif  /* |DEBUG_COMPILE|  */
+
+            jargon_trunk    = true;
+            jargon_core     = false;
+            icommands       = false;
+            irods_functions = false;
+
+        } /* |else if (option_index == JARGON_TRUNK_INDEX)|  */
+
+
+@q ***** (5) jargon-core.  @>
+@ \.{jargon-core}.
+\initials{LDF 2012.07.03.}
+
+\LOG
+\initials{LDF 2012.07.03.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == JARGON_CORE_INDEX)        
+        {
+
+@q ****** (6) @>
+
+
+#if DEBUG_COMPILE
+            if (DEBUG) 
+            {
+               lock_cerr_mutex();
+               cerr << "[Initial Thread] `option_index' "
+                    << "== `JARGON_CORE_INDEX'." 
+                    << endl
+                    << "Setting `jargon_core' to `true'."
+                    << endl;
+               unlock_cerr_mutex();
+            }
+#endif  /* |DEBUG_COMPILE|  */
+
+            jargon_core     = true;
+            jargon_trunk    = false;
+            icommands       = false;
+            irods_functions = false;
+
+        } /* |else if (option_index == JARGON_CORE_INDEX)|  */
+
+
+@q ***** (5) remote-hostname.  @>
+@ \.{remote-hostname}.
+\initials{LDF 2012.09.20.}
+
+\LOG
+\initials{LDF 2012.09.20.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == REMOTE_HOSTNAME_INDEX)        
+        {
+
+@q ****** (6) @>
+
+              if (is_gwirdcli || is_gwirdpcl)
+              {
+                 remote_hostname = optarg;
+                 remote_connection = true;
+
+#if DEBUG_COMPILE
+                 if (DEBUG)
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << "[Thread 0] In `process_command_line_options':  "
+                          << "`option_index' "
+                          << "== `REMOTE_HOSTNAME_INDEX'." 
+                          << endl
+                          << "Set `remote_hostname' to `"  << remote_hostname << "'."
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                 }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             }  /* |if (is_gwirdcli || is_gwirdpcl)|  */
+
+             else
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                      << endl 
+                      << "Option `--remote-hostname' is only used by the client program "
+                      << "`gwirdcli'."
+                      << endl
+                      << "Continuing."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else|  */
+
+        } /* |else if (option_index == REMOTE_HOSTNAME_INDEX)|  */
+
+@q ***** (5) anonymous.  @>
+@ \.{anonymous}.
+\initials{LDF 2012.09.21.}
+
+\LOG
+\initials{LDF 2012.09.21.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == ANONYMOUS_INDEX)        
+        {
+
+@q ****** (6) @>
+
+              if (is_gwirdcli || is_gwirdpcl)
+              {
+                 anonymous = true;
+
+#if DEBUG_COMPILE
+                 if (DEBUG)
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << "[Thread 0] In `process_command_line_options':  "
+                          << "`option_index' "
+                          << "== `ANONYMOUS_INDEX'." 
+                          << endl
+                          << "Set `anonymous' to `true'."
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                 }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             }  /* |if (is_gwirdcli || is_gwirdpcl)|  */
+
+             else
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                      << endl 
+                      << "Option `--anonymous' is only used by the client program "
+                      << "`gwirdcli'."
+                      << endl
+                      << "Continuing."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else|  */
+
+        } /* |else if (option_index == ANONYMOUS_INDEX)|  */
+
+@q ***** (5) standalone-handle.  @>
+@ \.{standalone-handle}.
+\initials{LDF 2012.10.15.}
+
+\LOG
+\initials{LDF 2012.10.15.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == STANDALONE_HANDLE_INDEX)        
+        {
+
+@q ****** (6) @>
+
+              if (is_gwirdsif)
+              {
+                 standalone_handle = true;
+
+#if DEBUG_COMPILE
+                 if (DEBUG)
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << "[Thread 0] In `process_command_line_options':  "
+                          << "`option_index' "
+                          << "== `STANDALONE_HANDLE_INDEX'." 
+                          << endl
+                          << "Set `standalone_handle' to `true'."
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                 }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             }  /* |if (is_gwirdsif)|  */
+
+             else
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                      << endl 
+                      << "Option `--standalone_handle' is only used by the server program "
+                      << "`gwirdsif'."
+                      << endl
+                      << "Continuing."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else|  */
+
+        } /* |else if (option_index == STANDALONE_HANDLE_INDEX)|  */
+
+@q ***** (5) end-server-enable.  @>
+@ \.{end-server-enable}.
+\initials{LDF 2013.04.03.}
+
+\LOG
+\initials{LDF 2013.04.03.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == END_SERVER_ENABLE_INDEX)        
+        {
+
+@q ****** (6) @>
+
+              if (is_gwirdsif)
+              {
+                 end_server_enabled = true;
+
+#if DEBUG_COMPILE
+                 if (DEBUG)
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << "[Thread 0] In `process_command_line_options':  "
+                          << "`option_index' "
+                          << "== `END_SERVER_ENABLE_INDEX'." 
+                          << endl
+                          << "Set `end_server_enabled' to `true'."
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                 }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             }  /* |if (is_gwirdsif)|  */
+
+             else
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                      << endl 
+                      << "Option `--end-server-enable' is only used by the server program "
+                      << "`gwirdsif'."
+                      << endl
+                      << "Continuing."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else|  */
+
+        } /* |else if (option_index == END_SERVER_ENABLE_INDEX)|  */
+
+@q ***** (5) sleep-server-enable.  @>
+@ \.{sleep-server-enable}.
+\initials{LDF 2013.05.02.}
+
+\LOG
+\initials{LDF 2013.05.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == SLEEP_SERVER_ENABLE_INDEX)        
+        {
+
+@q ****** (6) @>
+
+              if (is_gwirdsif)
+              {
+                 sleep_server_enabled = true;
+
+#if DEBUG_COMPILE
+                 if (DEBUG)
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << "[Thread 0] In `process_command_line_options':  "
+                          << "`option_index' "
+                          << "== `SLEEP_SERVER_ENABLE_INDEX'." 
+                          << endl
+                          << "Set `sleep_server_enabled' to `true'."
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                 }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             }  /* |if (is_gwirdsif)|  */
+
+             else
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                      << endl 
+                      << "Option `--sleep-server-enable' is only used by the server program "
+                      << "`gwirdsif'."
+                      << endl
+                      << "Continuing."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else|  */
+
+        } /* |else if (option_index == SLEEP_SERVER_ENABLE_INDEX)|  */
+
+@q ***** (5) sleep-server-disable.  @>
+@ \.{sleep-server-disable}.
+\initials{LDF 2013.05.02.}
+
+\LOG
+\initials{LDF 2013.05.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == SLEEP_SERVER_DISABLE_INDEX)        
+        {
+
+@q ****** (6) @>
+
+              if (is_gwirdsif)
+              {
+                 sleep_server_enabled = false;
+
+#if DEBUG_COMPILE
+                 if (DEBUG)
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << "[Thread 0] In `process_command_line_options':  "
+                          << "`option_index' "
+                          << "== `SLEEP_SERVER_DISABLE_INDEX'." 
+                          << endl
+                          << "Set `sleep_server_enabled' to `false'."
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                 }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             }  /* |if (is_gwirdsif)|  */
+
+             else
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                      << endl 
+                      << "Option `--sleep-server-disable' is only used by the server program "
+                      << "`gwirdsif'."
+                      << endl
+                      << "Continuing."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else|  */
+
+        } /* |else if (option_index == SLEEP_SERVER_DISABLE_INDEX)|  */
+
+@q ***** (5) sleep-client-enable.  @>
+@ \.{sleep-client-enable}.
+\initials{LDF 2013.05.02.}
+
+\LOG
+\initials{LDF 2013.05.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == SLEEP_CLIENT_ENABLE_INDEX)        
+        {
+
+@q ****** (6) @>
+
+             sleep_client_enabled = true;
+
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] In `process_command_line_options':  "
+                      << "`option_index' "
+                      << "== `SLEEP_CLIENT_ENABLE_INDEX'." 
+                      << endl
+                      << "Set `sleep_client_enabled' to `true'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+        } /* |else if (option_index == SLEEP_CLIENT_ENABLE_INDEX)|  */
+
+@q ***** (5) sleep-client-disable.  @>
+@ \.{sleep-client-disable}.
+\initials{LDF 2013.05.02.}
+
+\LOG
+\initials{LDF 2013.05.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == SLEEP_CLIENT_DISABLE_INDEX)        
+        {
+
+@q ****** (6) @>
+
+             sleep_client_enabled = false;
+
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] In `process_command_line_options':  "
+                      << "`option_index' "
+                      << "== `SLEEP_CLIENT_DISABLE_INDEX'." 
+                      << endl
+                      << "Set `sleep_client_enabled' to `false'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+        } /* |else if (option_index == SLEEP_CLIENT_DISABLE_INDEX)|  */
+
+
+
+
+
+@q ***** (5) signal-server-enable.  @>
+@ \.{signal-server-enable}.
+\initials{LDF 2013.05.02.}
+
+\LOG
+\initials{LDF 2013.05.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == SIGNAL_SERVER_ENABLE_INDEX)        
+        {
+
+@q ****** (6) @>
+
+              if (is_gwirdsif)
+              {
+                 signal_server_enabled = true;
+
+#if DEBUG_COMPILE
+                 if (DEBUG)
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << "[Thread 0] In `process_command_line_options':  "
+                          << "`option_index' "
+                          << "== `SIGNAL_SERVER_ENABLE_INDEX'." 
+                          << endl
+                          << "Set `signal_server_enabled' to `true'."
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                 }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             }  /* |if (is_gwirdsif)|  */
+
+             else
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                      << endl 
+                      << "Option `--signal-server-enable' is only used by the server program "
+                      << "`gwirdsif'."
+                      << endl
+                      << "Continuing."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else|  */
+
+        } /* |else if (option_index == SIGNAL_SERVER_ENABLE_INDEX)|  */
+
+@q ***** (5) signal-server-disable.  @>
+@ \.{signal-server-disable}.
+\initials{LDF 2013.05.02.}
+
+\LOG
+\initials{LDF 2013.05.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == SIGNAL_SERVER_DISABLE_INDEX)        
+        {
+
+@q ****** (6) @>
+
+              if (is_gwirdsif)
+              {
+                 signal_server_enabled = false;
+
+#if DEBUG_COMPILE
+                 if (DEBUG)
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << "[Thread 0] In `process_command_line_options':  "
+                          << "`option_index' "
+                          << "== `SIGNAL_SERVER_DISABLE_INDEX'." 
+                          << endl
+                          << "Set `signal_server_enabled' to `false'."
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                 }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             }  /* |if (is_gwirdsif)|  */
+
+             else
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                      << endl 
+                      << "Option `--signal-server-disable' is only used by the server program "
+                      << "`gwirdsif'."
+                      << endl
+                      << "Continuing."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else|  */
+
+        } /* |else if (option_index == SIGNAL_SERVER_DISABLE_INDEX)|  */
+
+@q ***** (5) signal-client-enable.  @>
+@ \.{signal-client-enable}.
+\initials{LDF 2013.05.02.}
+
+\LOG
+\initials{LDF 2013.05.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == SIGNAL_CLIENT_ENABLE_INDEX)        
+        {
+
+@q ****** (6) @>
+
+             signal_client_enabled = true;
+
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] In `process_command_line_options':  "
+                      << "`option_index' "
+                      << "== `SIGNAL_CLIENT_ENABLE_INDEX'." 
+                      << endl
+                      << "Set `signal_client_enabled' to `true'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        } /* |else if (option_index == SIGNAL_CLIENT_ENABLE_INDEX)|  */
+
+
+
+@q ***** (5) signal-client-disable.  @>
+@ \.{signal-client-disable}.
+\initials{LDF 2013.05.02.}
+
+\LOG
+\initials{LDF 2013.05.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == SIGNAL_CLIENT_DISABLE_INDEX)        
+        {
+
+@q ****** (6) @>
+
+             signal_client_enabled = false;
+
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] In `process_command_line_options':  "
+                      << "`option_index' "
+                      << "== `SIGNAL_CLIENT_DISABLE_INDEX'." 
+                      << endl
+                      << "Set `signal_client_enabled' to `false'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        } /* |else if (option_index == SIGNAL_CLIENT_DISABLE_INDEX)|  */
+
+
+@q ***** (5) server-test-enable.  @>
+@ \.{server-test-enable}.
+\initials{LDF 2013.04.19.}
+
+\LOG
+\initials{LDF 2013.04.19.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == SERVER_TEST_ENABLE_INDEX)        
+        {
+
+@q ****** (6) @>
+
+              if (is_gwirdsif)
+              {
+                  end_server_enabled    = true;
+                  sleep_server_enabled  = true;
+                  signal_server_enabled = true;
+                  signal_client_enabled = true;
+
+#if DEBUG_COMPILE
+                 if (DEBUG)
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << "[Thread 0] In `process_command_line_options':  "
+                          << "`option_index' "
+                          << "== `SERVER_TEST_ENABLE_INDEX'." 
+                          << endl
+                          << "Set `end_server_enabled' and `sleep_server_enabled' to `true'."
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                 }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             }  /* |if (is_gwirdsif)|  */
+
+             else
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                      << endl 
+                      << "Option `--server-test-enable' is only used by the server program "
+                      << "`gwirdsif'."
+                      << endl
+                      << "Continuing."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else|  */
+
+        } /* |else if (option_index == SERVER_TEST_ENABLE_INDEX)|  */
+
+@q ***** (5) server-test-disable.  @>
+@ \.{server-test-disable}.
+\initials{LDF 2013.05.02.}
+
+\LOG
+\initials{LDF 2013.05.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == SERVER_TEST_DISABLE_INDEX)        
+        {
+
+@q ****** (6) @>
+
+              if (is_gwirdsif)
+              {
+                  end_server_enabled    = false;
+                  sleep_server_enabled  = false;
+                  signal_server_enabled = false;
+                  signal_client_enabled = false;
+
+#if DEBUG_COMPILE
+                 if (DEBUG)
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << "[Thread 0] In `process_command_line_options':  "
+                          << "`option_index' "
+                          << "== `SERVER_TEST_DISABLE_INDEX'." 
+                          << endl
+                          << "Set `end_server_enabled', `sleep_server_enabled', "
+                          << "`signal_server_enabled' and `signal_client_enabled' to `false'."
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                 }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             }  /* |if (is_gwirdsif)|  */
+
+             else
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                      << endl 
+                      << "Option `--server-test-disable' is only used by the server program "
+                      << "`gwirdsif'."
+                      << endl
+                      << "Continuing."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else|  */
+
+        } /* |else if (option_index == SERVER_TEST_DISABLE_INDEX)|  */
+
+
+@q ***** (5) client-test-enable.  @>
+@ \.{client-test-enable}.
+\initials{LDF 2013.05.02.}
+
+\LOG
+\initials{LDF 2013.05.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == CLIENT_TEST_ENABLE_INDEX)        
+        {
+@q ****** (6) @>
+
+             sleep_client_enabled = signal_client_enabled = true;
+
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] In `process_command_line_options':  "
+                      << "`option_index' "
+                      << "== `CLIENT_TEST_ENABLE_INDEX'." 
+                      << endl
+                      << "Set `sleep_client_enabled' and `signal_client_enabled' to `true'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        } /* |else if (option_index == CLIENT_TEST_ENABLE_INDEX)|  */
+
+@q ***** (5) client-test-disable.  @>
+@ \.{client-test-disable}.
+\initials{LDF 2013.05.02.}
+
+\LOG
+\initials{LDF 2013.05.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == CLIENT_TEST_DISABLE_INDEX)        
+        {
+@q ****** (6) @>
+
+             signal_client_enabled = false;
+
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] In `process_command_line_options':  "
+                      << "`option_index' "
+                      << "== `CLIENT_TEST_DISABLE_INDEX'." 
+                      << endl
+                      << "Set `signal_client_enabled' to `false'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        } /* |else if (option_index == CLIENT_TEST_DISABLE_INDEX)|  */
+
+@q ***** (5) purge-logs-interval.  @>
+@ \.{purge-logs-interval}.
+\initials{LDF 2013.04.09.}
+
+\LOG
+\initials{LDF 2013.04.09.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == PURGE_LOGS_INTERVAL_INDEX)        
+        {
+@q ****** (6) @>
+
+             errno = 0;
+          
+             unsigned long temp_val = strtoul(optarg, 0, 10);
+
+             if (temp_val == ULONG_MAX || temp_val > UINT_MAX)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "ERROR!  In `process_command_line_options':"
+                      << endl 
+                      << "Invalid argument to `--purge-logs-interval-index' option:  "
+                      << optarg
+                      << endl 
+                      << "Not resetting `purge_logs_interval' from default value == " 
+                      << purge_logs_interval 
+                      << endl
+                      << "(" << (purge_logs_interval / (24 * 60 * 60)) << " day(s))"
+                      << endl 
+                      << "Continuing."
+                       << endl;
+                 unlock_cerr_mutex(); 
+
+
+             }  /* |if (temp_val == ULONG_MAX || temp_val > UINT_MAX)|  */
+
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2013.04.17.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+             else if (temp_val == 0UL)
+             {
+                 lock_cout_mutex(); 
+                 lock_cerr_mutex(); 
+                 cout << "Disabling \"purge\" for server logs:  "
+                      << "Will not start thread running `purge_server_logs'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+                 unlock_cout_mutex(); 
+
+                 purge_logs_interval = 0UL;
+
+             }  /* |if (temp_val == 0UL)|  */
+
+
+@q ****** (6) @>
+
+             else
+             {
+                  purge_logs_interval 
+                     = static_cast<unsigned int>(temp_val) * (24 * 60 * 60);
+
+#if DEBUG_COMPILE
+                  if (DEBUG)
+                  {
+                      lock_cerr_mutex(); 
+                      cerr << "[Thread 0] In `process_command_line_options':  "
+                           << "`option_index' "
+                           << "== `PURGE_LOGS_INTERVAL_INDEX'." 
+                           << endl
+                           << "Set `purge_logs_interval' to " << purge_logs_interval << " seconds "
+                           << "(" << (purge_logs_interval / (24 * 60 * 60)) << " day(s))"
+                           << endl;
+                      unlock_cerr_mutex(); 
+
+                  }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             }  /* |else|  */
+         
+@q ****** (6) @>
+
+        } /* |else if (option_index == PURGE_LOGS_INTERVAL_INDEX)|  */
+
+@q ***** (5) purge-logs-interval-seconds.  @>
+@ \.{purge-logs-interval-seconds}.
+\initials{LDF 2013.04.25.}
+
+\LOG
+\initials{LDF 2013.04.25.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == PURGE_LOGS_INTERVAL_SECONDS_INDEX)        
+        {
+@q ****** (6) @>
+
+             errno = 0;
+          
+             unsigned long temp_val = strtoul(optarg, 0, 10);
+
+             if (temp_val == ULONG_MAX || temp_val > UINT_MAX)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "ERROR!  In `process_command_line_options':"
+                      << endl 
+                      << "Invalid argument to `--purge-logs-interval-seconds-index' option:  "
+                      << optarg
+                      << endl 
+                      << "Not resetting `purge_logs_interval' from default value == " 
+                      << purge_logs_interval << " seconds."
+                      << endl 
+                      << "Continuing."
+                       << endl;
+                 unlock_cerr_mutex(); 
+
+
+             }  /* |if (temp_val == ULONG_MAX || temp_val > UINT_MAX)|  */
+
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2013.04.17.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+             else if (temp_val == 0UL)
+             {
+                 lock_cout_mutex(); 
+                 lock_cerr_mutex(); 
+                 cout << "Disabling \"purge\" for server logs:  "
+                      << "Will not start thread running `purge_server_logs'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+                 unlock_cout_mutex(); 
+
+                 purge_logs_interval = 0UL;
+
+             }  /* |if (temp_val == 0UL)|  */
+
+
+@q ****** (6) @>
+
+             else
+             {
+                  purge_logs_interval 
+                     = static_cast<unsigned int>(temp_val);
+
+#if DEBUG_COMPILE
+                  if (DEBUG)
+                  {
+                      lock_cerr_mutex(); 
+                      cerr << "[Thread 0] In `process_command_line_options':  "
+                           << "`option_index' "
+                           << "== `PURGE_LOGS_INTERVAL_SECONDS_INDEX'." 
+                           << endl
+                           << "Set `purge_logs_interval' to " << purge_logs_interval << " seconds "
+                           << "(" << (purge_logs_interval / (24 * 60 * 60)) << " day(s))"
+                           << endl;
+                      unlock_cerr_mutex(); 
+
+                  }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             }  /* |else|  */
+         
+@q ****** (6) @>
+
+        } /* |else if (option_index == PURGE_LOGS_INTERVAL_SECONDS_INDEX)|  */
+
+
+@q ***** (5) purge-logs-limit.  @>
+@ \.{purge-logs-limit}.
+\initials{LDF 2013.04.19.}
+
+\LOG
+\initials{LDF 2013.04.19.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == PURGE_LOGS_LIMIT_INDEX)        
+        {
+@q ****** (6) @>
+
+             errno = 0;
+          
+             unsigned long temp_val = strtoul(optarg, 0, 10);
+
+             if (temp_val == ULONG_MAX || temp_val > UINT_MAX)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "ERROR!  In `process_command_line_options':"
+                      << endl 
+                      << "Invalid argument to `--purge-logs-limit-index' option:  "
+                      << optarg
+                      << endl 
+                      << "Not resetting `purge_logs_limit' from default value == " 
+                      << purge_logs_limit << "."
+                      << endl 
+                      << "Continuing."
+                       << endl;
+                 unlock_cerr_mutex(); 
+
+
+             }  /* |if (temp_val == ULONG_MAX || temp_val > UINT_MAX)|  */
+
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2013.04.17.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+             else if (temp_val == 0UL)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "ERROR!  In `process_command_line_options':"
+                      << endl 
+                      << "Invalid argument to `--purge-logs-limit-index' option:  0"
+                      << endl 
+                      << "`purge_logs_limit' should not be set to 0."
+                      << endl 
+                      << "Not resetting `purge_logs_limit' from default value == " 
+                      << purge_logs_limit << "."
+                      << endl 
+                      << "Continuing."
+                       << endl;
+                 unlock_cerr_mutex(); 
+
+
+             }  /* |if (temp_val == 0UL)|  */
+
+
+@q ****** (6) @>
+
+             else
+             {
+                  purge_logs_limit = static_cast<unsigned int>(temp_val);
+
+#if DEBUG_COMPILE
+                  if (DEBUG)
+                  {
+                      lock_cerr_mutex(); 
+                      cerr << "[Thread 0] In `process_command_line_options':  "
+                           << "`option_index' "
+                           << "== `PURGE_LOGS_LIMIT_INDEX'." 
+                           << endl
+                           << "Set `purge_logs_limit' to " << purge_logs_limit << "."
+                           << endl;
+                      unlock_cerr_mutex(); 
+
+                  }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             }  /* |else|  */
+         
+@q ****** (6) @>
+
+        } /* |else if (option_index == PURGE_LOGS_LIMIT_INDEX)|  */
+
+
+
+
+@q ***** (5) socket-directory.  @>
+@ \.{socket-directory}.
+\initials{LDF 2013.04.09.}
+
+\LOG
+\initials{LDF 2013.04.09.}
+Added this section.
+
+\initials{LDF 2013.04.11.}
+Added error-handling code.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == SOCKET_DIRECTORY_INDEX)
+        {
+@q ****** (6) @>
+
+            errno = 0;
+            temp_str = realpath(optarg, 0);
+
+            if (temp_str == 0)
+            {
+                 lock_cerr_mutex(); 
+                 cerr << "ERROR!  In `process_command_line_options':"
+                      << endl 
+                      << "Option `--socket-directory':"
+                      << endl 
+                      << "`realpath' failed to convert `optarg' == " 
+                      << "`" << optarg << "' to an absolute path:"
+                      << endl 
+                      << strerror(errno)
+                      << endl 
+                      << "Not setting `socket_dir'.  Will use default value == "
+                      << "`" << DEFAULT_SOCKET_DIRECTORY << "'."
+                      << endl 
+                      << "Continuing."
+                       << endl;
+                 unlock_cerr_mutex(); 
+
+            }
+            else  
+            {
+               socket_dir = temp_str;
+
+               pos = socket_dir.find(homedir);
+
+               if (socket_dir == "/tmp")
+               {
+
+                   socket_dir = "";
+
+#if DEBUG_COMPILE
+                   if (DEBUG)       
+                   {
+                       lock_cerr_mutex(); 
+                       cerr << "In `process_command_line_options':"
+                            << endl 
+                            << "Option `--socket-directory':"
+                            << endl 
+                            << "`socket_dir' == `/tmp'.  This is the default value."
+                            << endl
+                            << "Resetting `socket_dir' to the empty string here."
+                            << endl 
+                            << "It will be set in `main' (or by a following use of this option)."
+                            << endl 
+                            << "Continuing."
+                            << endl;
+                       unlock_cerr_mutex(); 
+
+                   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+               }
+               else if (pos == string::npos)
+               {
+
+                   lock_cerr_mutex(); 
+                   cerr << "ERROR!  In `process_command_line_options':"
+                        << endl 
+                        << "Option `--socket-directory':"
+                        << endl 
+                        << "`socket_dir' == `" << socket_dir << "' is not `/tmp' "
+                        << "and does not contain the current user's home directory:  "
+                        << "`" << homedir << "'."
+                        << endl 
+                        << "This isn't permitted."
+                        << endl 
+                        << "Resetting `socket_dir' to the empty string here."
+                        << endl 
+                        << "It will be set in `main' (or by a following use of this option)."
+                        << endl 
+                        << "Continuing."
+                        << endl;
+                   unlock_cerr_mutex(); 
+
+                   socket_dir = "";
+
+
+               }  /* |if (pos == string:npos)|  */
+               else
+               {
+
+#if DEBUG_COMPILE
+                   if (DEBUG)
+                   {
+                       lock_cerr_mutex(); 
+                       cerr << "[Thread 0] In `process_command_line_options':  "
+                            << "`option_index' "
+                            << "== `SOCKET_DIRECTORY_INDEX'." 
+                            << endl
+                            << "Set `socket_dir' to " << socket_dir 
+                            << endl;
+                       unlock_cerr_mutex(); 
+
+                   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+               }  /* |else|  */
+
+            }  /* |else|  */
+
+@q ****** (6) @>
+
+            temp_str = 0;
+
+        } /* |else if (option_index == SOCKET_DIRECTORY_INDEX)|  */
+
+@q ***** (5) log-directory.  @>
+@ \.{log-directory}.
+\initials{LDF 2013.04.09.}
+
+\LOG
+\initials{LDF 2013.04.09.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == LOG_DIRECTORY_INDEX)        
+        {
+@q ****** (6) @>
+
+            errno = 0;
+            temp_str = realpath(optarg, 0);
+
+            if (temp_str == 0)
+            {
+                 lock_cerr_mutex(); 
+                 cerr << "ERROR!  In `process_command_line_options':"
+                      << endl 
+                      << "Option `--log-directory':"
+                      << endl 
+                      << "`realpath' failed to convert `optarg' == " 
+                      << "`" << optarg << "' to an absolute path:"
+                      << endl 
+                      << strerror(errno)
+                      << endl 
+                      << "Not setting `log_dir'.  "
+                      << "It will be set in `main' (or by another use of this option)."
+                      << endl 
+                      << "Continuing."
+                       << endl;
+                 unlock_cerr_mutex(); 
+
+            }
+            else
+            {
+
+                log_dir = temp_str;
+
+                pos = log_dir.find(homedir);
+
+                if (pos == string::npos)
+                {
+
+                    lock_cerr_mutex(); 
+                    cerr << "WARNING!  In `process_command_line_options':"
+                         << endl 
+                         << "Option `--log-directory':"
+                         << endl 
+                         << "`log_dir' == `" << log_dir << "' doesn't contain "
+                         << "the current user's home directory "
+                         << "`" << homedir << "'."
+                         << endl 
+                         << "This isn't permitted.  Resetting `log_dir' to the empty string."
+                         << endl 
+                         << "It will be set in `main' (or by another use of this option)."
+                         << endl 
+                         << "Continuing."
+                          << endl;
+                    unlock_cerr_mutex(); 
+
+                    log_dir = "";
+
+                }  /* |if|  */
+    
+#if DEBUG_COMPILE
+                else if (DEBUG)
+                {
+                    lock_cerr_mutex(); 
+                    cerr << "[Thread 0] In `process_command_line_options':  "
+                         << "`option_index' "
+                         << "== `LOG_DIRECTORY_INDEX'." 
+                         << endl
+                         << "Set `log_dir' to " << log_dir << "."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            }  /* |else|  */
+
+
+@q ****** (6) @>
+
+            temp_str = 0;
+
+        } /* |else if (option_index == LOG_DIRECTORY_INDEX)|  */
+
+@q ***** (5) irods-server-directory.  @>
+@ \.{irods-server-directory}.
+\initials{LDF 2013.06.07.}
+
+\LOG
+\initials{LDF 2013.06.07.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == IRODS_SERVER_DIRECTORY_INDEX)        
+        {
+@q ****** (6) @>
+
+            errno = 0;
+            temp_str = realpath(optarg, 0);
+
+#if 0 
+            cerr << "temp_str == " << temp_str << endl;
+#endif 
+
+            if (temp_str == 0)
+            {
+                 lock_cerr_mutex(); 
+                 cerr << "ERROR!  In `process_command_line_options':"
+                      << endl 
+                      << "Option `--irods-server-directory':"
+                      << endl 
+                      << "`realpath' failed to convert `optarg' == " 
+                      << "`" << optarg << "' to an absolute path:"
+                      << endl 
+                      << strerror(errno)
+                      << endl 
+                      << "Not setting `irods_server_dir'.  "
+                      << "It will be set in `main' (or by another use of this option)."
+                      << endl 
+                      << "Continuing."
+                       << endl;
+                 unlock_cerr_mutex(); 
+
+            }
+            else
+            {
+
+                irods_server_dir = temp_str;
+
+#if DEBUG_COMPILE
+                if (DEBUG)
+                {
+                    lock_cerr_mutex(); 
+                    cerr << "[Thread 0] In `process_command_line_options':  "
+                         << "`option_index' "
+                         << "== `IRODS_SERVER_DIRECTORY_INDEX'." 
+                         << endl
+                         << "Set `irods_server_dir' to " << irods_server_dir << "."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            }  /* |else|  */
+
+@q ****** (6) @>
+
+            temp_str = 0;
+
+        } /* |else if (option_index == IRODS_SERVER_DIRECTORY_INDEX)|  */
+
+@q ***** (5) config-directory.  @>
+@ \.{config-directory}.
+\initials{LDF 2013.07.04.}
+
+\LOG
+\initials{LDF 2013.07.04.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == CONFIG_DIRECTORY_INDEX)        
+        {
+@q ****** (6) @>
+
+            errno = 0;
+            temp_str = realpath(optarg, 0);
+
+#if 0 
+            cerr << "temp_str == " << temp_str << endl;
+#endif 
+
+            if (temp_str == 0)
+            {
+                 lock_cerr_mutex(); 
+                 cerr << "ERROR!  In `process_command_line_options':"
+                      << endl 
+                      << "Option `--config-directory':"
+                      << endl 
+                      << "`realpath' failed to convert `optarg' == " 
+                      << "`" << optarg << "' to an absolute path:"
+                      << endl 
+                      << strerror(errno)
+                      << endl 
+                      << "Not setting `config_dir'.  "
+                      << "It will be set in `main' (or by another use of this option)."
+                      << endl 
+                      << "Continuing."
+                       << endl;
+                 unlock_cerr_mutex(); 
+
+            }
+            else
+            {
+
+                config_dir = temp_str;
+
+#if DEBUG_COMPILE
+                if (DEBUG)
+                {
+                    lock_cerr_mutex(); 
+                    cerr << "[Thread 0] In `process_command_line_options':  "
+                         << "`option_index' "
+                         << "== `CONFIG_DIRECTORY_INDEX'." 
+                         << endl
+                         << "Set `config_dir' to `" << config_dir << "'."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            }  /* |else|  */
+
+@q ****** (6) @>
+
+            temp_str = 0;
+
+        } /* |else if (option_index == CONFIG_DIRECTORY_INDEX)|  */
+
+@q ***** (5) terminate-on-end-input.  @>
+@ \.{terminate-on-end-input}.
+\initials{LDF 2013.07.10.}
+
+
+This option is used by \.{gwirdcli} only.  It sets the global variable 
+|bool terminate_on_end_input|.  It takes an optional argument.  If there is no
+argument, or if the argument is one of |"1"|, |"t"|, |"T"|, |"true"| or
+|"TRUE"|, |terminate_on_end_input| is set to |true|.  With any other argument,
+it's set to |false|.  Please note that |terminate_on_end_input| can be set to
+|false| more easily using the \.{--no-terminate-on-end-input} option, which
+doesn't take an argument (see below).
+\par
+This option should normally not be needed, because the default for
+|terminate_on_end_input| is |true|.  However, it can be used to reset it after
+having set it on the command-line by means of this option or
+\.{--no-terminate-on-end-input}.  The last use of either of these options on the
+command-line determines the value of |terminate_on_end_input|.
+\initials{LDF 2013.07.10.}
+
+\LOG
+\initials{LDF 2013.07.10.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == TERMINATE_ON_END_INPUT_INDEX)        
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+                if (DEBUG)
+                {
+                    lock_cerr_mutex(); 
+                    cerr << "[Thread 0] In `process_command_line_options':  "
+                         << "`option_index' "
+                         << "== `TERMINATE_ON_END_INPUT_INDEX'." 
+                         << endl
+                         << "Setting `terminate_on_end_input' to `false'."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+            if (   optarg == 0
+                || (   strcmp(optarg, "1")    == 0
+                    || strcmp(optarg, "t")    == 0
+                    || strcmp(optarg, "T")    == 0
+                    || strcmp(optarg, "true") == 0
+                    || strcmp(optarg, "TRUE") == 0))
+            {
+ 
+                terminate_on_end_input = true;
+            }
+            else
+               terminate_on_end_input = false;
+
+        } /* |else if (option_index == TERMINATE_ON_END_INPUT_INDEX)|  */
+
+@q ***** (5) no-terminate-on-end-input.  @>
+@ \.{no-terminate-on-end-input}.
+\initials{LDF 2013.07.10.}
+
+Unlike the \.{--terminate-on-end-input} (see above), this option takes no argument.
+\initials{LDF 2013.07.10.}
+
+\LOG
+\initials{LDF 2013.07.10.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == NO_TERMINATE_ON_END_INPUT_INDEX)        
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+                if (DEBUG)
+                {
+                    lock_cerr_mutex(); 
+                    cerr << "[Thread 0] In `process_command_line_options':  "
+                         << "`option_index' "
+                         << "== `NO_TERMINATE_ON_END_INPUT_INDEX'." 
+                         << endl
+                         << "Setting `terminate_on_end_input' to `false'."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+            terminate_on_end_input = false;
+
+        } /* |else if (option_index == NO_TERMINATE_ON_END_INPUT_INDEX)|  */
+
+@q ***** (5) commands.  @>
+@ \.{commands}.
+\initials{LDF 2013.07.11.}
+
+\LOG
+\initials{LDF 2013.07.11.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == COMMANDS_INDEX)        
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+                if (DEBUG)
+                {
+                    lock_cerr_mutex(); 
+                    cerr << "[Thread 0] In `process_command_line_options':  "
+                         << "`option_index' "
+                         << "== `COMMANDS_INDEX'." 
+                         << endl
+                         << "Setting `command_str'."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+               command_str += optarg;
+               command_str += " ";
+
+        } /* |else if (option_index == COMMANDS_INDEX)|  */
+
+
+@q ***** (5) purge-database-interval.  @>
+@ \.{purge-database-interval}.
+\initials{LDF 2013.07.15.}
+
+\LOG
+\initials{LDF 2013.07.15.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == PURGE_DATABASE_INTERVAL_INDEX)        
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE                 
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] In `process_command_line_options':  "
+                      << "`option_index' "
+                      << "== `PURGE_DATABASE_INTERVAL_INDEX'." 
+                      << endl
+                      << "Setting `purge_database_interval'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+             errno = 0;
+             unsigned long int temp_val = strtoul(optarg, 0, 10);
+
+             if (temp_val == ULONG_MAX)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING! In `process_command_line_options':  "
+                      << endl
+                      << "`strtol' failed, returning `ULONG_MAX':"
+                      << endl 
+                      << strerror(errno)
+                      << "Failed to convert `optarg' == " << "`" << optarg << "' "
+                      << "to an integer."
+                      << endl
+                      << "Not resetting `purge_database_interval'."
+                      << endl
+                      << "Will use default value == " 
+                      << purge_database_interval << "."
+                      << endl;
+                 unlock_cerr_mutex(); 
+                 
+             }
+             else if (temp_val == 0UL)
+             {
+                 lock_cout_mutex(); 
+                 lock_cerr_mutex(); 
+                 cout << "Disabling \"purge\" for server database:  "
+                      << "Will not start thread running `purge_database'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+                 unlock_cout_mutex(); 
+
+                 purge_database_interval = 0UL;
+
+             }  /* |if (temp_val == 0UL)|  */
+             else
+             {
+                    purge_database_interval = temp_val;
+             }      
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == PURGE_DATABASE_INTERVAL_INDEX)|  */
+
+
+@q ***** (5) purge-database-limit.  @>
+@ \.{purge-database-limit}.
+\initials{LDF 2013.07.15.}
+
+\LOG
+\initials{LDF 2013.07.15.}
+Added this section.
+
+\initials{LDF 2013.07.25.}
+Added code for ensuring that |purge_database_limit| is set to a reasonable value:
+If it's greater than or equal to the current time minus two days, a warning is issued 
+and |purge_database_limit| is not reset from its default value.  
+\par
+Since the value of |purge_database_limit| is subtracted from the current time 
+to determine whether rows are deleted from the database, setting it to the 
+maximum value would have the effect of suppressing deletion of rows with a timestamp
+more recent than two days after the Epoch, where the latter is 
+1970-01-01 00:00:00 +0000 (UTC).  A buffer (here, two days) is needed, because 
+|Handle_Type::delete_from_database| sets the \.{last\_modified} field of handle 
+database entries to a value derived from the current time minus |purge_database_limit| 
+minus a constant and it's necessary to ensure that the derived value doesn't underflow.
+Similar functions may be added for other database items.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == PURGE_DATABASE_LIMIT_INDEX)        
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] In `process_command_line_options':  "
+                      << "`option_index' "
+                      << "== `PURGE_DATABASE_LIMIT_INDEX'." 
+                      << endl
+                      << "Setting `purge_database_limit'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+             errno = 0;
+             time_t temp_time = time(0);
+
+             if (temp_time == static_cast<time_t>(-1))
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING! In `process_command_line_options':  "
+                      << endl
+                      << "`time' failed, returning `static_cast<time_t>(-1)':" 
+                      << endl 
+                      << strerror(errno)
+                      << "Failed to get current time."
+                      << endl
+                      << "Not resetting `purge_database_limit'."
+                      << endl
+                      << "Will use default value == " << purge_database_limit << "."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }
+#if DEBUG_COMPILE
+             else if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] In `process_command_line_options':  "
+                      << endl
+                      << "`time' succeeded, returning `temp_time' == " 
+                      << temp_time << "."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+
+             errno = 0;
+             unsigned long int temp_val = strtoul(optarg, 0, 10);
+
+             if (temp_val == ULONG_MAX)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING! In `process_command_line_options':  "
+                      << endl
+                      << "`strtol' failed, returning `ULONG_MAX':"
+                      << endl 
+                      << strerror(errno)
+                      << "Failed to convert `optarg' == " << "`" << optarg << "' "
+                      << "to an integer."
+                      << endl
+                      << "Not resetting `purge_database_limit'."
+                      << endl
+                      << "Will use default value == " << purge_database_limit << "."
+                      << endl;
+                 unlock_cerr_mutex(); 
+                 
+             }
+@q ****** (6) @>
+
+@ 172800 $=$ number of seconds in two days.
+\initials{LDF 2013.07.25.}
+
+\LOG
+\initials{LDF 2013.07.25.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+             else if (temp_val >= temp_time - 172800)  
+             {
+
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING! In `process_command_line_options':  "
+                      << endl
+                      << "`temp_val' >= (`temp_time' - 172800):"
+                      << endl 
+                      << "`temp_val'                                     == " 
+                      << temp_val
+                      << endl
+                      << "`temp_time'                                    == " 
+                      << temp_time
+                      << endl 
+                      << "`temp_time' - 172800                           == " 
+                      << (temp_time - 172800)
+                      << endl 
+                      << "`temp_val' - (`temp_time' - 172800)            == " 
+                      << (temp_val - (temp_time - 172800))
+                      << endl 
+                      << "172800                                         == "
+                      << "number of seconds in two days"
+                      << endl
+                      << endl
+                      << "172800 - (`temp_val' - (`temp_time' - 172800)) == " 
+                      << (172800 - (temp_val - (temp_time - 172800)))
+                      << endl 
+                      << "`temp_val' is too large.  This isn't permitted."
+                      << endl
+                      << "Not resetting `purge_database_limit'."
+                      << endl
+                      << "Will use default value == " << purge_database_limit << "."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else if (temp_val >= (temp_time - 172800)  |  */
+
+@q ****** (6) @>        
+
+             else
+             {
+#if DEBUG_COMPILE
+                 if (DEBUG)
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << "[Thread 0] In `process_command_line_options':  "
+                          << endl
+                          << "`temp_val' == " << temp_val
+                          << endl
+                          << "Setting `purge_database_limit' to `temp_val' == " << temp_val
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                 }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+                 purge_database_limit = temp_val;
+             }      
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == PURGE_DATABASE_LIMIT_INDEX)|  */
+
+
+@q ***** (5) purge-irods-archive-interval.  @>
+@ \.{purge-irods-archive-interval}.
+\initials{LDF 2013.08.08.}
+
+\LOG
+\initials{LDF 2013.08.08.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == PURGE_IRODS_ARCHIVE_INTERVAL_INDEX)        
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE                 
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] In `process_command_line_options':  "
+                      << "`option_index' "
+                      << "== `PURGE_IRODS_ARCHIVE_INTERVAL_INDEX'." 
+                      << endl
+                      << "Setting `purge_irods_archive_interval'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+             errno = 0;
+             unsigned long int temp_val = strtoul(optarg, 0, 10);
+
+             if (temp_val == ULONG_MAX)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING! In `process_command_line_options':  "
+                      << endl
+                      << "`strtol' failed, returning `ULONG_MAX':"
+                      << endl 
+                      << strerror(errno)
+                      << "Failed to convert `optarg' == " << "`" << optarg << "' "
+                      << "to an integer."
+                      << endl
+                      << "Not resetting `purge_irods_archive_interval'."
+                      << endl
+                      << "Will use default value == " 
+                      << purge_irods_archive_interval << "."
+                      << endl;
+                 unlock_cerr_mutex(); 
+                 
+             }
+             else if (temp_val == 0UL)
+             {
+                 lock_cout_mutex(); 
+                 lock_cerr_mutex(); 
+                 cout << "Disabling \"purge\" for iRODS archive:  "
+                      << "Will not start thread running `purge_irods_archive'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+                 unlock_cout_mutex(); 
+
+                 purge_irods_archive_interval = 0UL;
+
+             }  /* |if (temp_val == 0UL)|  */
+             else
+             {
+                    purge_irods_archive_interval = temp_val;
+             }      
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == PURGE_IRODS_ARCHIVE_INTERVAL_INDEX)|  */
+
+
+@q ***** (5) purge-irods-archive-limit.  @>
+@ \.{purge-irods-archive-limit}.
+\initials{LDF 2013.08.08.}
+
+\LOG
+\initials{LDF 2013.08.08.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == PURGE_IRODS_ARCHIVE_LIMIT_INDEX)        
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] In `process_command_line_options':  "
+                      << "`option_index' "
+                      << "== `PURGE_IRODS_ARCHIVE_LIMIT_INDEX'." 
+                      << endl
+                      << "Setting `purge_irods_archive_limit'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+             errno = 0;
+             time_t temp_time = time(0);
+
+             if (temp_time == static_cast<time_t>(-1))
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING! In `process_command_line_options':  "
+                      << endl
+                      << "`time' failed, returning `static_cast<time_t>(-1)':" 
+                      << endl 
+                      << strerror(errno)
+                      << "Failed to get current time."
+                      << endl
+                      << "Not resetting `purge_irods_archive_limit'."
+                      << endl
+                      << "Will use default value == " << purge_irods_archive_limit << "."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }
+#if DEBUG_COMPILE
+             else if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] In `process_command_line_options':  "
+                      << endl
+                      << "`time' succeeded, returning `temp_time' == " 
+                      << temp_time << "."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+
+             errno = 0;
+             unsigned long int temp_val = strtoul(optarg, 0, 10);
+
+             if (temp_val == ULONG_MAX)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING! In `process_command_line_options':  "
+                      << endl
+                      << "`strtol' failed, returning `ULONG_MAX':"
+                      << endl 
+                      << strerror(errno)
+                      << "Failed to convert `optarg' == " << "`" << optarg << "' "
+                      << "to an integer."
+                      << endl
+                      << "Not resetting `purge_irods_archive_limit'."
+                      << endl
+                      << "Will use default value == " << purge_irods_archive_limit << "."
+                      << endl;
+                 unlock_cerr_mutex(); 
+                 
+             }
+@q ****** (6) @>
+
+@ 172800 $=$ number of seconds in two days.
+\initials{LDF 2013.08.08.}
+
+\LOG
+\initials{LDF 2013.08.08.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+             else if (temp_val >= temp_time - 172800)  
+             {
+
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING! In `process_command_line_options':  "
+                      << endl
+                      << "`temp_val' >= (`temp_time' - 172800):"
+                      << endl 
+                      << "`temp_val'                                     == " 
+                      << temp_val
+                      << endl
+                      << "`temp_time'                                    == " 
+                      << temp_time
+                      << endl 
+                      << "`temp_time' - 172800                           == " 
+                      << (temp_time - 172800)
+                      << endl 
+                      << "`temp_val' - (`temp_time' - 172800)            == " 
+                      << (temp_val - (temp_time - 172800))
+                      << endl 
+                      << "172800                                         == "
+                      << "number of seconds in two days"
+                      << endl
+                      << endl
+                      << "172800 - (`temp_val' - (`temp_time' - 172800)) == " 
+                      << (172800 - (temp_val - (temp_time - 172800)))
+                      << endl 
+                      << "`temp_val' is too large.  This isn't permitted."
+                      << endl
+                      << "Not resetting `purge_irods_archive_limit'."
+                      << endl
+                      << "Will use default value == " << purge_irods_archive_limit << "."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else if (temp_val >= temp_time - 172800)|  */
+
+@q ****** (6) @>        
+
+             else
+             {
+#if DEBUG_COMPILE
+                 if (DEBUG)
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << "[Thread 0] In `process_command_line_options':  "
+                          << endl
+                          << "`temp_val' == " << temp_val
+                          << endl
+                          << "Setting `purge_irods_archive_limit' to `temp_val' == " << temp_val
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                 }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+                 purge_irods_archive_limit = temp_val;
+             }      
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == PURGE_IRODS_ARCHIVE_LIMIT_INDEX)|  */
+
+
+@q ***** (5) purge-dc-metadata-interval.  @>
+@ \.{purge-dc-metadata-interval}.
+\initials{LDF 2013.11.21.}
+
+\LOG
+\initials{LDF 2013.11.21.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == PURGE_DC_METADATA_INTERVAL_INDEX)        
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE                 
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] In `process_command_line_options':  "
+                      << "`option_index' "
+                      << "== `PURGE_DC_METADATA_INTERVAL_INDEX'." 
+                      << endl
+                      << "Setting `purge_dc_metadata_interval'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+             errno = 0;
+             unsigned long int temp_val = strtoul(optarg, 0, 10);
+
+             if (temp_val == ULONG_MAX)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING! In `process_command_line_options':  "
+                      << endl
+                      << "`strtol' failed, returning `ULONG_MAX':"
+                      << endl 
+                      << strerror(errno)
+                      << "Failed to convert `optarg' == " << "`" << optarg << "' "
+                      << "to an integer."
+                      << endl
+                      << "Not resetting `purge_dc_metadata_interval'."
+                      << endl
+                      << "Will use default value == " 
+                      << purge_dc_metadata_interval << "."
+                      << endl;
+                 unlock_cerr_mutex(); 
+                 
+             }
+             else if (temp_val == 0UL)
+             {
+                 lock_cout_mutex(); 
+                 lock_cerr_mutex(); 
+                 cout << "Disabling \"purge\" for Dublin Core metadata:  "
+                      << "Will not start thread running `purge_dc_metadata'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+                 unlock_cout_mutex(); 
+
+                 purge_dc_metadata_interval = 0UL;
+
+             }  /* |if (temp_val == 0UL)|  */
+             else
+             {
+                    purge_dc_metadata_interval = temp_val;
+             }      
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == PURGE_DC_METADATA_INTERVAL_INDEX)|  */
+
+
+@q ***** (5) purge-dc-metadata-limit.  @>
+@ \.{purge-dc-metadata-limit}.
+\initials{LDF 2013.11.21.}
+
+\LOG
+\initials{LDF 2013.11.21.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == PURGE_DC_METADATA_LIMIT_INDEX)        
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] In `process_command_line_options':  "
+                      << "`option_index' "
+                      << "== `PURGE_DC_METADATA_LIMIT_INDEX'." 
+                      << endl
+                      << "Setting `purge_dc_metadata_limit'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+             errno = 0;
+             time_t temp_time = time(0);
+
+             if (temp_time == static_cast<time_t>(-1))
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING! In `process_command_line_options':  "
+                      << endl
+                      << "`time' failed, returning `static_cast<time_t>(-1)':" 
+                      << endl 
+                      << strerror(errno)
+                      << "Failed to get current time."
+                      << endl
+                      << "Not resetting `purge_dc_metadata_limit'."
+                      << endl
+                      << "Will use default value == " << purge_dc_metadata_limit << "."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }
+#if DEBUG_COMPILE
+             else if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] In `process_command_line_options':  "
+                      << endl
+                      << "`time' succeeded, returning `temp_time' == " 
+                      << temp_time << "."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+
+             errno = 0;
+             unsigned long int temp_val = strtoul(optarg, 0, 10);
+
+             if (temp_val == ULONG_MAX)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING! In `process_command_line_options':  "
+                      << endl
+                      << "`strtol' failed, returning `ULONG_MAX':"
+                      << endl 
+                      << strerror(errno)
+                      << "Failed to convert `optarg' == " << "`" << optarg << "' "
+                      << "to an integer."
+                      << endl
+                      << "Not resetting `purge_dc_metadata_limit'."
+                      << endl
+                      << "Will use default value == " << purge_dc_metadata_limit << "."
+                      << endl;
+                 unlock_cerr_mutex(); 
+                 
+             }
+@q ****** (6) @>
+
+@ 172800 $=$ number of seconds in two days.
+\initials{LDF 2013.11.21.}
+
+\LOG
+\initials{LDF 2013.11.21.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+             else if (temp_val >= temp_time - 172800)  
+             {
+
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] WARNING! In `process_command_line_options':  "
+                      << endl
+                      << "`temp_val' >= (`temp_time' - 172800):"
+                      << endl 
+                      << "`temp_val'                                     == " 
+                      << temp_val
+                      << endl
+                      << "`temp_time'                                    == " 
+                      << temp_time
+                      << endl 
+                      << "`temp_time' - 172800                           == " 
+                      << (temp_time - 172800)
+                      << endl 
+                      << "`temp_val' - (`temp_time' - 172800)            == " 
+                      << (temp_val - (temp_time - 172800))
+                      << endl 
+                      << "172800                                         == "
+                      << "number of seconds in two days"
+                      << endl
+                      << endl
+                      << "172800 - (`temp_val' - (`temp_time' - 172800)) == " 
+                      << (172800 - (temp_val - (temp_time - 172800)))
+                      << endl 
+                      << "`temp_val' is too large.  This isn't permitted."
+                      << endl
+                      << "Not resetting `purge_dc_metadata_limit'."
+                      << endl
+                      << "Will use default value == " << purge_dc_metadata_limit << "."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else if (temp_val >= temp_time - 172800)|  */
+
+@q ****** (6) @>        
+
+             else
+             {
+#if DEBUG_COMPILE
+                 if (DEBUG)
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << "[Thread 0] In `process_command_line_options':  "
+                          << endl
+                          << "`temp_val' == " << temp_val
+                          << endl
+                          << "Setting `purge_dc_metadata_limit' to `temp_val' == " << temp_val
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                 }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+                 purge_dc_metadata_limit = temp_val;
+             }      
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == PURGE_DC_METADATA_LIMIT_INDEX)|  */
+
+
+
+
+
+@q ***** (5) debug_level.  @>
+@ \.{debug-level}.
+\initials{LDF 2013.07.25.}
+
+\LOG
+\initials{LDF 2013.07.25.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == DEBUG_LEVEL_INDEX)        
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] In `process_command_line_options':  "
+                      << "`option_index' "
+                      << "== `DEBUG_LEVEL_INDEX'." 
+                      << endl
+                      << "Setting `global_debug_level'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+
+             long int temp_val = strtol(optarg, 0, 10);
+          
+             if (temp_val == LONG_MAX || temp_val == LONG_MIN)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "WARNING!  In `process_command_line_options':"
+                      << endl
+                      << "`strtol' failed, returning ";
+
+                 if (temp_val == LONG_MAX)
+                     cerr << "`LONG_MAX' == " << LONG_MAX << endl;
+                 else
+                     cerr << "`LONG_MIN' == " << LONG_MIN << endl;
+
+ 
+                 cerr << "Not resetting `global_debug_level'.  "
+                      << "Current value == " << global_debug_level
+                      << endl;
+
+                 unlock_cerr_mutex(); 
+
+
+             }  /* |if (temp_val == LONG_MAX || temp_val == LONG_MIN)|  */
+
+@q ****** (6) @>
+
+             else if (temp_val < -10 || temp_val > 10)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "WARNING!  In `process_command_line_options':"
+                      << endl
+                      << "Invalid value specified for `--debug-level' option:  "
+                      << temp_val
+                      << endl
+                      << "Value must be within the range [-10, 10] (inclusive)."
+                      << endl 
+                      << "Not resetting `global_debug_level'.  "
+                      << "Current value == " << global_debug_level
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }   /* |else if (temp_val < -10 || temp_val > 10)|  */
+
+@q ****** (6) @>
+
+             else
+             {
+#if DEBUG_COMPILE
+                 if (DEBUG)    
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << "In `process_command_line_options':"
+                          << endl
+                          << "Setting `global_debug_level' to " << temp_val << "."
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                 }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+                 global_debug_level = static_cast<int>(temp_val); 
+
+             }  /* |else|  */
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == DEBUG_LEVEL_INDEX)|  */
+
+
+@q ***** (5) suppress-prompt.  @>
+@ \.{suppress-prompt}.
+\initials{LDF 2013.08.29.}
+
+This option sets the global variable 
+|unsigned int suppress_prompt|.
+\initials{LDF 2013.08.29.}
+\initials{LDF 2013.10.04.}
+
+\LOG
+\initials{LDF 2013.08.29.}
+Added this section.
+
+\initials{LDF 2013.10.04.}
+Now using this option for \.{gwirdsif}.  
+Removed code for ignoring this option if the program is not \.{gwirdcli}.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == SUPPRESS_PROMPT_INDEX)        
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] In `process_command_line_options':  "
+                     << "`option_index' "
+                     << "== `SUPPRESS_PROMPT_INDEX'." 
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+            if (optarg == 0)
+            {
+                suppress_prompt = 10;
+            }
+
+@q ****** (6) @>
+
+            else 
+            {
+@q ******* (7) @>
+
+                errno = 0;
+                unsigned long temp_val = strtoul(optarg, 0, 10);
+
+                if (temp_val == ULONG_MAX)
+                {
+                    lock_cerr_mutex(); 
+                    cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                         << endl 
+                         << "`strtoul' failed, returning `ULONG_MAX':"
+                         << endl
+                         << strerror(errno)
+                         << endl
+                         << "Setting `suppress_prompt' to 0 (i.e., not suppressing)."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                    suppress_prompt = 0U;
+
+                }  /* |if (temp_val == ULONG_MAX)|  */
+
+                else if (temp_val >= UINT_MAX)
+                {
+                    lock_cerr_mutex(); 
+                    cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                         << endl 
+                         << "`temp_val' >= `UINT_MAX'."
+                         << endl
+                         << "Value out of range for `suppress_prompt'."
+                         << endl
+                         << "Setting `suppress_prompt' to 0 (i.e., not suppressing)."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                    suppress_prompt = 0U;
+
+                }  /* |else if (temp_val >= UINT_MAX)|  */
+
+                else
+                {
+                    suppress_prompt = static_cast<unsigned int>(temp_val);
+
+#if DEBUG_COMPILE
+                    if (DEBUG)           
+                    {
+                        lock_cerr_mutex(); 
+                        cerr << "[Thread 0] In `process_command_line_options':"
+                             << endl 
+                             << "set `suppress_prompt' to " << suppress_prompt << ".";
+                        unlock_cerr_mutex(); 
+
+                    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+                }  /* |else|  */
+
+@q ******* (7) @>
+
+           }  /* |else|  */
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == SUPPRESS_PROMPT_INDEX)|  */
+
+@q ***** (5) anon-port.  @>
+@ \.{anon-port}.
+\initials{LDF 2013.08.29.}
+
+\LOG
+\initials{LDF 2013.08.29.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == ANON_PORT_INDEX)        
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] In `process_command_line_options':  "
+                     << "`option_index' "
+                     << "== `ANON_PORT_INDEX'." 
+                     << endl
+                     << "`optarg' == " << optarg
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            errno = 0;
+            unsigned long temp_val = strtoul(optarg, 0, 10);
+
+            if (temp_val == ULONG_MAX)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                     << endl 
+                     << "`strtoul' failed, returning `ULONG_MAX':"
+                     << endl
+                     << strerror(errno)
+                     << endl
+                     << "Not resetting `port_num_anon'.  Will use default value."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (temp_val == ULONG_MAX)|  */
+
+            else if (temp_val >= INT_MAX)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                     << endl 
+                     << "`temp_val' >= `INT_MAX'."
+                     << endl
+                     << "Value out of range for `port_num_anon'."
+                     << endl
+                     << "Not resetting `port_num_anon'.  Will use default value "
+                     << "(" << DEFAULT_PORT_NUM_ANON << ")"
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (temp_val >= INT_MAX)|  */
+
+            else
+            {
+
+                port_str_anon = optarg;
+                port_num_anon = temp_val;
+
+#if DEBUG_COMPILE
+                if (DEBUG)   
+                {
+                    lock_cerr_mutex(); 
+                    cerr << "[Thread 0] In `process_command_line_options':"
+                         << endl 
+                         << "Set `port_num_anon' to " << port_num_anon << " and "
+                         << "`port_str_anon' to " << port_str_anon << "."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            }
+
+        } /* |else if (option_index == PORT_NUM_ANON_INDEX)|  */
+
+@q ***** (5) x509-port.  @>
+@ \.{x509-port}.
+\initials{LDF 2013.08.29.}
+
+\LOG
+\initials{LDF 2013.08.29.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == X509_PORT_INDEX)        
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] In `process_command_line_options':  "
+                     << "`option_index' "
+                     << "== `X509_PORT_INDEX'." 
+                     << endl
+                     << "`optarg' == " << optarg
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            errno = 0;
+            unsigned long temp_val = strtoul(optarg, 0, 10);
+
+            if (temp_val == ULONG_MAX)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                     << endl 
+                     << "`strtoul' failed, returning `ULONG_MAX':"
+                     << endl
+                     << strerror(errno)
+                     << endl
+                     << "Not resetting `port_str_x_509'.  Will use default value."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (temp_val == ULONG_MAX)|  */
+
+            else if (temp_val >= INT_MAX)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                     << endl 
+                     << "`temp_val' >= `UINT_MAX'."
+                     << endl
+                     << "Value out of range for `port_str_x_509'."
+                     << endl
+                     << "Not resetting `port_str_x_509'.  Will use default value "
+                     << "(" << DEFAULT_PORT_NUM_X_509 << ")"
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (temp_val >= INT_MAX)|  */
+
+            else
+            {
+                port_str_x_509 = optarg;
+                port_num_x_509 = temp_val;
+
+#if DEBUG_COMPILE
+                if (DEBUG)   
+                {
+                    lock_cerr_mutex(); 
+                    cerr << "[Thread 0] In `process_command_line_options':"
+                         << endl 
+                         << "Set `port_num_x_509' to " << port_num_x_509 << " and "
+                         << "`port_str_x_509' to " << port_str_x_509 << "."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            }
+
+        } /* |else if (option_index == X509_PORT_INDEX)|  */
+
+@q ***** (5) gpg-key-id.  @>
+@ \.{gpg-key-id}.
+\initials{LDF 2013.09.19.}
+
+@:NOTE@> !! PLEASE NOTE:  The validity of the GPG key ID can't be tested here,
+because the GPG ``home directory'' may not be known at this point.  It must be
+tested after this function returns.  As of this date, this option is only used 
+by \.{gwirdsif}.
+\initials{LDF 2013.09.19.}
+
+\LOG
+\initials{LDF 2013.09.19.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == GPG_KEY_ID_INDEX)
+        {
+@q ****** (6) @>
+ 
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] In `process_command_line_options':  "
+                     << "`option_index' "
+                     << "== `GPG_KEY_ID_INDEX'."
+                     << endl;
+
+                if (optarg)
+                   cerr  << "`optarg' == " << optarg << endl;
+                else
+                   cerr  << "`optarg' == NULL.  Will query for GPG key id." << endl;
+
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+            gpg_key_id = new char[10];
+
+            errno = 0;
+            status = mlock(gpg_key_id, 10);
+
+            if (status == -1)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] ERROR!  In `process_command_line_options':"
+                     << endl
+                     << "`mlock' failed, returning -1:"
+                     << endl
+                     << strerror(errno)
+                     << endl
+                     << "Failed to lock memory for `gpg_key_id'."
+                     << endl
+                     << "Exiting " << argv[0] << " unsuccessfully with exit status 1."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                exit(1);
+
+            }  /* |if (status == -1)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] In `process_command_line_options':"
+                     << endl
+                     << "`mlock' succeeded, returning 0."
+                     << endl
+                     << "Locked memory for `gpg_key_id' successfully."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            memset(gpg_key_id, 0, 10);
+            
+@q ****** (6) @>
+@
+@<|process_command_line_options| definition@>=
+
+           if (optarg && strlen(optarg) == 8)
+           {
+               strncpy(gpg_key_id, optarg, 8);
+
+           }  /* |if (optarg && strlen(optarg) == 8)|  */
+
+@q ****** (6) @>
+
+           else
+           {
+@q ******* (7) @>
+ 
+                if (optarg && strlen(optarg) != 8)
+                {
+                    lock_cerr_mutex(); 
+                    cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                         << endl 
+                         << "Invalid argument to `--gpg-key-id' option:  " << optarg << " "
+                         << "length == " << strlen(optarg)
+                         << endl
+                         << "GPG key ID must be 8 characters long."
+                         << endl;
+                    unlock_cerr_mutex(); 
+ 
+                }
+
+                char *temp_str = 0;
+  
+                for (int i = 3; i > 0; --i)
+                {
+
+                   memset(gpg_key_id, 0, 10);
+
+                   lock_cerr_mutex(); 
+                   lock_cout_mutex();
+ 
+                   cerr << "Enter GPG key ID:  ";
+                    
+                   temp_str = fgets(gpg_key_id, 10, stdin);
+
+                   unlock_cout_mutex();
+                   unlock_cerr_mutex(); 
+
+                    if (temp_str && strlen(temp_str) == 9)
+                       break;
+
+
+                    else if (temp_str == 0 || strlen(temp_str) != 9)
+                    {
+                        lock_cerr_mutex(); 
+                        cerr << "ERROR!  GPG key ID must be 8 characters long."
+                             << endl
+                             << "You entered " << (strlen(temp_str) - 1) << " characters."
+                             << endl 
+                             << "You have " << (i - 1) << " more tries."
+                             << endl;
+                        unlock_cerr_mutex(); 
+                    }
+
+                }  /* |for|  */
+
+@q ******* (7) @>
+
+                if (strlen(gpg_key_id) != 9)
+                {
+                    lock_cerr_mutex(); 
+                    cerr << "[Thread 0] ERROR!  In `process_command_line_options':"
+                         << endl
+                         << "Failed to set GPG key ID (`gpg_key_id')."
+                         << endl
+                         << "Exiting " << argv[0] << " unsuccessfully with exit status 1."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                    exit(1);
+                }
+
+@q ******* (7) @>
+
+                gpg_key_id[8] = gpg_key_id[9] = '\0';
+
+@q ******* (7) @>
+
+           }  /* |else|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+           if (DEBUG) 
+           {
+               lock_cerr_mutex(); 
+               cerr << "[Thread 0] In `process_command_line_options':"
+                    << endl
+                    << "Set GPG key ID (`gpg_key_id') successfully:  "
+                    << gpg_key_id
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           } /* |if (DEBUG)|  */
+
+#endif  /* |DEBUG_COMPILE|  */ 
+           
+
+@q ****** (6) @>
+
+        } /* |else if|  */
+
+@q ***** (5) passphrase-gpg or gpg-passphrase.  @>
+@ \.{passphrase-gpg} or \.{gpg-passphrase}.
+\initials{LDF 2013.09.19.}
+
+\LOG
+\initials{LDF 2013.09.19.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (   option_index == PASSPHRASE_GPG_INDEX 
+                 || option_index == GPG_PASSPHRASE_INDEX)
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] In `process_command_line_options':  "
+                     << "`option_index' "
+                     << "== `PASSPHRASE_GPG_INDEX' or `GPG_PASSPHRASE_INDEX'." 
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            char buffer[1024];
+            memset(buffer, 0, 1024);
+
+            errno = 0;
+            status = mlock(buffer, 1024);
+
+@q ******* (7) @>
+@
+@<|process_command_line_options| definition@>=
+
+            if (status == -1)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] ERROR!  In `process_command_line_options':"
+                     << endl
+                     << "`mlock' failed, returning -1:"
+                     << endl
+                     << strerror(errno)
+                     << endl
+                     << "Failed to lock memory for `gpg_passphrase' (temporary buffer)."
+                     << endl
+                     << "Exiting " << argv[0] << " unsuccessfully with exit status 1."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                exit(1);
+
+            }  /* |if (status == -1)|  */
+
+@q ******* (7) @>
+@
+@<|process_command_line_options| definition@>=
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] In `process_command_line_options':"
+                     << endl
+                     << "`mlock' succeeded, returning 0."
+                     << endl
+                     << "Locked memory for `gpg_passphrase' successfully (temporary buffer)."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+\LOG
+\initials{LDF 2013.10.04.}
+@:BUG FIX@> BUG FIX:  Now using |istream::get| instead of |istream::read|.  
+|get| uses the newline character as a delimiter.  Previously, |read| would block
+until |EOF| was read (since I never used a passphrase with 1023 characters).
+This worked fine when passing the passphrase to \.{gwirdsif} via a pipe 
+(I am only just about to start using this option with \.{gwirdcli}), but 
+not when the user is queried.  @:NOTE@> !! PLEASE NOTE:  When using GNU Emacs, 
+the user types the passphrase into the minibuffer and it's hidden.  Emacs does
+this automatically (at least GNU Emacs 23.3.1 does).
+\ENDLOG 
+
+@<|process_command_line_options| definition@>=
+
+#if 1 /* 0 */
+bool save_DEBUG = DEBUG;
+DEBUG = false; /* |true|  */
+#endif 
+ 
+            if (suppress_prompt == 0)
+            {
+               cerr << "Enter GPG passphrase:  "; 
+            }
+            else 
+               --suppress_prompt;
+
+            cin.get(buffer, 1023);
+
+            cerr << endl;     
+    
+
+#if 0 
+            cerr << "cin.gcount() == " << cin.gcount() << endl;
+#endif 
+
+            if (cin.bad() || cin.gcount() == 0)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] ERROR!  In `process_command_line_options':"
+                     << endl
+                     << "Failed to read GPG passphrase from standard input:"
+                     << endl
+                     << "`cin.bad()'   == " << cin.good()
+                     << endl
+                     << "`cin.gcount()' == " << cin.gcount()
+                     << endl
+                     << "Exiting " << argv[0] << " unsuccessfully with exit status 1."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                memset(buffer, 0, 1024);
+                munlock(buffer, 1024);
+
+                exit(1);
+
+            }  /* |if (cin.bad() || cin.gcount() == 0)|  */
+
+
+@q ******* (7) @>
+@
+@<|process_command_line_options| definition@>=
+
+            else if (cin.gcount() == 1023)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] ERROR!  In `process_command_line_options':"
+                     << endl
+                     << "GPG passphrase exceeds maximum length of 1022 characters:"
+                     << endl 
+                     << "`cin.gcount()' == " << cin.gcount()
+                     << endl 
+                     << "Exiting " << argv[0] << " unsuccessfully with exit status 1."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                memset(buffer, 0, 1024);
+                munlock(buffer, 1024);
+
+                exit(1);
+
+            }  /* |if (cin.gcount() == 1023)|  */
+
+@q ******* (7) @>
+@
+@<|process_command_line_options| definition@>=
+
+#if 0 
+            /* WARNING!  This writes the passphrase to standard error!
+               \initials{LDF 2013.09.26.}  */
+
+            cerr << "buffer == " << buffer << endl;
+            cerr << "strlen(buffer) == " << strlen(buffer) << endl;
+#endif 
+
+            for (int i = strlen(buffer) - 1; i >= 0; --i)  
+            {
+
+               /* Remove newlines and carriage returns from 
+                  the end of |buffer|.  
+                  \initials{LDF 2013.09.25.}  */
+
+               if (buffer[i] == '\n' || buffer[i] == '\r')
+                  buffer[i] = '\0';
+               else
+                  break;
+               
+            }  /* |for|  */
+
+@q ******* (7) @>
+
+            gpg_passphrase_length = strlen(buffer) + 1;
+
+            gpg_passphrase = new char[gpg_passphrase_length];
+            memset(gpg_passphrase, 0, gpg_passphrase_length);
+
+            errno = 0;
+            status = mlock(gpg_passphrase, gpg_passphrase_length);
+
+@q ******* (7) @>
+@
+@<|process_command_line_options| definition@>=
+
+            if (status == -1)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] ERROR!  In `process_command_line_options':"
+                     << endl
+                     << "`mlock' failed, returning -1:"
+                     << endl
+                     << strerror(errno)
+                     << endl
+                     << "Failed to lock memory for `gpg_passphrase'."
+                     << endl
+                     << "Exiting " << argv[0] << " unsuccessfully with exit status 1."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                exit(1);
+
+            }  /* |if (status == -1)|  */
+
+
+
+@q ******* (7) @>
+@
+@<|process_command_line_options| definition@>=
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] In `process_command_line_options':"
+                     << endl
+                     << "`mlock' succeeded, returning 0."
+                     << endl
+                     << "Locked memory for `gpg_passphrase' successfully."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ******* (7) @>
+@
+@<|process_command_line_options| definition@>=
+
+            strncpy(gpg_passphrase, buffer, strlen(buffer));
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "gpg_passphrase == " << gpg_passphrase << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ******* (7) @>
+@
+@<|process_command_line_options| definition@>=
+
+            errno = 0;
+            memset(buffer, 0, 1024);
+            status = munlock(buffer, 1024);
+
+@q ******* (7) @>
+
+            if (status == -1)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] ERROR!  In `process_command_line_options':"
+                     << endl
+                     << "`munlock' failed, returning -1:"
+                     << endl
+                     << strerror(errno)
+                     << endl
+                     << "Failed to unlock memory for `gpg_passphrase' (temporary buffer)."
+                     << endl
+                     << "Exiting " << argv[0] << " unsuccessfully with exit status 1."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                exit(1);
+
+            }  /* |if (status == -1)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] In `process_command_line_options':"
+                     << endl
+                     << "`munlock' succeeded, returning 0."
+                     << endl
+                     << "Unlocked memory for `gpg_passphrase' successfully."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+#if 1 /* 0 */
+DEBUG = save_DEBUG; 
+#endif 
+
+        } /* |else if|  */
+
+@q ***** (5) gpg-homedir.  @>
+@ \.{passphrase-gpg} or \.{gpg-homedir}.
+\initials{LDF 2014.01.07.}
+
+\LOG
+\initials{LDF 2014.01.07.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == GPG_HOMEDIR_INDEX)
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] In `process_command_line_options':  "
+                     << "`option_index' "
+                     << "== `GPG_HOMEDIR_INDEX':" 
+                     << endl
+                     << "`optarg' == " << optarg
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            gpg_homedir = optarg;
+
+        } /* |else if|  */
+
+@q ***** (5) mysql-username.  @>
+@ \.{mysql-username}.
+\initials{LDF 2013.09.24.}
+
+\LOG
+\initials{LDF 2013.09.24.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == MYSQL_USERNAME_INDEX)
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] In `process_command_line_options':  "
+                     << "`option_index' "
+                     << "== `MYSQL_USERNAME_INDEX'."
+                     << endl
+                     << "`optarg' == " << optarg
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            mysql_username = optarg;
+
+        } /* |else if (option_index == MYSQL_USERNAME_INDEX)|  */
+
+
+@q ***** (5) mysql-password-filename.  @>
+@ \.{mysql-password-filename}.
+\initials{LDF 2013.09.24.}
+
+\LOG
+\initials{LDF 2013.09.24.}
+Added this section.
+
+\initials{LDF 2013.09.26.}
+Made the argument optional:  If none is specified, |DEFAULT_MYSQL_PASSWORD_FILENAME| 
+is used.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == MYSQL_PASSWORD_FILENAME_INDEX)
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] In `process_command_line_options':  "
+                     << "`option_index' "
+                     << "== `MYSQL_PASSWORD_FILENAME_INDEX'."
+                     << endl;
+
+                if (optarg != 0)
+                    cerr << "`optarg' == " << optarg << endl;
+ 
+                else 
+                    cerr << "`optarg' is NULL." << endl;
+
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            if (optarg != 0)
+               mysql_password_filename = optarg;
+            else 
+               mysql_password_filename = DEFAULT_MYSQL_PASSWORD_FILENAME;
+
+
+        } /* |else if (option_index == MYSQL_PASSWORD_FILENAME_INDEX)|  */
+
+
+@q ***** (5) listen-client-port.  @>
+@ \.{listen-client-port}.
+\initials{LDF 2014.01.27.}
+
+\LOG
+\initials{LDF 2014.01.27.}
+Added this section.
+
+\initials{LDF 2014.02.14.}
+Changed so that this option is no longer processed if |is_gwirdsif == true|.
+The port for each ``pull client'' must be set by means of a ``pull request''.
+That is, it's stored in the \.{client\_port} field of the \.{gwirdsif.Pull\_Requests} 
+database table and the |unsigned int client_port| data member of |class Pull_Request|.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == LISTEN_CLIENT_PORT_INDEX)
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] In `process_command_line_options':  "
+                     << "`option_index' "
+                     << "== `LISTEN_CLIENT_PORT_INDEX'."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+            if (is_gwirdpcl)
+            {
+@q ******* (7) @>
+
+                listen_client = true;
+
+                if (optarg != 0)
+                {
+@q ******** (8) @>
+                    errno = 0;
+                    unsigned long int temp_val = strtoul(optarg, 0, 10);
+
+                    if (temp_val == ULONG_MAX)
+                    {
+                        lock_cerr_mutex(); 
+                        cerr << "[Thread 0] ERROR!  In `process_command_line_options':"
+                             << endl 
+                             << "`strtoul' failed, returning `ULONG_MAX':"
+                             << endl
+                             << strerror(errno)
+                             << endl
+                             << "Can't reset value for `listen_client_port'.  "
+                             << "Will use default value:  " << DEFAULT_LISTEN_CLIENT_PORT
+                             << endl
+                             << "Continuing."
+                             << endl;
+                        unlock_cerr_mutex(); 
+                    }
+
+@q ******** (8) @>
+
+                    else if (temp_val > INT_MAX)
+                    {
+                        lock_cerr_mutex(); 
+                        cerr << "[Thread 0] ERROR!  In `process_command_line_options':"
+                             << endl 
+                             << "`temp_val' == " << temp_val << " (> `INT_MAX')."
+                             << endl
+                             << "This is not permitted.  "
+                             << "Can't reset value for `listen_client_port'.  "
+                             << "Will use default value:  " << DEFAULT_LISTEN_CLIENT_PORT
+                             << endl
+                             << "Continuing."
+                             << endl;
+                        unlock_cerr_mutex(); 
+                    }
+
+@q ******** (8) @>
+
+                    else 
+                    {
+                        listen_client_port     = temp_val;
+                        listen_client_port_str = optarg;
+                    }
+@q ******** (8) @>
+
+                }  /* |if (optarg != 0)|  */
+
+@q ******* (7) @>
+                    else 
+                       listen_client_port = DEFAULT_LISTEN_CLIENT_PORT;
+
+@q ******* (7) @>
+
+            }  /* |if (is_gwirdpcl)|  */
+
+@q ****** (6) @>
+
+            else
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                     << endl 
+                     << "`--listen-client-port' option specified, "
+                     << "but `is_gwirdpcl' == `false'."
+                     << "Will ignore and continue."
+                     << endl;  
+                unlock_cerr_mutex(); 
+            }
+
+        } /* |else if (option_index == LISTEN_CLIENT_PORT_INDEX)|  */
+
+@q ***** (5) pull-request-interval.  @>
+@ \.{pull-request-interval}.
+\initials{LDF 2014.01.31.}
+
+\LOG
+\initials{LDF 2014.01.31.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == PULL_REQUEST_INTERVAL_INDEX)
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] In `process_command_line_options':  "
+                     << "`option_index' "
+                     << "== `PULL_REQUEST_INTERVAL_INDEX'."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+            if (is_gwirdsif)
+            {
+@q ******* (7) @>
+
+                if (optarg != 0)
+                {
+@q ******** (8) @>
+                    errno = 0;
+                    unsigned long int temp_val = strtoul(optarg, 0, 10);
+
+                    if (temp_val == ULONG_MAX)
+                    {
+                        lock_cerr_mutex(); 
+                        cerr << "[Thread 0] ERROR!  In `process_command_line_options':"
+                             << endl 
+                             << "`strtoul' failed, returning `ULONG_MAX':"
+                             << endl
+                             << strerror(errno)
+                             << endl
+                             << "Can't set `pull_request_interval'.  "
+                             << "Won't start \"pull request\" thread."
+                             << endl
+                             << "Continuing."
+                             << endl;
+                        unlock_cerr_mutex(); 
+                    }
+
+@q ******** (8) @>
+
+                    else if (temp_val > INT_MAX)
+                    {
+                        lock_cerr_mutex(); 
+                        cerr << "[Thread 0] ERROR!  In `process_command_line_options':"
+                             << endl 
+                             << "`temp_val' == " << temp_val << " (> `INT_MAX')."
+                             << endl
+                             << "This is not permitted."
+                             << endl
+                             << "Won't start \"pull request\" thread."
+                             << endl
+                             << "Continuing."
+                             << endl;
+                        unlock_cerr_mutex(); 
+                    }
+
+@q ******** (8) @>
+
+                    else 
+                    {
+                        pull_request_interval = temp_val;
+
+                    }
+@q ******** (8) @>
+
+                }  /* |if (optarg != 0)|  */
+
+@q ******* (7) @>
+                    else 
+                       pull_request_interval = DEFAULT_PULL_REQUEST_INTERVAL;
+
+@q ******* (7) @>
+
+            }  /* |if (is_gwirdsif)|  */
+
+@q ****** (6) @>
+
+            else
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                     << endl 
+                     << "`--pull-request-interval' option specified, "
+                     << "but `is_gwirdsif' == `false'."
+                     << endl 
+                     << "Will ignore and continue."
+                     << endl;  
+                unlock_cerr_mutex(); 
+            }
+
+        } /* |else if (option_index == PULL_REQUEST_INTERVAL_INDEX)|  */
+
+@q ***** (5) read-client-command-file.  @>
+@ \.{read-client-command-file}.
+\initials{LDF 2014.02.01.}
+
+\LOG
+\initials{LDF 2014.02.01.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+        else if (option_index == READ_CLIENT_COMMAND_FILE_INDEX)
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] In `process_command_line_options':  "
+                     << "`option_index' "
+                     << "== `READ_CLIENT_COMMAND_FILE_INDEX'."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+            if (is_gwirdcli || is_gwirdpcl)
+            {
+
+                 client_command_filename = optarg;
+
+            }  /* |if (optarg != 0)|  */
+
+@q ****** (6) @>
+
+            else
+            {
+                lock_cerr_mutex(); 
+                cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                     << endl 
+                     << "`--read-client-command-file' option specified, "
+                     << "but `is_gwirdcli' and `is_gwirdpcl' == `false'."
+                     << endl 
+                     << "Will ignore and continue."
+                     << endl;  
+                unlock_cerr_mutex(); 
+            }
+
+        } /* |else if (option_index == READ_CLIENT_COMMAND_FILE_INDEX)|  */
+
+
+
+
+@q ***** (5) Invalid option_index value.@>
+@ Invalid {\tt option\_index} value.
+
+@<|process_command_line_options| definition@>=
+
+        else 
+        {
+          lock_cerr_mutex();
+          cerr << "[Initial Thread] WARNING!  In `process_command_line_options':"
+               << endl 
+               << "`option_index' has invalid value: "
+               << option_index << endl
+               << "Will try to continue." 
+               << endl;
+          unlock_cerr_mutex();
+
+        }
+
+@q ***** (5) @>
+
+      }  /* |else if (option_ctr == 0)|  */
+
+
+@q **** (4) Ambiguous option.@>
+@ Ambiguous option.
+\initials{LDF 2012.07.02.}
+
+@^!! TODO@> !! TODO: 
+\initials{LDF 2012.07.02.}  
+Fix asterisk comments.  
+Possibly try grepping for one day at a time to reduce the amount of code.
+Maybe put it into a file.
+
+@<|process_command_line_options| definition@>=
+
+    else if (option_ctr == '?')
+    {
+
+        lock_cerr_mutex();
+        cerr << "[Initial Thread] WARNING! In `process_command_line_options':"
+             << endl
+             << "`getopt_long_only' returned ambiguous match.  "
+             << "Breaking."
+             << endl;
+        unlock_cerr_mutex();
+
+        break;
+
+    }  /* |else if (option_ctr == '?')|  */
+
+@q **** (4) Invalid option.@>
+@ Invalid option.
+
+@<|process_command_line_options| definition@>=
+
+    else
+    {
+#if DEBUG_COMPILE
+        if (DEBUG) 
+        {
+           lock_cerr_mutex();
+
+           cerr << "[Initial Thread] `getopt_long_only' returned invalid option."
+                << endl;
+           unlock_cerr_mutex();
+        }
+#endif  /* |DEBUG_COMPILE|  */
+    }
+
+
+
+
+@q **** (4) End of while loop.@>
+@ End of while loop.
+
+@<|process_command_line_options| definition@>=
+
+#if DEBUG_COMPILE
+    if (DEBUG) 
+    {
+       lock_cerr_mutex();
+       cerr << "[Initial Thread] End of option processing" << endl;
+       unlock_cerr_mutex();
+    }
+#endif  /* |DEBUG_COMPILE|  */
+
+
+@q **** (4) @>
+
+    } /* |while|  */
+  
+@q *** (3) Non-option command line arguments.  @>
+@ Non-option command line arguments.  
+\initials{LDF 2012.07.02.}
+
+@<|process_command_line_options| definition@>=
+        
+@q **** (4) @>
+
+  if (optind < argc)
+  {
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+          lock_cerr_mutex(); 
+          cerr << "[Initial Thread] non-option ARGV-elements: ";
+          unlock_cerr_mutex();
+
+       }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+    
+       int j = optind;
+
+@q ***** (5) @>
+
+       for (int i = 0; j < argc;  ++i, ++j)
+       {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex();
+               cerr << "[Thread 0] argv[" << j << "] == " << argv[j] << endl
+                    << "strlen(argv[j]) == " << strlen(argv[j]) << endl;
+               unlock_cerr_mutex();
+
+           }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) First non-option argument for `gwirdcli':  |remote_hostname|.  @>
+
+@ First non-option argument for `gwirdcli':  |remote_hostname|. 
+\initials{LDF 2012.09.20.}
+
+\LOG
+\initials{LDF 2012.09.20.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options| definition@>=
+
+           if (i == 0 && (is_gwirdcli || is_gwirdpcl))  /* |remote_hostname|  */
+           {
+@q ******* (7) @>
+
+               if (!remote_hostname.empty() && strcmp(remote_hostname.c_str(), argv[j]) != 0)
+               {
+                   lock_cerr_mutex();
+                   cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                        << endl 
+                        << "Non-option argument found for `anonymous':  "
+                        << argv[j] << ", however `remote_hostname' has already been set "
+                        << "using the `--anonymous' option:  " << remote_hostname
+                        << endl 
+                        << "Not resetting."
+                        << endl;
+                   unlock_cerr_mutex();
+
+               }
+@q ******* (7) @>
+
+               else if (!remote_hostname.empty() && strcmp(remote_hostname.c_str(), argv[j]) == 0)
+               {
+                   lock_cerr_mutex();
+                   cerr << "[Thread 0] WARNING!  In `process_command_line_options':"
+                        << endl 
+                        << "Non-option argument found for `anonymous':  "
+                        << argv[j] << ", however `remote_hostname' has already been set "
+                        << "to this value using the `--anonymous' option."
+                        << endl 
+                        << "Continuing."
+                        << endl;
+                   unlock_cerr_mutex();
+
+               }
+
+@q ******* (7) @>
+
+               else
+               {
+                   remote_hostname = argv[j];
+                   remote_connection = true;
+
+#if DEBUG_COMPILE
+                   if (DEBUG)
+                   {
+                       lock_cerr_mutex(); 
+                       cerr << "[Thread 0] In `process_command_line_options':"
+                            << endl 
+                            << "Non-option argument found for `anonymous':  "
+                            << argv[j]
+                            << endl 
+                            << "Setting `remote_hostname' to this value."
+                            << endl;
+                       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+               }  /* |else|  */
+
+@q ******* (7) @>
+
+           }  /* |if (i == 0 && (is_gwirdcli || is_gwirdpcl)| (|remote_hostname|)  */
+
+@q ****** (6) @>
+@
+@<|process_command_line_options| definition@>=
+
+       }  /* |for| */ 
+   
+@q ***** (5) @>
+ 
+  } /* |if (optind < argc)|  */
+
+
+@q ****** (6) @>
+@
+@<|process_command_line_options| definition@>=
+
+@q ***** (5) @>
+
+@q **** (4) @>
+
+   return 0;
+
+}  /* End of |process_command_line_options| definition  */
+
+
+@q *** (3) @>
+
+@q ** (2) Putting ``Command-line option processing'' together.@>
+
+@ Putting ``Command-line option processing'' together.
+\initials{LDF 2012.07.02.}
+
+@q *** (3) @>
+
+This is what's compiled.
+\initials{LDF 2012.07.02.}
+
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+extern int xxdebug;
+extern int yydebug;
+extern int zzdebug;
+@<|process_command_line_options| declaration@>@;@/
+@<|process_command_line_options| definition@>@;
+
+@q *** (3) @>
+
+@ This is what's written to the header file \filename{cmdlnopt.h} (which is 
+renamed to \filename{cmdlnopt.h++} if it has changed).
+\initials{LDF 2012.07.02.}
+
+@(cmdlnopt.h@>=
+@<|process_command_line_options| declaration@>@;@/
+
+@q (progn (cweb-mode) (outline-minor-mode))                                @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

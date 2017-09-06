@@ -1,0 +1,1111 @@
+@q gntlsfnc.web  @>
+@q [...]/Finston/gwrdifpk/src/gntlsfnc.web  @>
+
+@q Created by Laurence D. Finston (LDF) Fri Sep 21 16:20:07 CEST 2012  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q * (0) Functions for GNUTLS (gntlsfnc.web).  @>
+
+@*  Functions for GNUTLS (gntlsfnc\PERIOD web).
+
+@q ** (2) Include files  @>
+
+@ Include files.
+\initials{LDF 2009.11.25.}
+
+@<Include files@>=
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <string.h>
+#include <unistd.h>
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+#include <gcrypt.h> /* for |gcry_control| */
+
+
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <fstream>
+#include <sstream>   
+#include <string>
+#include <vector>
+#include <deque>
+#include <stack>
+#include <set>
+
+#include <expat.h>
+
+#include <pthread.h>
+
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#include <mysql.h>
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "rspnstp.h++"
+#include "irdsavtp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif 
+
+@q ** (2) Preprocessor macro definitions.  @>
+
+@ Preprocessor macro definitions.
+\initials{LDF 2009.11.25.}
+
+@<Preprocessor macro definitions@>=
+
+#define TLS_SESSION_CACHE 50
+#define MAX_SESSION_ID_SIZE 32
+#define MAX_SESSION_DATA_SIZE 512
+
+#define DH_BITS 1024
+
+
+@q *** (3) struct CACHE.  @>
+@ {\bf struct CACHE}.  
+\initials{LDF 2009.11.25.}
+
+@<Type definitions@>=
+
+typedef struct
+{
+  char session_id[MAX_SESSION_ID_SIZE];
+  int session_id_size;
+
+  char session_data[MAX_SESSION_DATA_SIZE];
+  int session_data_size;
+} CACHE;
+
+
+@q ** (2) Global variables.  @>
+@ Global variables.
+\initials{LDF 2009.11.25.}
+
+
+@<Global variables@>=
+
+static CACHE *cache_db;
+static int cache_db_ptr = 0;
+
+@q ** (2) @>
+@
+@<Declare functions@>=
+
+void 
+wrap_db_init (void);
+
+@
+@<Define functions@>=
+void
+wrap_db_init (void)
+{
+
+  /* allocate |cache_db| */
+  cache_db = static_cast<CACHE*>(calloc (1, TLS_SESSION_CACHE * sizeof (CACHE)));
+}
+
+
+
+@q ** (2) @>
+@
+@<Declare functions@>=
+
+void 
+wrap_db_deinit (void);
+
+@
+@<Define functions@>=
+void
+wrap_db_deinit (void)
+{
+  if (cache_db)
+    free (cache_db);
+  cache_db = NULL;
+  return;
+}
+
+@q ** (2) @>
+@
+@<Declare functions@>=
+
+int 
+wrap_db_store (void *dbf, gnutls_datum_t key, gnutls_datum_t data);
+
+@
+@<Define functions@>=
+int
+wrap_db_store (void *dbf, gnutls_datum_t key, gnutls_datum_t data)
+{
+
+  if (cache_db == NULL)
+    return -1;
+
+  if (key.size > MAX_SESSION_ID_SIZE)
+    return -1;
+  if (data.size > MAX_SESSION_DATA_SIZE)
+    return -1;
+
+  memcpy (cache_db[cache_db_ptr].session_id, key.data, key.size);
+  cache_db[cache_db_ptr].session_id_size = key.size;
+
+  memcpy (cache_db[cache_db_ptr].session_data, data.data, data.size);
+  cache_db[cache_db_ptr].session_data_size = data.size;
+
+  cache_db_ptr++;
+  cache_db_ptr %= TLS_SESSION_CACHE;
+
+  return 0;
+}
+
+@q ** (2) @>
+@
+@<Declare functions@>=
+
+gnutls_datum_t 
+wrap_db_fetch (void *dbf, gnutls_datum_t key);
+
+@
+@<Define functions@>=
+gnutls_datum_t
+wrap_db_fetch (void *dbf, gnutls_datum_t key)
+{
+  gnutls_datum_t res = { NULL, 0 };
+  int i;
+
+  if (cache_db == NULL)
+    return res;
+
+  for (i = 0; i < TLS_SESSION_CACHE; i++)
+    {
+      if (key.size == cache_db[i].session_id_size &&
+	  memcmp (key.data, cache_db[i].session_id, key.size) == 0)
+	{
+
+
+	  res.size = cache_db[i].session_data_size;
+
+	  res.data = static_cast<unsigned char*>(gnutls_malloc (res.size)); 
+	  if (res.data == NULL)
+	    return res;
+
+	  memcpy (res.data, cache_db[i].session_data, res.size);
+
+	  return res;
+	}
+    }
+  return res;
+}
+
+@q ** (2) @>
+@
+@<Declare functions@>=
+
+int 
+wrap_db_delete (void *dbf, gnutls_datum_t key);
+
+@
+@<Define functions@>=
+int
+wrap_db_delete (void *dbf, gnutls_datum_t key)
+{
+  int i;
+
+  if (cache_db == NULL)
+    return -1;
+
+  for (i = 0; i < TLS_SESSION_CACHE; i++)
+    {
+      if (key.size == cache_db[i].session_id_size &&
+	  memcmp (key.data, cache_db[i].session_id, key.size) == 0)
+	{
+
+	  cache_db[i].session_id_size = 0;
+	  cache_db[i].session_data_size = 0;
+
+	  return 0;
+	}
+    }
+
+  return -1;
+
+}  /* End of |wrap_db_delete| definition  */
+
+
+@q ** (2) |print_info|.  @>
+@ {\bf print\_info}.
+\initials{LDF 2009.12.03.}
+
+@<Declare functions@>=
+int
+print_info (gnutls_session_t session);
+
+@
+@<Define functions@>=
+int
+print_info (gnutls_session_t session)
+{
+
+  cerr << "GnuTLS version:  " << gnutls_check_version(0) << endl;
+
+  const char *tmp;
+  gnutls_credentials_type_t cred;
+  gnutls_kx_algorithm_t kx;
+
+  /* print the key exchange's algorithm name
+   */
+  kx = gnutls_kx_get (session);
+  tmp = gnutls_kx_get_name (kx);
+  fprintf(stderr, "- Key Exchange: %s\n", tmp);
+
+  /* Check the authentication type used and switch
+   * to the appropriate.
+   */
+  cred = gnutls_auth_get_type (session);
+
+  switch (cred)
+    {
+    case GNUTLS_CRD_IA:
+      fprintf(stderr, "- TLS/IA session\n");
+      break;
+
+
+#ifdef ENABLE_SRP
+    case GNUTLS_CRD_SRP:
+      fprintf(stderr, "- SRP session with username %s\n",
+	      gnutls_srp_server_get_username (session));
+      break;
+#endif
+
+    case GNUTLS_CRD_PSK:
+      /* This returns NULL in server side.
+       */
+      if (gnutls_psk_client_get_hint (session) != NULL)
+	fprintf(stderr, "- PSK authentication. PSK hint '%s'\n",
+		gnutls_psk_client_get_hint (session));
+      /* This returns NULL in client side.
+       */
+      if (gnutls_psk_server_get_username (session) != NULL)
+	fprintf(stderr, "- PSK authentication. Connected as '%s'\n",
+		gnutls_psk_server_get_username (session));
+      break;
+
+    case GNUTLS_CRD_ANON:	/* anonymous authentication */
+
+      fprintf(stderr, "- Anonymous DH using prime of %d bits\n",
+	      gnutls_dh_get_prime_bits (session));
+      break;
+
+    case GNUTLS_CRD_CERTIFICATE:	/* certificate authentication */
+
+      /* Check if we have been using ephemeral Diffie-Hellman.
+       */
+      if (kx == GNUTLS_KX_DHE_RSA || kx == GNUTLS_KX_DHE_DSS)
+	{
+	  fprintf(stderr, "\n- Ephemeral DH using prime of %d bits\n",
+		  gnutls_dh_get_prime_bits (session));
+	}
+
+      /* if the certificate list is available, then print some information about it.  */
+
+      print_x509_certificate_info (session);
+
+    }  /* switch */
+
+  /* print the protocol's name (ie TLS 1.0)  */
+
+  tmp = gnutls_protocol_get_name (gnutls_protocol_get_version (session));
+  fprintf(stderr, "- Protocol: %s\n", tmp);
+
+  /* print the certificate type of the peer, i.e., X.509   */
+
+  tmp = gnutls_certificate_type_get_name (gnutls_certificate_type_get (session));
+
+  fprintf(stderr, "- Certificate Type: %s\n", tmp);
+
+  /* print the compression algorithm (if any)
+   */
+  tmp = gnutls_compression_get_name (gnutls_compression_get (session));
+  fprintf(stderr, "- Compression: %s\n", tmp);
+
+  /* print the name of the cipher used.
+   * ie 3DES.
+   */
+  tmp = gnutls_cipher_get_name (gnutls_cipher_get (session));
+  fprintf(stderr, "- Cipher: %s\n", tmp);
+
+  /* Print the MAC algorithms name.
+   * ie SHA1
+   */
+  tmp = gnutls_mac_get_name (gnutls_mac_get (session));
+  fprintf(stderr, "- MAC: %s\n", tmp);
+
+  return 0;
+
+}  /* End of |print_info| definition  */
+
+@q ** (2) bin2hex  @>
+@ {\bf bin2hex}.
+
+@q *** (3) Declaration @>
+@
+@<Declare functions@>=
+const char *
+bin2hex (const void *bin, size_t bin_size);
+
+@q *** (3) Definition  @>
+@
+@<Define functions@>=
+const char *
+bin2hex (const void *bin, size_t bin_size)
+{
+  static char printable[110];
+  const unsigned char *_bin = (const unsigned char*) bin;
+  char *print;
+  size_t i;
+
+  if (bin_size > 50)
+    bin_size = 50;
+
+  print = printable;
+  for (i = 0; i < bin_size; i++)
+    {
+      sprintf (print, "%.2x ", _bin[i]);
+      print += 2;
+    }
+
+  return printable;
+}
+
+@q ** (2) |print_x509_certificate_info|.  @>
+@ {\bf print\_x509\_certificate\_info}.
+\initials{LDF 2009.12.03.}
+
+This function will print information about this session's peer
+certificate.
+
+@q *** (3) Declaration  @>
+
+@<|print_x509_certificate_info| declaration@>=
+
+void
+print_x509_certificate_info (gnutls_session_t session);
+
+@q *** (3) Definition  @>
+@
+@<|print_x509_certificate_info| definition@>=
+void
+print_x509_certificate_info (gnutls_session_t session)
+{
+@q **** (4) @>
+
+  bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0);
+
+  char serial[40];
+  char dn[256];
+  size_t size;
+  unsigned int algo, bits;
+  time_t expiration_time, activation_time;
+  const gnutls_datum_t *cert_list;
+  unsigned int cert_list_size = 0;
+  gnutls_x509_crt_t cert;
+
+  char message_str[256];
+
+  int status = 0;
+
+@q **** (4) @>
+
+  /* This function only works for X.509 certificates.   */
+
+  cerr << "*** Entering `print_x509_certificate_info'" << endl;
+
+
+  if (gnutls_certificate_type_get (session) != GNUTLS_CRT_X509)
+  {
+
+      cerr << "WARNING!  In `print_x509_certificate_info':"
+           << endl 
+           << "Certificate type isn't X.509."
+           << endl 
+           << "Exiting function and continuing."
+           << endl;
+
+
+      return;
+
+  }  /* |if (gnutls_certificate_type_get (session) != GNUTLS_CRT_X509)|  */
+
+
+@q **** (4) @>
+
+  cert_list = gnutls_certificate_get_peers (session, &cert_list_size);
+
+  cerr << "Peer provided " << cert_list_size << " certificates." 
+       << endl;
+
+
+@q **** (4) @>
+@
+@<|print_x509_certificate_info| definition@>=
+
+#if 0 
+  /* From  [...]/gnutls/include/gnutls/x509.h  LDF 2009.12.21.  */
+
+  typedef void *gnutls_x509_dn_t;
+
+  typedef struct gnutls_x509_ava_st
+  {
+    gnutls_datum_t oid;
+    gnutls_datum_t value;
+    unsigned long value_tag;
+  } gnutls_x509_ava_st;
+
+  /* From  [...]/gnutls/include/gnutls/gnutls.h  LDF 2009.12.21.  */
+
+  typedef struct
+  {
+    unsigned char *data;
+    unsigned int size;
+  } gnutls_datum_t;
+
+
+#endif 
+
+#if 0
+  GNUTLS_CRT_PRINT_FULL
+  GNUTLS_CRT_PRINT_ONELINE
+
+/* |gnutls_x509_crt_print|:  Defined in \filename{[...]/gnutls/lib/x509/output.c}  */
+
+/* 
+
+  Numerical codes for the fields in the DN ("Distinguished Name") can be found
+  in this file:
+
+  \filename{[...]/gnutls/doc/protocol/x509guide.txt} 
+
+  LDF 2009.12.21.
+
+*/
+
+#endif 
+
+
+@q **** (4) @>
+@
+@<|print_x509_certificate_info| definition@>=
+
+  gnutls_datum_t out;
+
+@q **** (4) @>
+@
+@<|print_x509_certificate_info| definition@>=
+
+  if (cert_list_size > 0)
+  {
+@q ***** (5) @>
+
+    gnutls_x509_crt_init (&cert);
+
+    for (int i = 0; i < cert_list_size; ++i)
+    {
+@q ****** (6) @>
+
+       gnutls_x509_crt_import (cert, &cert_list[i], GNUTLS_X509_FMT_DER);
+
+       if (DEBUG)
+          cerr << "Certificate info for certificate " << i << endl;
+
+@q ****** (6) Get subject information.  @>
+@ Get subject information.  
+\initials{LDF 2009.12.21.}
+
+This works.  Not calling |extract_dn_fields| at present, because it's called elsewhere
+and I don't want the terminal output at present.
+\initials{LDF 2009.12.22.}
+
+@<|print_x509_certificate_info| definition@>=
+
+#if 0 
+   extract_dn_fields(cert, true);  /* Subject  */
+#endif 
+
+@q ****** (6) @>
+@
+@<|print_x509_certificate_info| definition@>=
+
+#if 0 
+   extract_dn_fields(cert, false);  /* Issuer  */
+#endif 
+
+@q ****** (6) @>
+@
+@<|print_x509_certificate_info| definition@>=
+
+       expiration_time = gnutls_x509_crt_get_expiration_time (cert);
+       activation_time = gnutls_x509_crt_get_activation_time (cert);
+
+       cerr << "     Certificate is valid since:  " <<  ctime(&activation_time) 
+            << endl;
+
+#if 0 
+            /* !! TODO:  LDF 2012.01.18.  BUG!! This prints the same 
+               information as |ctime(&activation_time)|, i.e., the
+               contents of the "Not Before" field.
+
+               See whether it's been fixed in a newer version of GNUTLS.
+               Otherwise, submit bug report.
+
+             */
+
+            << "     Certificate expires: " << ctime(&expiration_time)
+            << endl;
+#endif 
+
+       /* Print the serial number of the certificate.   */
+
+       size = sizeof (serial);
+       gnutls_x509_crt_get_serial (cert, serial, &size);
+
+       cerr << "     Certificate serial number: " << bin2hex (serial, size)
+            << endl;
+
+       /* Extract some of the public key algorithm's parameters  */
+
+       algo = gnutls_x509_crt_get_pk_algorithm (cert, &bits);
+
+       cerr << "Certificate public key: "
+            << gnutls_pk_algorithm_get_name((gnutls_pk_algorithm_t) algo)
+             << endl;
+
+       /* Print the version of the X.509 certificate.  */
+
+       cerr << "     Certificate version: #"
+            << gnutls_x509_crt_get_version (cert)
+            << endl;
+
+       size = sizeof (dn);
+       gnutls_x509_crt_get_dn (cert, dn, &size);
+  
+       cerr << "     sizeof DN: " << size
+            << endl       
+            << "     DN: " << dn 
+            << endl;
+
+       size = sizeof (dn);
+       gnutls_x509_crt_get_issuer_dn (cert, dn, &size);
+       cerr << "     Issuer's DN: "  << dn
+            << endl;
+
+@q ****** (6) @>
+
+    }  /* |for|  */
+
+    gnutls_x509_crt_deinit (cert);
+
+
+@q ***** (5) @>
+
+  }  /* |if (cert_list_size > 0)|  */
+
+@q **** (4) @>
+
+
+  if (DEBUG)
+  {
+      cerr << "*** Exiting `print_x509_certificate_info' successfully." 
+           << endl;
+  }  /* |if (DEBUG)|  */ 
+
+
+  return;  
+
+}  /* End of |print_x509_certificate_info| definition  */
+
+@q ** (2) @>
+@
+@<Global variables@>=
+
+
+/* Export-grade cipher suites require temporary RSA  keys. */
+
+static char srp_dh_group2048[] =
+  "-----BEGIN DH PARAMETERS-----\n"
+  "MIIBBwKCAQCsa9tBMkqam/Fm3l4TiVgvr3K2ZRmH7gf8MZKUPbVgUKNzKcu0oJnt\n"
+  "gZPgdXdnoT3VIxKrSwMxDc1/SKnaBP1Q6Ag5ae23Z7DPYJUXmhY6s2YaBfvV+qro\n"
+  "KRipli8Lk7hV+XmT7Jde6qgNdArb9P90c1nQQdXDPqcdKB5EaxR3O8qXtDoj+4AW\n"
+  "dr0gekNsZIHx0rkHhxdGGludMuaI+HdIVEUjtSSw1X1ep3onddLs+gMs+9v1L7N4\n"
+  "YWAnkATleuavh05zA85TKZzMBBx7wwjYKlaY86jQw4JxrjX46dv7tpS1yAPYn3rk\n"
+  "Nd4jbVJfVHWbZeNy/NaO8g+nER+eSv9zAgEC\n"
+  "-----END DH PARAMETERS-----\n";
+
+
+
+@q ** (2) @>
+@
+@<Declare functions@>=
+int
+generate_dh_params (gnutls_dh_params_t& dh_params);
+
+@
+@<Define functions@>=
+
+int
+generate_dh_params (gnutls_dh_params_t& dh_params)
+{
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0);
+
+   if (DEBUG) 
+   {  lock_cerr_mutex(); 
+      cerr << "Entering generate_dh_params." << endl;
+      unlock_cerr_mutex(); 
+   }
+
+   gnutls_datum_t dparams = { reinterpret_cast<unsigned char*>(srp_dh_group2048) , 
+                              sizeof( srp_dh_group2048) };
+
+  /* Here instead of generating Diffie Hellman parameters (for use with DHE
+     kx algorithms) we import them.   */
+
+  gnutls_dh_params_init (&dh_params);
+  gnutls_dh_params_import_pkcs3 (dh_params, &dparams, GNUTLS_X509_FMT_PEM);
+
+   if (DEBUG) 
+   {  lock_cerr_mutex(); 
+      cerr << "Exiting generate_dh_params." << endl;
+      unlock_cerr_mutex(); 
+   }
+
+  return 0;
+}
+
+@q ** (2) @>
+@
+@<Declare functions@>=
+int
+generate_rsa_params (gnutls_rsa_params_t& rsa_params);
+
+@
+@<Define functions@>=
+int
+generate_rsa_params (gnutls_rsa_params_t& rsa_params)
+{
+
+  bool DEBUG = false;  /* |true|  */
+  set_debug_level(DEBUG, 0, 0);
+
+  if (DEBUG) 
+  {
+     lock_cerr_mutex(); 
+     cerr << "Entering generate_rsa_params." << endl;
+     unlock_cerr_mutex(); 
+  }
+
+  /* Generate RSA parameters - for use with RSA-export
+   * cipher suites. This is an RSA private key and should be
+   * discarded and regenerated once a day, once every 500
+   * transactions etc. Depends on the security requirements.
+   */
+
+#if IS_OPTINUM_SRV
+
+#if 0  
+   int status = gnutls_rsa_params_generate2 (rsa_params, 31);  /* 512  */
+#endif
+
+#else
+
+  /* !! TODO:  This fails on `optinum-srv'.  
+     Find out why.  LDF 2010.04.16.  
+  */
+
+  gnutls_rsa_params_init (&rsa_params);
+
+  int status = gnutls_rsa_params_generate2 (rsa_params, 512);  
+
+#endif
+
+
+  if (DEBUG) 
+  {
+     lock_cerr_mutex(); 
+     cerr << "Exiting generate_rsa_params." << endl;
+     unlock_cerr_mutex(); 
+  }
+
+  return 0;
+
+}  /* End of |generate_rsa_params| definition  */
+
+
+@q ** (2) initialize_tls_session.@>
+
+@ {\bf initialize\_tls\_session}.
+
+@<Declare functions@>=
+
+gnutls_session_t
+initialize_tls_session (gnutls_certificate_credentials_t& cert_cred);
+
+@
+@<Define functions@>=
+
+gnutls_session_t
+initialize_tls_session (gnutls_certificate_credentials_t& cert_cred)
+{
+  gnutls_session_t session;
+
+  gnutls_init (&session, GNUTLS_SERVER);
+
+  /* Use the default priorities, plus, export cipher suites.   */
+
+  gnutls_priority_set_direct(session, "EXPORT", NULL);
+
+
+  gnutls_credentials_set (session, GNUTLS_CRD_CERTIFICATE, cert_cred);
+
+  /* request client certificate if any.  */
+
+  gnutls_certificate_server_set_request (session, GNUTLS_CERT_REQUEST);
+
+  gnutls_dh_set_prime_bits (session, DH_BITS);
+
+  if (TLS_SESSION_CACHE != 0)
+    {
+      gnutls_db_set_retrieve_function (session, wrap_db_fetch);
+      gnutls_db_set_remove_function (session, wrap_db_delete);
+      gnutls_db_set_store_function (session, wrap_db_store);
+      gnutls_db_set_ptr (session, NULL);
+    }
+
+  return session;
+
+}  /* End of |initialize_tls_session| definition  */
+
+@q ** (2) Extract DN fields.  @>
+@ Extract DN fields.  
+\initials{LDF 2009.12.21.}
+
+The |bool subject| argument should be |false| when this function is 
+used for the issuer's certificate.
+\initials{LDF 2009.12.30.}
+
+\LOG
+\initials{LDF 2009.12.21.}
+Added this function.
+
+\initials{LDF 2009.12.23.}
+Added the argument |X509_Cert_Type* x509_cert|.  The extracted information is 
+stored in the object it references.
+Also added the argument |Scan_Parse_Parameter_Type* param|.
+
+\initials{LDF 2013.05.08.}
+Added this function to \.{gwrdifpk}.  I've copied it from the \.{dbsrvcli} package 
+(from the OptiNum-Grid project).
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|extract_dn_fields| declaration@>=
+int
+extract_dn_fields(gnutls_x509_crt_t &cert, 
+                  X509_Cert_Type *x509_cert = 0, 
+                  bool subject = true,
+                  Scan_Parse_Parameter_Type *param = 0); 
+
+@q *** (3) Definition  @>
+@
+@<|extract_dn_fields| definition@>=
+int
+extract_dn_fields(gnutls_x509_crt_t &cert, 
+                  X509_Cert_Type *x509_cert, 
+                  bool subject,  
+                  Scan_Parse_Parameter_Type *param)
+{
+@q **** (4) @>
+
+  bool DEBUG = false;  /* |true|  */
+  set_debug_level(DEBUG, 0, 0);
+
+  string thread_ctr_str = "";
+
+  if (param)
+  {
+    stringstream s;
+    s << "[Thread " << param->get_thread_ctr() << "]: ";
+    thread_ctr_str = s.str();
+  }
+
+  if (DEBUG)
+  {
+     lock_cerr_mutex(); 
+     cerr << thread_ctr_str
+          << "*** Entering `extract_dn_fields'." 
+          << endl;
+     unlock_cerr_mutex(); 
+
+  }  /* |if (DEBUG)|  */
+
+
+  gnutls_x509_ava_st curr_ava;
+  gnutls_x509_dn_t curr_dn;
+
+  string value_str = "";
+  string oid_str = "";
+
+  int status = 0;
+
+  if (subject)
+  {
+     status = gnutls_x509_crt_get_subject(cert, &curr_dn);
+
+     if (DEBUG)
+        cerr << "`gnutls_x509_crt_get_subject' returned " << status << endl;
+  }
+  else
+  {
+     status = gnutls_x509_crt_get_issuer(cert, &curr_dn);
+
+     if (DEBUG)
+        cerr << "`gnutls_x509_crt_get_issuer' returned " << status << endl;
+  }
+
+@q **** (4) @>
+@
+@<|extract_dn_fields| definition@>=
+
+       for (int j = 0;;++j)
+       {
+@q ***** (5) @>
+
+          if (DEBUG) 
+             cerr << "j == " << j << endl;
+
+          status = gnutls_x509_dn_get_rdn_ava(curr_dn, j, 0, &curr_ava);
+
+          if (DEBUG) 
+              cerr << "`gnutls_x509_dn_get_rdn_ava' returned " << status << endl;
+
+          if (status != 0)
+          {
+              if (DEBUG)
+                 cerr << "Breaking." << endl;
+              break;
+          }
+
+
+@q ***** (5) @>
+
+@ |curr_ava.value.data| and |curr_ava.oid.data| are copied to |strings|, because it's a lot easier 
+to handle |strings| than it is to handle arrays of |unsigned char|.
+\initials{LDF 2009.12.21.}
+
+\LOG
+\initials{LDF 2009.12.22.}
+Now checking that |curr_ava.value.data[k] > 0| and 
+|curr_ava.oid.size && curr_ava.oid.data[k] > 0| before putting the characters 
+onto the corresponding strings.  Otherwise, it's possible that an ASCII 
+null character could get onto one (or both) of them.
+\ENDLOG 
+
+@<|extract_dn_fields| definition@>=
+
+         value_str = "";
+
+         for (int k = 0; 
+              k < curr_ava.value.size && curr_ava.value.data[k] > 0; 
+              ++k)
+            value_str += static_cast<char>(curr_ava.value.data[k]); 
+
+         oid_str = "";
+
+         for (int k = 0; 
+              k < curr_ava.oid.size && curr_ava.oid.data[k] > 0; 
+              ++k)
+            oid_str += static_cast<char>(curr_ava.oid.data[k]); 
+
+          if (DEBUG) 
+          cerr << "curr_ava.value.data == " << value_str << endl
+               << "curr_ava.value.size == " << curr_ava.value.size << endl
+               << "curr_ava.value_tag == " << curr_ava.value_tag   << endl
+               << "curr_ava.oid.data == " << oid_str   << endl
+               << endl
+               << "curr_ava.oid.size == " << curr_ava.oid.size   
+               << endl
+               << "value_str == " << value_str
+               << endl 
+               << "oid_str == " << oid_str
+               << endl 
+               << "dn_fields[\"" << oid_str << "\"] == " 
+               << dn_fields[oid_str] 
+               << endl;
+
+          if (oid_str == "2.5.4.3")
+             x509_cert->commonName = value_str;
+
+          else if (oid_str == "2.5.4.6")
+             x509_cert->countryName = value_str;
+
+          else if (oid_str == "2.5.4.7")
+             x509_cert->localityName = value_str;
+
+          else if (oid_str == "2.5.4.8")
+             x509_cert->stateOrProvinceName = value_str;
+
+          else if (oid_str == "2.5.4.10")
+             x509_cert->organization = value_str;
+
+          else if (oid_str == "2.5.4.11")
+             x509_cert->organizationalUnitName = value_str;
+
+
+@q ***** (5) @>
+
+      }  /* |for|  */
+
+@q **** (4) @>
+
+   if (DEBUG)
+   {
+       cerr << "Exiting `extract_dn_fields' successfully with return value 0." 
+            << endl;
+
+   }  /* |if (DEBUG)|  */
+
+
+   return 0;
+
+}  /* End of |extract_dn_fields| definition   */
+
+@q *** (3) @>
+
+@q ** (2) Garbage.  @>
+@
+@<Garbage@>=
+#if 0
+#endif
+
+@q ** (2) Putting Functions for GNUTLS together.@>
+
+@ Putting Functions for GNUTLS together.
+
+@q *** (3) @>
+
+@ This is what's compiled.
+\initials{LDF 2013.05.08.}
+
+@c
+using namespace std;
+@<Include files@>@;@/
+using namespace gwrdifpk;
+@<Preprocessor macro definitions@>@;@/
+@<Type definitions@>@;@/
+@<Global variables@>@;@/
+void lock_cerr_mutex(void);
+void unlock_cerr_mutex(void);
+
+#if 0 /* 1 */ 
+@<Garbage@>@;@/
+#endif 
+
+@<Declare functions@>@;@/
+@<|print_x509_certificate_info| declaration@>@;@/
+@<|extract_dn_fields| declaration@>@;@/
+@<Define functions@>@;@/
+@<|print_x509_certificate_info| definition@>@;@/
+@<|extract_dn_fields| definition@>@;@/
+
+@q *** (3) @>
+
+@ This is what's written to the header file \filename{gntlsfnc.h}.
+\initials{LDF 2013.05.08.}
+
+@(gntlsfnc.h@>=
+#ifndef GNTLSFNC_H
+#define GNTLSFNC_H 1
+@<Preprocessor macro definitions@>@;@/
+@<Declare functions@>@;@/
+@<|print_x509_certificate_info| declaration@>@;@/
+@<|extract_dn_fields| declaration@>@;@/
+#endif 
+
+@q (progn (cweb-mode) (outline-minor-mode))   @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

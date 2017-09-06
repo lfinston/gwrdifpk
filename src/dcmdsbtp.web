@@ -1,0 +1,1410 @@
+@q dcmdsbtp.web  @>
+@q Created by Laurence D. Finston (LDF) @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+@q ** (2)  dcmdsbtp.web  @>
+
+@* {\bf class Dublin\_Core\_Metadata\_Sub\_Type}.
+
+\LOG
+\initials{LDF 2013.12.16.}
+Added this file.
+\ENDLOG
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+#include <stdlib.h>  /* Standard Library for C  */
+#include <stdio.h>
+#include <string.h>
+
+#include <limits.h>
+#include <errno.h>
+
+
+#include <expat.h>
+
+#include <fstream> /* Standard Template Library (STL) for C++  */
+#include <iomanip>
+#include <ios>
+#include <iostream>
+
+#include <bitset>
+
+#include <map>
+#include <vector>
+#include <stack>
+
+#include <string>
+
+#if 0 
+#include <time.h>
+#include <math.h>
+#endif 
+
+#include <sstream>  
+
+#include <pthread.h>  /* POSIX threads  */
+
+#include <mysql.h>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif 
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "utilfncs.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "hndlvltp.h++"
+#include "rspnstp.h++"
+#include "rspercds.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+
+@q ** (2) |class Dublin_Core_Metadata_Sub_Type|. @>
+@ {\bf class Dublin\_Core\_Metadata\_Sub\_Type}.
+\initials{LDF 2012.12.06.}
+
+@:TODO@> !! TODO:  I am somewhat confused about the way |qualifier_id| is used.
+Are both |qualifier_id| and |term_id| needed?  
+\initials{LDF 2013.12.16.}
+
+\LOG
+\initials{LDF 2012.12.06.}
+Added this type declaration.
+
+\initials{LDF 2012.12.12.}
+Renamed this |class|.  Old name:  |Dublin_Core_Qualifier_Type|.  New name:
+|Dublin_Core_Metadata_Sub_Type|.  
+
+\initials{LDF 2013.12.16.}
+Changed type of |id| from |unsigned long | to |unsigned long int|.
+
+\initials{LDF 2013.12.16.}
+Added |unsigned int term_id|.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|class Dublin_Core_Metadata_Sub_Type| declaration@>=
+
+class Dublin_Core_Metadata_Sub_Type
+{
+   friend int yyparse(yyscan_t parameter);
+                               
+   friend class Scan_Parse_Parameter_Type;
+   friend class Dublin_Core_Metadata_Type;
+
+   friend int exchange_data_with_server(Scan_Parse_Parameter_Type&);
+   friend int exchange_data_with_client(Scan_Parse_Parameter_Type&);
+
+   private:
+
+   unsigned long int id;
+   unsigned long int metadata_id;
+   unsigned int      element_id;
+   unsigned int      qualifier_id;
+   unsigned int      term_id;
+
+   string            value;
+
+   multimap <string, string> attribute_map;
+
+   public:
+
+   @<|Dublin_Core_Metadata_Sub_Type| function declarations@>@;
+
+};
+
+@q **** (4) Default constructor.  @>
+@ Default constructor.
+\initials{LDF 2012.12.06.}
+
+@q ***** (5) Declaration  @>
+
+@<|Dublin_Core_Metadata_Sub_Type| function declarations@>=
+Dublin_Core_Metadata_Sub_Type(void);
+
+@q ***** (5) Definition  @>
+@
+@<|Dublin_Core_Metadata_Sub_Type| function definitions@>=
+
+Dublin_Core_Metadata_Sub_Type::Dublin_Core_Metadata_Sub_Type(void)
+{
+
+   id = metadata_id = 0UL;
+   element_id = qualifier_id = term_id = 0U;
+
+   return;
+}
+
+@q **** (4) Destructor.  @>
+@ Destructor.
+\initials{LDF 2012.12.06.}
+
+\LOG
+\initials{LDF 2012.12.06.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|Dublin_Core_Metadata_Sub_Type| function declarations@>=
+~Dublin_Core_Metadata_Sub_Type(void);
+
+@q ***** (5) Definition  @>
+@
+@<|Dublin_Core_Metadata_Sub_Type| function definitions@>=
+
+Dublin_Core_Metadata_Sub_Type::~Dublin_Core_Metadata_Sub_Type(void)
+{
+
+   return;
+}
+
+@q **** (4) Set (|set|).  Scalar arguments.  @>
+@ Set (|set|) Scalar arguments.
+\initials{LDF 2013.12.17.}
+
+\LOG
+\initials{LDF 2013.12.17.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|Dublin_Core_Metadata_Sub_Type| function declarations@>=
+int
+set(unsigned long int         iid,
+    unsigned long int         mmetadata_id,
+    unsigned int              eelement_id,
+    unsigned int              qqualifier_id,
+    unsigned int              tterm_id,
+    string                    vvalue, 
+    multimap <string, string> *attribute_map_ptr = 0,
+    string                    thread_str = "");
+
+@q ***** (5) Definition  @>
+@
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+int
+Dublin_Core_Metadata_Sub_Type::set(unsigned long int         iid,    
+                                   unsigned long int         mmetadata_id,
+                                   unsigned int              eelement_id,
+                                   unsigned int              qqualifier_id,
+                                   unsigned int              tterm_id,
+                                   string                    vvalue, 
+                                   multimap <string, string> *attribute_map_ptr,
+                                   string                    thread_str)
+{
+@q ****** (6) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Dublin_Core_Metadata_Sub_Type::set'."
+            << endl;
+
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   id           = iid;
+   metadata_id  = mmetadata_id;
+   element_id   = eelement_id;
+   qualifier_id = qqualifier_id;
+   term_id      = tterm_id;
+   value        = vvalue;
+
+   if (attribute_map_ptr != 0)
+   {
+       attribute_map = *attribute_map_ptr;
+       delete attribute_map_ptr;
+       attribute_map_ptr = 0;
+   }
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Dublin_Core_Metadata_Sub_Type::set' successfully "
+            << "with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |Dublin_Core_Metadata_Sub_Type::set| definition  */
+
+
+@q **** (4) Set (|set|).  Database row argument.  @>
+@ Set (|set|).  Database row argument.
+\initials{LDF 2013.12.09.}
+
+\LOG
+\initials{LDF 2013.12.09.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|Dublin_Core_Metadata_Sub_Type| function declarations@>=
+int
+set(MYSQL *&mysql_ptr, 
+    MYSQL_ROW &curr_row, 
+    string database = "gwirdsif", 
+    string thread_str = "");
+
+@q ***** (5) Definition  @>
+@
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+int
+Dublin_Core_Metadata_Sub_Type::set(MYSQL *&mysql_ptr, 
+                                   MYSQL_ROW &curr_row, 
+                                   string database, 
+                                   string thread_str)
+{
+@q ****** (6) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   unsigned long int temp_val = 0UL; 
+
+   MYSQL_RES *result = 0;
+
+   unsigned int row_ctr = 0;
+   unsigned int field_ctr = 0;
+
+   MYSQL_ROW attribute_row;
+
+   stringstream sql_strm;
+
+   int status = 0;
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Dublin_Core_Metadata_Sub_Type::set'."
+            << endl;
+
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) metadata_id (dublin_core_metadata_id)    @>
+
+@ |metadata_id| (|dublin_core_metadata_id|).
+\initials{LDF 2013.12.16.}
+
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+
+@q ******* (7) @>
+
+   if (curr_row[field_ctr] == 0)
+   {
+       cerr << thread_str << "ERROR!  In `Dublin_Core_Metadata_Type::set':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' == 0."
+            << endl
+            << "Can't set `metadata_id'."
+            << endl 
+            << "This is not permitted.  Exiting function unsuccessfully with return value 1."
+            << endl;
+
+        return 1;
+
+   }  /* |if (curr_row[field_ctr] == 0)|  */
+    
+@q ******* (7) @>
+
+   else 
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Dublin_Core_Metadata_Type::set':"
+                << endl 
+                << "`curr_row[" << field_ctr << "]' == " << curr_row[field_ctr]
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******** (8) @>
+
+       errno = 0;
+       temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           cerr << thread_str << "ERROR!  In `Dublin_Core_Metadata_Type::set':"
+                << endl 
+                << "`strtoul' failed, returning `ULONG_MAX':"
+                << endl
+                << strerror(errno)
+                << endl 
+                << "Failed to set `metadata_id'."
+                << endl 
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+
+           return 1;
+
+       }  /* |if (temp_val == ULONG_MAX)|  */
+
+@q ******** (8) @>
+
+       else
+       {
+           metadata_id = temp_val;
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "In `Dublin_Core_Metadata_Type::set':"
+                    << endl 
+                    << "`strtoul' succeeded, returning `temp_val' == " << temp_val << endl
+                    << endl
+                    << "Set `metadata_id' to `temp_val' == " << metadata_id
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       }  /* |else|  */
+
+
+@q ******** (8) @>
+
+   }  /* |else|  */
+
+@q ******* (7) @>
+
+@q ****** (6) id (dublin_core_metadata_sub_id)  @>
+
+@ |id| (|dublin_core_metadata_sub_id|).
+\initials{LDF 2013.12.16.}
+
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+
+@q ******* (7) @>
+
+   ++field_ctr;
+
+   if (curr_row[field_ctr] == 0)
+   {
+       cerr << thread_str << "ERROR!  In `Dublin_Core_Metadata_Type::set':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' == 0."
+            << endl
+            << "Can't set `id'."
+            << endl 
+            << "This is not permitted.  Exiting function unsuccessfully with return value 1."
+            << endl;
+
+        return 1;
+
+   }  /* |if (curr_row[field_ctr] == 0)|  */
+
+@q ******* (7) @>
+
+   else 
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Dublin_Core_Metadata_Type::set':"
+                << endl 
+                << "`curr_row[" << field_ctr << "]' == " << curr_row[field_ctr]
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******** (8) @>
+
+       errno = 0;
+       temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           cerr << thread_str << "ERROR!  In `Dublin_Core_Metadata_Type::set':"
+                << endl 
+                << "`strtoul' failed, returning `ULONG_MAX':"
+                << endl
+                << strerror(errno)
+                << endl 
+                << "Failed to set `id' (`dublin_core_metadata_sub_id')."
+                << endl 
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+
+           return 1;
+
+       }  /* |if (temp_val == ULONG_MAX)|  */
+
+@q ******** (8) @>
+
+       else
+       {
+           id = temp_val;
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "In `Dublin_Core_Metadata_Type::set':"
+                    << endl 
+                    << "`strtoul' succeeded, returning `temp_val' == " << temp_val << endl
+                    << endl
+                    << "Set `id' to `temp_val' == " << id
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       }  /* |else|  */
+
+@q ******** (8) @>
+
+   }  /* |else|  */
+
+@q ******* (7) @>
+
+@q ****** (6) dublin_core_term_id          @>
+@
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+
+@q ******* (7) @>
+
+   ++field_ctr;
+
+   if (curr_row[field_ctr] == 0)
+   {
+       cerr << thread_str << "ERROR!  In `Dublin_Core_Metadata_Type::set':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' == 0."
+            << endl
+            << "Can't set `dublin_core_term_id'."
+            << endl 
+            << "This is not permitted.  Exiting function unsuccessfully with return value 1."
+            << endl;
+
+        return 1;
+
+   }  /* |if (curr_row[field_ctr] == 0)|  */
+
+
+@q ******* (7) @>
+
+   else 
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Dublin_Core_Metadata_Type::set':"
+                << endl 
+                << "`curr_row[" << field_ctr << "]' == " << curr_row[field_ctr]
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******** (8) @>
+
+       errno = 0;
+       temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           cerr << thread_str << "ERROR!  In `Dublin_Core_Metadata_Type::set':"
+                << endl 
+                << "`strtoul' failed, returning `ULONG_MAX':"
+                << endl
+                << strerror(errno)
+                << endl 
+                << "Failed to set `term_id' (`dublin_core_term_id')."
+                << endl 
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+
+           return 1;
+
+       }  /* |if (temp_val == ULONG_MAX)|  */
+
+@q ******** (8) @>
+
+       else if (temp_val >= UINT_MAX)
+       {
+           cerr << thread_str << "ERROR!  In `Dublin_Core_Metadata_Type::set':"
+                << endl 
+                << "`strtoul' returned `temp_val' == " << temp_val << " (> UINT_MAX):"
+                << endl
+                << "Value out of range for `term_id'."
+                << endl 
+                << "Failed to set `term_id' (`dublin_core_term_id')."
+                << endl 
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+
+           return 1;
+
+       }  /* |if (temp_val > UINT_MAX)|  */
+
+@q ******** (8) @>
+
+       else
+       {
+           term_id = static_cast<unsigned int>(temp_val);
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "In `Dublin_Core_Metadata_Type::set':"
+                    << endl 
+                    << "`strtoul' succeeded, returning `temp_val' == " << temp_val << endl
+                    << endl
+                    << "Set `term_id' to `temp_val' == " << term_id
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       }  /* |else|  */
+
+
+@q ******** (8) @>
+
+   }  /* |else|  */
+
+@q ******* (7) @>
+
+@q ****** (6) term_ name                    @>
+
+@ \.{term\_name}.  There is no corresponding data member in |Dublin_Core_Metadata_Sub_Type|,
+but we check the value of the field against |Dublin_Core_Metadata_Type::qualifier_map[term_id]|
+to make sure they match.
+\initials{LDF 2013.12.16.}
+
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+
+   ++field_ctr;
+
+@q ******* (7) @>
+@
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+
+   if (curr_row[field_ctr] != Dublin_Core_Metadata_Type::qualifier_map[term_id])
+   {
+       cerr << thread_str << "ERROR!  In `Dublin_Core_Metadata_Type::set':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' != "
+            << "`Dublin_Core_Metadata_Type::qualifier_map[" << term_id << "] == " 
+            << Dublin_Core_Metadata_Type::qualifier_map[term_id]
+            << endl
+            << "Term name mismatch."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+
+        return 1;
+
+   }  /* |if|  */
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `Dublin_Core_Metadata_Type::set':"
+                 << endl 
+                 << "Term name `curr_row[" << field_ctr << "]' == " << curr_row[field_ctr]
+                 << endl 
+                 << "`Dublin_Core_Metadata_Type::qualifier_map[" << term_id << "] == " 
+                 << Dublin_Core_Metadata_Type::qualifier_map[term_id]
+                 << endl
+                 << "Term names match."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   
+@q ****** (6) value                        @>
+@
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+
+   ++field_ctr;
+
+   if (curr_row[field_ctr] == 0)
+   {
+       cerr << thread_str << "ERROR!  In `Dublin_Core_Metadata_Type::set':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' == 0."
+            << endl
+            << "Can't set `value'."
+            << endl 
+            << "This is not permitted.  Exiting function unsuccessfully with return value 1."
+            << endl;
+
+        return 1;
+
+   }  /* |if (curr_row[field_ctr] == 0)|  */
+
+@q ******* (7) @>
+@
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+
+   else
+   {
+        value = curr_row[field_ctr];
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `Dublin_Core_Metadata_Type::set':"
+                 << endl 
+                 << "`value' == " << value
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   }
+
+@q ****** (6) dublin_core_element_id       @>
+@
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+
+   ++field_ctr;
+
+   if (curr_row[field_ctr] == 0)
+   {
+       cerr << thread_str << "ERROR!  In `Dublin_Core_Metadata_Type::set':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' == 0."
+            << endl
+            << "Can't set `element_id'."
+            << endl 
+            << "This is not permitted.  Exiting function unsuccessfully with return value 1."
+            << endl;
+
+        return 1;
+
+   }  /* |if (curr_row[field_ctr] == 0)|  */
+
+@q ******* (7) @>
+
+   else 
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Dublin_Core_Metadata_Type::set':"
+                << endl 
+                << "`curr_row[" << field_ctr << "]' == " << curr_row[field_ctr]
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******** (8) @>
+
+       errno = 0;
+       temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           cerr << thread_str << "ERROR!  In `Dublin_Core_Metadata_Type::set':"
+                << endl 
+                << "`strtoul' failed, returning `ULONG_MAX':"
+                << endl
+                << strerror(errno)
+                << endl 
+                << "Failed to set `element_id' (`dublin_core_element_id')."
+                << endl 
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+
+           return 1;
+
+       }  /* |if (temp_val == ULONG_MAX)|  */
+
+@q ******** (8) @>
+
+       else if (temp_val >= UINT_MAX)
+       {
+           cerr << thread_str << "ERROR!  In `Dublin_Core_Metadata_Type::set':"
+                << endl 
+                << "`strtoul' returned `temp_val' == " << temp_val << " (> UINT_MAX):"
+                << endl
+                << "Value out of range for `element_id'."
+                << endl 
+                << "Failed to set `element_id' (`dublin_core_element_id')."
+                << endl 
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+
+           return 1;
+
+       }  /* |if (temp_val > UINT_MAX)|  */
+
+@q ******** (8) @>
+
+       else
+       {
+           element_id = static_cast<unsigned int>(temp_val);
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "In `Dublin_Core_Metadata_Type::set':"
+                    << endl 
+                    << "`strtoul' succeeded, returning `temp_val' == " << temp_val << endl
+                    << endl
+                    << "Set `element_id' to `temp_val' == " << element_id
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       }  /* |else|  */
+
+
+@q ******** (8) @>
+
+   }  /* |else|  */
+
+@q ******* (7) @>
+
+@q ****** (6) element_name               @>
+
+@ \.{element\_name}.  There is no corresponding data member in |Dublin_Core_Metadata_Sub_Type|,
+but we check the value of the field against |Dublin_Core_Metadata_Type::element_map[element_id]|
+to make sure they match.
+\initials{LDF 2013.12.16.}
+
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+
+   ++field_ctr;
+
+@q ******* (7) @>
+@
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+
+   if (curr_row[field_ctr] != Dublin_Core_Metadata_Type::element_map[element_id])
+   {
+       cerr << thread_str << "ERROR!  In `Dublin_Core_Metadata_Type::set':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' != "
+            << "`Dublin_Core_Metadata_Type::element_map[" << element_id << "] == " 
+            << Dublin_Core_Metadata_Type::element_map[element_id]
+            << endl
+            << "Element name mismatch."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+
+        return 1;
+
+   }  /* |if|  */
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `Dublin_Core_Metadata_Type::set':"
+                 << endl 
+                 << "Element name `curr_row[" << field_ctr << "]' == " << curr_row[field_ctr]
+                 << endl 
+                 << "`Dublin_Core_Metadata_Type::element_map[" << element_id << "] == " 
+                 << Dublin_Core_Metadata_Type::element_map[element_id]
+                 << endl
+                 << "Element names match."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+
+@q ******* (7) @>
+
+        sql_strm << "select attribute, value from " << database << ".Dublin_Core_Attributes "
+                 << "where dublin_core_metadata_sub_id = " << id;
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `Dublin_Core_Metadata_Type::set':"
+                 << endl 
+                 << "`sql_strm.str()' == " << sql_strm.str()
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+        status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, &row_ctr, &field_ctr);
+
+        if (status != 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  "
+                 << "In `Dublin_Core_Metadata_Sub_Type::set':"
+                 << endl
+                 << "`submit_mysql_query' failed, returning " << status << ":"
+                 << endl 
+                 << "Error:  " << mysql_error(mysql_ptr)
+                 << endl 
+                 << "Error number:  " << mysql_errno(mysql_ptr)
+                 << endl 
+                 << "Failed to select Dublin Core metadata from the "
+                 << "`gwirdsif.Dublin_Core_Metadata' database table." 
+                 << endl 
+                 << "Exiting function unsuccessfully with return value 1."
+                 << endl;
+             unlock_cerr_mutex(); 
+
+             if (result)
+                mysql_free_result(result);
+
+             return 1;
+
+        }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+@
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `Dublin_Core_Metadata_Sub_Type::set':" 
+                 << endl
+                 << "`submit_mysql_query' succeeded, returning 0."
+                 << endl
+                 << "`row_ctr' == " << row_ctr
+                 << endl
+                 << "`field_ctr' == " << field_ctr
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ******* (7) |row_ctr == 0|.  No rows found.  @>
+
+@ |row_ctr == 0|.  No rows found.
+\initials{LDF 2013.12.16.}
+
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+
+        if (row_ctr == 0)
+        {
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str 
+                     << "In `Dublin_Core_Metadata_Sub_Type::set':"
+                     << endl
+                     << "`row_ctr' == 0.  No rows found."
+                     << endl
+                     << "No attributes for `Dublin_Core_Metadata_Sub' "
+                     << id << "."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            mysql_free_result(result);
+            result = 0;
+      
+        }  /* |if (row_ctr == 0)|  */
+
+@q ******* (7) |row_ctr > 0|.  Rows found.  @>
+
+@ |row_ctr > 0|.  Rows found.
+\initials{LDF 2013.12.16.}
+
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex();
+            cerr << thread_str 
+                 << "In `Dublin_Core_Metadata_Sub_Type::set':"
+                 << endl
+                 << "`row_ctr' == " << row_ctr << "."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+
+        for (int i = 0; i < row_ctr; ++i)
+        {
+@q ******** (8) @>
+
+             attribute_row = mysql_fetch_row(result);
+
+             if (attribute_row == 0)
+             {
+                     lock_cerr_mutex(); 
+                     cerr << thread_str 
+                          << "ERROR!  "
+                          << "In `Dublin_Core_Metadata_Sub_Type::set':"
+                          << endl 
+                          << "`mysql_fetch_row' failed:"
+                          << endl
+                          << mysql_error(mysql_ptr)
+                          << endl 
+                          << "Exiting function unsuccessfully with return value 1."
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                     mysql_free_result(result);
+
+                     return 1;
+
+             }  /* |if (attribute_row == 0)|  */
+
+@q ******** (8) @>
+@
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+
+             if (attribute_row[0] && attribute_row[1])
+             {
+#if DEBUG_COMPILE
+                if (DEBUG)
+                {
+                    lock_cerr_mutex(); 
+                     cerr << thread_str 
+                          << "In `Dublin_Core_Metadata_Sub_Type::set':"
+                          << endl 
+                          << "Inserting `attribute_row[0]' == " << attribute_row[0] << " and "
+                          << "          `attribute_row[1]' == " << attribute_row[1] << " into "
+                          << "`attribute_map'."
+                          << endl;
+                    unlock_cerr_mutex(); 
+
+                }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+                attribute_map.insert(make_pair(attribute_row[0], attribute_row[1]));
+             }
+
+@q ******** (8) @>
+@
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+
+             else
+             {
+                 lock_cerr_mutex(); 
+                 cerr << thread_str 
+                      << "WARNING!  "
+                      << "In `Dublin_Core_Metadata_Sub_Type::set':"
+                      << endl 
+                      << "`attribute_row[0]' and/or `attribute_row[1]' is NULL."
+                      << endl
+                      << "This shouldn't ever happen."
+                      << endl 
+                      << "Not inserting pair into `attribute_map'."
+                      << endl 
+                      << "Continuing."
+                      << endl;
+                 unlock_cerr_mutex(); 
+             }
+
+@q ******** (8) @>
+
+        }  /* |for|  */
+
+@q ******* (7) @>
+
+        mysql_free_result(result);
+        result = 0;
+
+@q ******* (7) @>
+
+@q ****** (6) @>
+@
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Dublin_Core_Metadata_Sub_Type::set'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |Dublin_Core_Metadata_Sub_Type::set|  */
+
+
+@q **** (4) Equality operator.  @>
+@ Equality operator.
+\initials{LDF 2012.12.21.}
+
+\LOG
+\initials{LDF 2012.12.21.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|Dublin_Core_Metadata_Sub_Type| function declarations@>=
+
+bool
+operator==(const Dublin_Core_Metadata_Sub_Type& d) const;
+
+
+@q ***** (5) Definition  @>
+@
+@<|Dublin_Core_Metadata_Sub_Type| function definitions@>=
+
+bool
+Dublin_Core_Metadata_Sub_Type::operator==(const Dublin_Core_Metadata_Sub_Type& d) const
+{
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `Dublin_Core_Metadata_Sub_Type::operator=='."
+            << endl
+            << "element_id   == " << element_id << endl
+            << "d.element_id == " << d.element_id << endl
+            << "qualifier_id   == " << qualifier_id << endl
+            << "d.qualifier_id == " << d.qualifier_id << endl
+            << "term_id == " << term_id << endl
+            << "d.term_id == " << d.term_id << endl
+            << "value == " << value << endl
+            << "d.value == " << d.value << endl
+            << "attribute_map.size()   == " << attribute_map.size() << endl
+            << "d.attribute_map.size() == " << d.attribute_map.size() 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+
+    if (!(   element_id == d.element_id && qualifier_id == d.qualifier_id
+          && term_id == d.term_id
+          && value == d.value && attribute_map.size() == d.attribute_map.size()))
+       return false;
+
+   if (attribute_map.size() == 0)
+      return true;
+
+    multimap<string, string>::const_iterator iter
+       = attribute_map.begin();
+
+    multimap<string, string>::const_iterator iter_1
+       = d.attribute_map.begin();
+
+    for (; iter != attribute_map.end() && iter_1 != d.attribute_map.end();
+         ++iter, ++iter_1)
+    {
+         if (!(iter->first == iter_1->first && iter->second == iter_1->second))
+            return false;
+
+    }
+
+    return true;
+
+}  /* End of |Dublin_Core_Metadata_Sub_Type::operator==| definition  */
+
+
+@q **** (4) Inequality operator.  @>
+@ Inequality operator.
+\initials{LDF 2012.12.21.}
+
+\LOG
+\initials{LDF 2012.12.21.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|Dublin_Core_Metadata_Sub_Type| function declarations@>=
+
+bool
+operator!=(const Dublin_Core_Metadata_Sub_Type& d) const;
+
+
+@q ***** (5) Definition  @>
+@
+@<|Dublin_Core_Metadata_Sub_Type| function definitions@>=
+
+bool
+Dublin_Core_Metadata_Sub_Type::operator!=(const Dublin_Core_Metadata_Sub_Type& d) const
+{
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `Dublin_Core_Metadata_Sub_Type::operator!='." << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    return !operator==(d);
+
+}
+
+@q **** (4) Clear.  @>
+@ Clear.
+\initials{LDF 2012.12.06.}
+
+\LOG
+\initials{LDF 2012.12.06.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|Dublin_Core_Metadata_Sub_Type| function declarations@>=
+void
+clear(void);
+
+@q ***** (5) Definition  @>
+@
+@<|Dublin_Core_Metadata_Sub_Type| function definitions@>=
+void
+Dublin_Core_Metadata_Sub_Type::clear(void)
+{
+    id = metadata_id = 0UL;
+    element_id = qualifier_id = term_id = 0U;
+
+    value = "";
+
+    attribute_map.clear();
+
+} /* |Dublin_Core_Metadata_Sub_Type::clear|  */
+
+
+@q **** (4) Show.  @>
+@ Show.
+\initials{LDF 2012.12.06.}
+
+\LOG
+\initials{LDF 2012.12.06.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|Dublin_Core_Metadata_Sub_Type| function declarations@>=
+int
+show(string s = "") const;
+
+@q ***** (5) Definition  @>
+@
+@<|Dublin_Core_Metadata_Sub_Type| function definitions@>=
+int
+Dublin_Core_Metadata_Sub_Type::show(string s) const
+{
+
+   if (s.size() == 0)
+      s = "Dublin_Core_Metadata_Sub_Type:";
+
+   cerr << s 
+        << endl
+        << "id                          == " << id 
+        << endl
+        << "metadata_id                 == " << metadata_id
+        << endl;
+
+   if (element_id == 0 && qualifier_id == 0)
+       cerr << "element_id == qualifier_id == 0" << endl;
+   else if (element_id > 0)
+      cerr << "element_id ==   " << element_id 
+           << " (" << Dublin_Core_Metadata_Type::element_map[element_id] << ")"
+           << endl;
+   else
+      cerr << "qualifier_id ==      " << qualifier_id 
+           << endl;
+
+   cerr << "term_id == " << term_id;
+
+   if (term_id != 0)
+      cerr << " (" << Dublin_Core_Metadata_Type::qualifier_map[term_id] << ")";
+
+   cerr << endl;
+
+   cerr << "value ==        " << value
+        << endl;
+
+   if (attribute_map.size() == 0)
+      cerr << "attribute_map is empty." << endl;
+   else
+   {
+      cerr << "attribute_map:" << endl;
+
+      for (multimap<string, string>::const_iterator iter = attribute_map.begin();
+           iter != attribute_map.end();
+           ++iter)
+      {
+          cerr << iter->first << ": " << iter->second << endl;
+      }
+     
+   }
+
+   cerr << endl;
+
+   return 0;
+
+} /* |Dublin_Core_Metadata_Sub_Type::show|  */
+
+
+@q *** (3) Putting `dcmdsbtp.web' together.  @>
+
+@ Putting {\tt dcmdsbtp\PERIOD web} together.
+
+@q **** (4) This is what's compiled.  @>
+@ This is what's compiled.
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+
+@<|Dublin_Core_Metadata_Sub_Type| function definitions@>@;@/
+@<|Dublin_Core_Metadata_Sub_Type::set| definition@>@;@/
+
+@q **** (4) This is what's written to the header file `dcmdsbtp.h'.  @>
+
+@ This is what's written to the header file \filename{dcmdsbtp.h}.
+@
+@(dcmdsbtp.h@>=
+#ifndef DCMDSBTP_H
+#define DCMDSBTP_H 1
+using namespace std;
+using namespace gwrdifpk;
+class Scan_Parse_Parameter_Type;
+class Dublin_Core_Metadata_Type;
+@<|class Dublin_Core_Metadata_Sub_Type| declaration@>@;@/
+#endif 
+
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))                          @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+

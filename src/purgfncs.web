@@ -1,0 +1,1786 @@
+@q purgfncs.web  @>
+@q [...]/Finston/gwrdifpk/src/purgfncs.web  @>
+
+@q Created by Laurence D. Finston (LDF) Tue Apr  9 14:09:52 CEST 2013  @>
+
+@q * (1) Top @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+@* Functions for culling and purging.
+\initials{LDF 2013.04.09.}
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE         
+#endif 
+
+#include <stdlib.h>  /* Standard Library for C  */
+#include <stdio.h>
+#include <errno.h>
+
+#include <unistd.h>
+
+#if 0 
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <limits.h>
+#endif 
+
+#include <string.h>
+
+#include <algorithm> /* Standard Template Library (STL) for C++  */
+#include <fstream> 
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <string>
+#include <time.h>
+#include <math.h>
+#include <sstream>  
+
+#include <vector>
+
+#include <pthread.h>  /* POSIX threads  */
+
+#include <mysql.h>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif 
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+
+@q ** (2) Purge log files function for server.@>
+
+@ Purge log files function for server.
+\initials{LDF 2013.04.09.}
+
+@q *** (3) Declaration  @>
+
+@<|purge_server_logs| declaration@>=
+
+void* purge_server_logs(void *v);
+
+@q *** (3) Definition  @>
+@
+@<|purge_server_logs| definition@>=
+
+void* purge_server_logs(void *v)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int sleep_value = *static_cast<int*>(v); 
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `purge_server_logs'."
+            << endl
+            << "`sleep_value' == " << sleep_value << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@ The following shell command calls \.{ls} to output information on the temporary files
+with name \filename{gwirdsif} or \filename{gwirdsif\_a} and an extension consisting of 
+6 ``random'' characters.  The temporary files are sorted according to the time of last 
+access (``\.{atime}'').  The sort order is descending, i.e., oldest first.
+\par
+The reason that \.{atime} is used is that the files containing the users' 
+``scrambled'' iRODS passwords must have their original last modification time (``\.{mtime}'');  
+otherwise, the iRODS server considers them invalid.
+The timestamp is therefore stored in the \.{gwirdsif.Users} database table, along with the 
+scrambled password itself.  After the temporary file is created, \.{touch} is called 
+to set the modification time.  This is done in |Scan_Parse_Parameter_Type::get_user|.
+\par
+If there are no matching files, \.{ls} fails.  We must catch this error, otherwise it will 
+appear that |popen| has failed.  We therefore store the output in |a| and the exit status of
+\.{ls} in |r|.  The output of \.{ls} is processed by \.{tr} and \.{cut} to extract the 
+timestamps and filenames.  The timestamps are extracted in the form of 
+``seconds since the Epoch'' for purposes of comparison with |time_t limit|, but also in the
+form of human-readable strings for debugging purposes (|date_str| and |time_str|).
+\par
+If |DEBUG_COMPILE| is non-null and |DEBUG == true|, some output from the shell commands are
+output to |stderr|.  Otherwise, it's sent to \.{/dev/null}.
+\initials{LDF 2013.04.09.}
+
+\LOG
+\initials{LDF 2013.04.19.}
+Now using |purge_limit| to set |sec_val|.  |purge_limit| is a global variable, which 
+can be set using the option \.{--purge-limit}.  The default is 14, i.e., days.
+\ENDLOG 
+
+@<|purge_server_logs| definition@>=
+
+   unsigned int sec_val = (60 * 60 * 24 * purge_logs_limit);  
+
+   stringstream temp_strm;
+
+   string err_out_str = " > /dev/null";  /* Send error output to \.{/dev/null},
+                                            unless |DEBUG_COMPILE| is non-null
+                                            and |DEBUG == true|.
+                                            \initials{LDF 2013.04.17.}  */
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       err_out_str = " >&2";
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   temp_strm << "a=`ls -l -t -u --reverse --time-style=\"+%s %Y-%m-%d %H:%M:%S\" "
+             << "/tmp/gwirdsif\\.?????? 2>/dev/null`; " 
+             << "r=$?; "
+             << "echo -e \"r == $r\"" << err_out_str << "; "
+             << "if test $r -eq 0; then echo -e \"r == 0\na ==\n$a\"" << err_out_str << "; "
+             << "b=`echo \"$a\" | tr -s \" \" | cut -f6- -d\" \"`; "
+             << "r=$?; echo \"After 'cut':  r == $r\"" << err_out_str << "; "
+             << "if test $r -eq 0; then echo -e \"'cut' succeeded.\nb=\n$b\" " 
+             << err_out_str << "; "
+             << "echo \"$b\"; "
+             << "else echo \"'tr' or 'cut' failed.\"" << err_out_str << ";"
+             << "fi; "
+             << "else echo \"r <> 0.  No temporary files found.\"" << err_out_str << "; "
+             << "echo; fi";
+
+   string delete_temp_files_str = temp_strm.str();
+
+   temp_strm.str("");
+
+   unsigned int line_num;
+   unsigned int timestamp;
+   char filename[256];
+   int status;
+   int status_1;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `purge_server_logs':  sec_val == " << sec_val 
+            << endl
+            << "`delete_temp_files_str' == " << delete_temp_files_str
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) Main loop.  Purge, delete, cull, rotate, etc.  @>
+
+@ Main loop.  Purge, delete, cull, rotate, etc.
+\initials{LDF 2013.04.09.}
+
+@<|purge_server_logs| definition@>=
+
+   char buffer[2048];
+
+   for (;;)
+   {
+@q ***** (5) Disable cancellation of this thread.  @>
+
+@ Disable cancellation of this thread.  
+\initials{LDF 2013.04.18.}
+
+\LOG
+\initials{LDF 2013.04.18.}
+Added this section.
+\ENDLOG
+
+@<|purge_server_logs| definition@>=
+
+       status = pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, 0);
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << "WARNING!  In `purge_server_logs':  `pthread_setcancelstate' failed, "
+                << "returning " << status << ":"
+                << endl
+                << strerror(status)
+                << endl
+                << "Failed to disable thread cancellation.  Will try to continue."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `purge_server_logs':  `pthread_setcancelstate' succeeded, "
+            << "returning 0." 
+            << endl
+            << "Disabled thread cancellation successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|purge_server_logs| definition@>=
+
+       memset(buffer, 0, 2048);
+
+       errno = 0;
+       time_t now = time(0);
+
+       if (now == (time_t) -1)
+       {
+            lock_cerr_mutex(); 
+            cerr << "ERROR!  In `purge_server_logs':  `time' failed, returning -1:"
+                 << endl
+                 << strerror(errno)
+                 << endl
+                 << "Exiting thread function unsuccessfully with exit status 0."
+                 << endl
+                 << "PLEASE NOTE:  Logs, temporary files, etc., will not be purged "
+                 << "until `gwirdsif' is restarted."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            pthread_exit(0);
+
+       }  /* |if|  */
+
+       time_t limit = now - sec_val;
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+            cerr << "In `purge_server_logs':"
+                 << endl 
+                 << "`now' ==     " << now
+                 << endl 
+                 << "`sec_val' == " << sec_val
+                 << endl 
+                 << "`limit' ==   " << limit
+                 << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|purge_server_logs| definition@>=
+
+       errno = 0;
+       FILE *fp = popen(delete_temp_files_str.c_str(), "r");
+    
+       if (fp == 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `purge_server_logs':  `popen' failed, returning NULL:"
+                << endl
+                << strerror(errno)
+                << endl 
+                << "Exiting thread function unsuccessfully with exit status 0."
+                << endl
+                << "PLEASE NOTE:  Logs, temporary files, etc., will not be purged "
+                << "until `gwirdsif' is restarted."
+                << endl;
+            
+           unlock_cerr_mutex(); 
+    
+           pthread_exit(0);
+    
+       }
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `purge_server_logs':  `popen' succeeded." << endl;
+           unlock_cerr_mutex(); 
+    
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+       
+       memset(buffer, 0, 2048);
+
+       char date_str[16];
+       char time_str[16];
+
+@q ***** (5) @>
+@
+@<|purge_server_logs| definition@>=
+
+       do
+       {
+@q ****** (6) @>
+
+         memset(date_str, 0, 16);
+         memset(time_str, 0, 16);
+
+         status = fscanf(fp, "%u %s %s %s", &timestamp, date_str, time_str, filename);
+   
+         if (status > 0)
+         {
+#if DEBUG_COMPILE 
+             if (DEBUG) 
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "filename:  " << filename << endl
+                      << "timestamp: " << timestamp << endl
+                      << "date_str:  " << date_str << endl 
+                      << "time_str:  " << time_str << endl;
+                 unlock_cerr_mutex(); 
+             }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+             if (timestamp < limit)
+             {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+                if (DEBUG)
+                {
+                    lock_cerr_mutex(); 
+           	        cerr << "timestamp < limit.  Deleting " << filename << endl
+                             << "timestamp == " << timestamp << endl
+                             << "limit ==     " << limit << endl
+                             << "limit - timestamp == " << (limit - timestamp)
+                             << endl;
+                    unlock_cerr_mutex(); 
+    
+                }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******** (8) @>
+
+                errno = 0;
+                status_1 = unlink(filename);
+
+                if (status_1 == -1)
+                {
+                     lock_cerr_mutex(); 
+                     cerr << "WARNING!  In `purge_server_logs':  `unlink' failed, returning -1:"
+                      << endl
+                      << strerror(errno)
+                      << endl
+                      << "Failed to delete file `" << filename << "'.  Will try to continue."
+                      << endl;
+                     unlock_cerr_mutex(); 
+
+                }  /* |if (status_1 == -1)|  */
+
+
+@q ******** (8) @>
+
+@ |unlink| returns only 0 (upon success) or $-1$ (upon error), so we just assume here
+that it returned 0.
+\initials{LDF 2013.04.09.}
+
+@<|purge_server_logs| definition@>=
+
+#if DEBUG_COMPILE
+                else if (DEBUG)
+                {
+                    lock_cerr_mutex(); 
+                     cerr << "In `purge_server_logs':  `unlink' succeeded, returning " 
+                          << status_1 << "."
+                          << endl
+                          << "Deleted file `" << filename << "'."
+                          << endl;
+                    unlock_cerr_mutex(); 
+
+                }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */             
+             
+
+@q ******** (8) @>
+
+             }  /* |if (timestamp < limit)|  */
+
+@q ******* (7) @>
+
+             else /* |timestamp >= limit|  */
+             {
+#if DEBUG_COMPILE
+                 if (DEBUG)    
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << "timestamp >= limit.  Not deleting `" << filename << "'."
+                          << endl 
+                          << "Breaking."
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                 }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+                 break;
+
+             }  /* |else| (|timestamp >= limit|)  */
+
+@q ******* (7) @>
+
+         }  /* |if (status > 0)|  */
+
+@q ****** (6) @>
+
+       }  /* |do|  */
+
+       while (status > 0 && !feof(fp) && !ferror(fp));
+
+
+@q ***** (5) @>
+
+@ Read any remaining shell output, so \.{cut} won't complain about a ``write error''.  
+\initials{LDF 2013.04.09.}
+
+@<|purge_server_logs| definition@>=
+
+#if DEBUG_COMPILE 
+
+       if (DEBUG && status > 0 && !feof(fp) && !ferror(fp))
+       {
+          lock_cerr_mutex(); 
+          cerr << "There may be unread output.  Will read and discard." << endl;
+          unlock_cerr_mutex(); 
+       }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+   
+       while (!(status == 0 || feof(fp) || ferror(fp)))  
+       {
+            memset(buffer, 0, 2048);
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "Input remaining in stream (`FILE *fp').  Reading into `buffer'." 
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            status = fread(buffer, 1, 2047, fp);
+
+#if DEBUG_COMPILE
+            if (status > 0 && DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "buffer: " << buffer << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       }  /* |while|  */
+
+@q ***** (5) @>
+
+       pclose(fp);
+       fp = 0;
+
+#if 0 /* 1 */ 
+       goto PURGE_SERVER_LOGS_SLEEP;  /* Uncomment to skip rotating files.  
+                                    \initials{LDF 2013.04.17.}  */
+#endif 
+
+@q ***** (5) Rotate log and error log files.  @>
+
+@ Rotate log and error log files.  
+\initials{LDF 2013.04.10.}
+
+@<|purge_server_logs| definition@>=
+
+@q ****** (6) @>
+  
+       status = rotate_log_file(log_filename, now, limit, log_strm_mutex);
+ 
+       if (status == 2)
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "`rotate_log_file' succeeded, returning 2."
+                    << endl
+                    << "Log file `" << log_filename << "' does not exist."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       }  /* |if (status == 2)|  */
+
+       else if (status == 4)
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "`rotate_log_file' succeeded, returning 4."
+                    << endl
+                    << "Log file `" << log_filename << "' did not need to be rotated."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       }  /* |else if (status == 4)|  */
+
+@q ****** (6) @>
+
+       else if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `purge_server_logs':  `rotate_log_file' failed, returning " 
+                << status << "."
+                << endl
+                << "Failed to rotate `" << log_filename << "'."
+                << endl 
+                << "Exiting thread function unsuccessfully with exit status 0."
+                << endl
+                << "PLEASE NOTE:  Logs, temporary files, etc., will not be purged "
+                << "until `gwirdsif' is restarted."
+                << endl;
+            
+           unlock_cerr_mutex(); 
+    
+           pthread_exit(0);
+
+       }  /* |else if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "`rotate_log_file' succeeded, returning 0."
+                << endl
+                << "Rotated log file `" << log_filename << "' successfully."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) Error log file.  @>
+
+@ Error log file.  
+\initials{LDF 2013.04.18.}
+
+@<|purge_server_logs| definition@>=
+
+       status = rotate_log_file(err_log_filename, now, limit, err_log_strm_mutex);
+
+       if (status == 2)
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "`rotate_log_file' succeeded, returning 2."
+                    << endl
+                    << "Error log file `" << err_log_filename << "' does not exist."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+       }  /* |if (status == 2)|  */
+
+       else if (status == 4)
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "`rotate_log_file' succeeded, returning 4."
+                    << endl
+                    << "Error log file `" << err_log_filename << "' did not need to be rotated."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       }  /* |else if (status == 4)|  */
+
+
+@q ****** (6) @>
+
+       else if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `purge_server_logs':  `rotate_log_file' failed, returning " 
+                << status << "."
+                << endl
+                << "Failed to rotate `" << err_log_filename << "'."
+                << endl 
+                << "Exiting thread function unsuccessfully with exit status 0."
+                << endl
+                << "PLEASE NOTE:  Logs, temporary files, etc., will not be purged "
+                << "until `gwirdsif' is restarted."
+                << endl;
+            
+           unlock_cerr_mutex(); 
+    
+           pthread_exit(0);
+
+       }  /* |else if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "`rotate_log_file' succeeded, returning 0."
+                << endl
+                << "Rotated log file `" << err_log_filename << "' successfully."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ****** (6) Standard output file.  @>
+
+@ Standard output file.  This file will exist if the output to standard output, i.e., 
+|stdout| or |cout|, is redirected to the file \filename{\<log directory>/gwirdsif.stdout}.
+\initials{LDF 2013.04.18.}
+
+\LOG
+\initials{LDF 2013.04.18.}
+Added this section.
+\ENDLOG
+
+@<|purge_server_logs| definition@>=
+
+       string stdout_filename = log_dir;
+       stdout_filename += '/';
+       stdout_filename += "gwirdsif.stdout";
+
+       status = rotate_log_file(stdout_filename, now, limit, cout_mutex);
+
+       if (status == 2)
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "`rotate_log_file' succeeded, returning 2."
+                    << endl
+                    << "Standard output log file `" << stdout_filename << "' does not exist."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       }  /* |if (status == 2)|  */
+
+       else if (status == 4)
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "`rotate_log_file' succeeded, returning 4."
+                    << endl
+                    << "Standard output log file `" << stdout_filename << "' "
+                    << "did not need to be rotated."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       }  /* |else if (status == 4)|  */
+
+
+@q ****** (6) @>
+
+       else if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `purge_server_logs':  `rotate_log_file' failed, returning " 
+                << status << "."
+                << endl
+                << "Failed to rotate `" << stdout_filename << "'."
+                << endl 
+                << "Exiting thread function unsuccessfully with exit status 0."
+                << endl
+                << "PLEASE NOTE:  Logs, temporary files, etc., will not be purged "
+                << "until `gwirdsif' is restarted."
+                << endl;
+            
+           unlock_cerr_mutex(); 
+    
+           pthread_exit(0);
+
+       }  /* |else if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "`rotate_log_file' succeeded, returning 0."
+                << endl
+                << "Rotated log file `" << stdout_filename << "' successfully."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) Standard error file.  @>
+
+@ Standard error file.  This file will exist if the output to standard error, i.e., 
+|stderr| or |cerr|, is redirected to the file \filename{\<log directory>/gwirdsif.stderr}.
+\initials{LDF 2013.04.18.}
+
+\LOG
+\initials{LDF 2013.04.18.}
+Added this section.
+\ENDLOG
+
+@<|purge_server_logs| definition@>=
+
+       string stderr_filename = log_dir;
+       stderr_filename += '/';
+       stderr_filename += "gwirdsif.stderr";
+
+       status = rotate_log_file(stderr_filename, now, limit, cerr_mutex, &cout_mutex, &cout);
+
+       if (status == 2)
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "`rotate_log_file' succeeded, returning 2."
+                    << endl
+                    << "Standard error log file `" << stderr_filename << "' does not exist."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       }  /* |if (status == 2)|  */
+
+       else if (status == 4)
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "`rotate_log_file' succeeded, returning 4."
+                    << endl
+                    << "Standard error log file `" << stderr_filename << "' "
+                    << "did not need to be rotated."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       }  /* |else if (status == 4)|  */
+
+
+@q ****** (6) @>
+
+       else if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `purge_server_logs':  `rotate_log_file' failed, returning " 
+                << status << "."
+                << endl
+                << "Failed to rotate `" << stderr_filename << "'."
+                << endl 
+                << "Exiting thread function unsuccessfully with exit status 0."
+                << endl
+                << "PLEASE NOTE:  Logs, temporary files, etc., will not be purged "
+                << "until `gwirdsif' is restarted."
+                << endl;
+            
+           unlock_cerr_mutex(); 
+    
+           pthread_exit(0);
+
+       }  /* |else if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "`rotate_log_file' succeeded, returning 0."
+                << endl
+                << "Rotated log file `" << stderr_filename << "' successfully."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) End of code for rotating log and error log files.  @>
+
+@ End of code for rotating log and error log files. 
+\initials{LDF 2013.04.18.}
+
+@<|purge_server_logs| definition@>=
+
+PURGE_SERVER_LOGS_SLEEP: 
+
+@q ***** (5) Enable cancellation of this thread.  @>
+
+@ Enable cancellation of this thread.  
+\initials{LDF 2013.04.18.}
+
+\LOG
+\initials{LDF 2013.04.18.}
+Added this section.
+\ENDLOG
+
+@<|purge_server_logs| definition@>=
+
+       status = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, 0);
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << "WARNING!  In `purge_server_logs':  `pthread_setcancelstate' failed, "
+                << "returning " << status << ":"
+                << endl
+                << strerror(status)
+                << endl
+                << "Failed to enable thread cancellation.  Will try to continue."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `purge_server_logs':  `pthread_setcancelstate' succeeded, "
+            << "returning 0." 
+            << endl
+            << "Enabled thread cancellation successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) End of loop.  Go to sleep.  @>
+
+@ End of loop.  Go to sleep.  
+\initials{LDF 2013.04.18.}
+
+@<|purge_server_logs| definition@>=
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `purge_server_logs':  Going to sleep for " << sleep_value << " seconds."
+            << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       sleep(sleep_value);
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `purge_server_logs':  Woke up after sleeping for " 
+                << sleep_value << " seconds."
+            << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+   }  /* |for|  */
+
+@q **** (4) Exit.  This code will normally never be reached.  @>
+
+@ Exit.  This code will normally never be reached.
+\initials{LDF 2013.04.09.}
+
+@<|purge_server_logs| definition@>=
+
+   pthread_exit(0);
+
+}  /* End of |purge_server_logs| definition  */
+
+@q *** (3) @>
+
+@q ** (2) Rotate log file.  @>
+
+@ Rotate log file.  
+\initials{LDF 2013.04.11.}
+
+\LOG
+\initials{LDF 2013.04.11.}
+Added this function.
+
+\initials{LDF 2013.04.18.}
+Added optional arguments |pthread_mutex_t *mutex_1_ptr = 0| and |ostream *out_strm = 0|.  
+They're  needed when rotating log files into which the output to standard output and 
+standard error are redirected.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|rotate_log_file| declaration@>=
+
+int 
+rotate_log_file(string &filename, 
+                time_t now, 
+                time_t limit, 
+                pthread_mutex_t &mutex, 
+                pthread_mutex_t *mutex_1_ptr = 0,
+                ostream *out_strm = 0);
+
+@q *** (3) Definition  @>
+@
+@<|rotate_log_file| definition@>=
+
+int 
+rotate_log_file(string &filename, 
+                time_t now, 
+                time_t limit, 
+                pthread_mutex_t &mutex, 
+                pthread_mutex_t *mutex_1_ptr,
+                ostream *out_strm)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   if (mutex_1_ptr == 0)
+      mutex_1_ptr = &cerr_mutex;
+
+   if (out_strm == 0)
+      out_strm = &cerr;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       pthread_mutex_lock(mutex_1_ptr);
+       *out_strm << "Entering `rotate_log_file'."
+                 << endl
+                 << "`filename' == " << filename
+                 << endl;
+       pthread_mutex_unlock(mutex_1_ptr); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   FILE *fp = 0;
+   stringstream temp_strm;
+   string rotate_str;
+
+   unsigned int line_num;
+   unsigned int timestamp;
+
+   int status = 0;
+
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2013.04.18.}
+Added this section.
+\ENDLOG
+
+@<|rotate_log_file| definition@>=
+
+@q ***** (5) @>
+
+   errno = 0;
+   status = access(filename.c_str(), F_OK);
+
+   if (status == -1 && errno == ENOENT)
+   {
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           pthread_mutex_lock(mutex_1_ptr); 
+           *out_strm << "In `rotate_log_file':  File `" << filename << "' doesn't exist."
+                     << endl 
+                     << "Exiting function successfully with return value 2."
+                     << endl;
+           pthread_mutex_unlock(mutex_1_ptr); 
+
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       return 2;
+
+   }  /* |if (status == -1)|  */
+
+@q ***** (5) @>
+
+   else if (status == -1)
+   {
+       pthread_mutex_lock(mutex_1_ptr); 
+       *out_strm << "In `rotate_log_file':  `access' failed, returning -1:"
+                 << endl 
+                 << strerror(errno)
+                 << endl
+                 << "Failed to test existence of `" << filename << "'."
+                 << endl 
+                 << "Exiting function successfully with return value 1."
+                 << endl;
+       pthread_mutex_unlock(mutex_1_ptr); 
+
+       return 1;
+
+   }  /* |else if (status == -1)|  */
+
+@q ***** (5) @>
+
+@q **** (4) @>
+@
+@<|rotate_log_file| definition@>=
+
+   pthread_mutex_lock(&mutex);
+
+   vector<unsigned int> line_num_vector;
+
+   char buffer[2048];
+
+   struct tm tmp;
+
+   char date_ext_str[64];
+
+   memset(date_ext_str, 0, 64);
+
+   if (gmtime_r(&now, &tmp) == 0) 
+   {
+
+       pthread_mutex_lock(mutex_1_ptr); 
+       *out_strm << "ERROR!  In `rotate_log_file':  `gmtime_r' failed, returning 0:"
+                 << "Exiting function unsuccessfully with return value 1."
+                 << endl;
+       pthread_mutex_unlock(mutex_1_ptr); 
+
+       pthread_mutex_unlock(&mutex); 
+
+       return 1;
+
+   }
+   if (strftime(date_ext_str, sizeof(date_ext_str), "%Y.%m.%d", &tmp) == 0) 
+   {
+       pthread_mutex_lock(mutex_1_ptr); 
+       *out_strm << "ERROR!  In `rotate_log_file':  `strftime' failed, returning 0."
+                 << endl
+                 << "Exiting function unsuccessfully with return value 1."
+                 << endl;
+       pthread_mutex_unlock(mutex_1_ptr); 
+
+       pthread_mutex_unlock(&mutex); 
+
+       return 1;
+
+   }   
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       pthread_mutex_lock(mutex_1_ptr); 
+       *out_strm << "date_ext_str == " << date_ext_str << endl;
+       pthread_mutex_unlock(mutex_1_ptr); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q **** (4) Setup commands for rotating log and error log files.  @>
+
+@ Setup commands for rotating log and error log files.
+\initials{LDF 2013.04.10.}
+
+\LOG
+\initials{LDF 2013.04.10.}
+Added this section.
+\ENDLOG
+
+@<|rotate_log_file| definition@>=
+    
+   temp_strm << "cat " << filename << " | "
+             << "grep -n -e \"^#\" | cut -f1-10 -d\" \" | tr -d \"#\" | tr -s \" \"";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       pthread_mutex_lock(mutex_1_ptr); 
+       *out_strm << "temp_strm.str() == " << temp_strm.str() << endl;
+       pthread_mutex_unlock(mutex_1_ptr); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   rotate_str = temp_strm.str();
+
+   temp_strm.str("");
+
+
+@q **** (4) @>
+@
+@<|rotate_log_file| definition@>=
+
+   errno = 0;
+   fp = popen(rotate_str.c_str(), "r");
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       pthread_mutex_lock(mutex_1_ptr); 
+       *out_strm << "rotate_str == " << rotate_str << endl;
+       pthread_mutex_unlock(mutex_1_ptr); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   if (fp == 0)
+   {
+@q ***** (5) @>
+
+        pthread_mutex_lock(mutex_1_ptr); 
+        *out_strm << "ERROR!  In `rotate_log_file':  `popen' failed, returning NULL:"
+                  << endl
+                  << strerror(errno)
+                  << endl
+                  << "Command:  " << rotate_str 
+                  << endl  
+                  << "Exiting function unsuccessfully with return value 1."
+                  << endl;
+        pthread_mutex_unlock(mutex_1_ptr); 
+
+        pthread_mutex_unlock(&mutex);
+
+        return 1;
+    
+@q ***** (5) @>
+
+   }  /* |for|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       pthread_mutex_lock(mutex_1_ptr); 
+       *out_strm << "In `rotate_log_file':  `popen' succeeded." << endl;
+       pthread_mutex_unlock(mutex_1_ptr); 
+   
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|rotate_log_file| definition@>=
+
+
+   char date_str[64];
+
+   do
+   {
+@q ***** (5) @>
+
+       errno = 0;
+       memset(date_str, 0, 64);
+
+       status = fscanf(fp, "%u: %u '%[a-zA-Z0-9.,: ]'", &line_num, &timestamp, date_str);
+
+       if (status == EOF)
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)  
+           {
+               pthread_mutex_lock(mutex_1_ptr); 
+               *out_strm << "Reached end of input.  Breaking." << endl;
+               pthread_mutex_unlock(mutex_1_ptr); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+    
+           break;
+
+       }
+       else if (status != 3)
+       {
+           pthread_mutex_lock(mutex_1_ptr); 
+           *out_strm << "Error!  `fscanf' failed, returning " << status << ":"
+                     << endl
+                     << strerror(errno)
+                     << endl
+                     << "Breaking." 
+                     << endl;
+           pthread_mutex_unlock(mutex_1_ptr); 
+
+           break;
+       } 
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           pthread_mutex_lock(mutex_1_ptr); 
+           *out_strm << "`fscanf' succeeded, returning 3."
+                     << endl
+                     << "`line_num' ==  " << line_num
+                     << endl 
+                     << "`timestamp' == " << timestamp
+                     << endl
+                     << "`date_str' == " << date_str
+                     << endl;
+           pthread_mutex_unlock(mutex_1_ptr); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|rotate_log_file| definition@>=
+
+      if (timestamp >= limit)
+      {
+#if DEBUG_COMPILE
+          if (DEBUG) 
+          {
+              pthread_mutex_lock(mutex_1_ptr); 
+              *out_strm << "`timestamp >= limit':" << endl
+                        << "timestamp == " << timestamp
+                        << endl 
+                        << "limit ==     " << limit
+                        << endl 
+                        << "Breaking."
+                        << endl; 
+              pthread_mutex_unlock(mutex_1_ptr); 
+
+          }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */               
+ 
+          break;
+
+      }  /* |if (timestamp >= limit)|  */
+
+@q ***** (5) @>
+@
+@<|rotate_log_file| definition@>=
+
+      else /* |timestamp < limit|  */
+      {
+#if DEBUG_COMPILE
+          if (DEBUG) 
+          {
+              pthread_mutex_lock(mutex_1_ptr); 
+              *out_strm << "`timestamp < limit':" << endl
+                        << "timestamp == " << timestamp
+                        << endl 
+                        << "limit ==     " << limit
+                        << endl 
+                        << "Continuing."
+                        << endl; 
+              pthread_mutex_unlock(mutex_1_ptr); 
+
+          }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */               
+
+          line_num_vector.push_back(line_num);
+
+      } /* |else| (|timestamp < limit|)  */
+
+@q ***** (5) @>
+
+   } 
+   while (status > 0 && !feof(fp) && !ferror(fp)); 
+
+@q ***** (5) @>
+
+@ Read any unread output.
+\initials{LDF 2013.04.10.}
+
+@<|rotate_log_file| definition@>=
+
+   while (status > 0 && !(feof(fp) || ferror(fp)))
+   {
+           memset(buffer, 0, 2048);
+
+           status = fread(buffer, 1, 2047, fp);
+
+           if (status == 0) 
+           {
+#if DEBUG_COMPILE
+               if (DEBUG)  
+               {
+                   pthread_mutex_lock(mutex_1_ptr); 
+                   *out_strm << "`fread' returned 0." << endl;
+                   pthread_mutex_unlock(mutex_1_ptr); 
+
+               }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */                
+
+           }
+           else
+           {
+#if DEBUG_COMPILE
+               if (DEBUG)  
+               {
+                   pthread_mutex_lock(mutex_1_ptr); 
+                   *out_strm << "`fread' returned " << status  << endl
+                             << "buffer ==" << endl 
+                             << buffer
+                             << endl;
+                   pthread_mutex_unlock(mutex_1_ptr); 
+
+               }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */                
+
+           }  /* |else|  */
+
+   }  /* |while|  */
+
+@q ***** (5) @>
+
+   pclose(fp);
+   fp = 0;
+
+@q ***** (5) @>
+@
+@<|rotate_log_file| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       pthread_mutex_lock(mutex_1_ptr); 
+       *out_strm << "line_num_vector.size() == " << line_num_vector.size() << endl;
+
+       if (line_num_vector.size() > 0)
+          *out_strm << "Showing `line_num_vector':"
+                    << endl;
+       else
+          *out_strm << "`line_num_vector' is empty.  Not showing."
+                    << endl;
+       pthread_mutex_unlock(mutex_1_ptr); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+
+       for (vector<unsigned int>::iterator iter = line_num_vector.begin();
+            iter != line_num_vector.end();
+            ++iter)
+       {
+
+                 pthread_mutex_lock(mutex_1_ptr); 
+                 *out_strm << "*iter == " << *iter << endl;
+                 pthread_mutex_unlock(mutex_1_ptr); 
+
+       }  /* |for|  */
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|rotate_log_file| definition@>=
+
+   string old_filename = filename;
+   old_filename += ".";
+   old_filename += date_ext_str;
+
+   int i = 0;
+
+   for (; i < 6; ++i)
+   {
+       temp_strm.str("");
+       temp_strm << old_filename;
+
+       if (i > 0)
+          temp_strm << "." << i;
+
+       errno = 0;
+       status = access(temp_strm.str().c_str(), F_OK);
+
+       if (status == -1 && errno == ENOENT)
+       {
+           if (i > 0)        
+              old_filename = temp_strm.str();
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               pthread_mutex_lock(mutex_1_ptr); 
+               *out_strm << "Found a name for `old_filename':  " << old_filename
+                         << endl
+                         << "Breaking."
+                         << endl;
+               pthread_mutex_unlock(mutex_1_ptr); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           break;
+            
+       }  /* |if|  */
+
+       else if (status == 0)
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               pthread_mutex_lock(mutex_1_ptr); 
+               *out_strm << "File `" << temp_strm.str() << "' already exists.  "
+                         << "Continuing to search."
+                         << endl;
+               pthread_mutex_unlock(mutex_1_ptr); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */            
+
+           continue;
+
+       }  /* |else if (status == 0)|  */
+
+       else
+       {
+           pthread_mutex_lock(mutex_1_ptr); 
+           *out_strm << "ERROR!  In `rotate_log_file':  `access' failed, returning -1 and "
+                     << "`errno' != `ENOENT':"
+                     << endl 
+                     << strerror(errno)
+                     << endl
+                     << "Failed to rotate log file `" << filename << "'."
+                     << endl
+                     << "Exiting function unsuccessfully with return value 1."
+                     << endl;
+           pthread_mutex_unlock(mutex_1_ptr); 
+
+           pthread_mutex_unlock(&mutex); 
+
+           return 1;
+
+       }  /* |else|  */
+
+
+   }  /* |for|  */
+
+@q **** (4) @>
+@
+@<|rotate_log_file| definition@>=
+
+   if (i == 6)
+   {
+        pthread_mutex_lock(mutex_1_ptr); 
+        *out_strm << "ERROR!  In `rotate_log_file':  Files named `" << old_filename << "' "
+                  << "with suffixes `.1' through `.6' already exist."
+                  << endl 
+                  << "This shouldn't happen."
+                  << endl
+                  << "Failed to rotate log file `" << filename << "'."
+                  << endl
+                  << "Exiting function unsuccessfully with return value 1."
+                  << endl;
+        pthread_mutex_unlock(mutex_1_ptr); 
+
+        pthread_mutex_unlock(&mutex); 
+
+        return 1;
+
+   }
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       pthread_mutex_lock(mutex_1_ptr); 
+       *out_strm << "Found a name for a file that doesn't exist yet:"
+                 << endl 
+                 << "old_filename == " << old_filename << endl;
+       pthread_mutex_unlock(mutex_1_ptr); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|rotate_log_file| definition@>=
+
+   if (line_num_vector.size() > 0 && line_num_vector.back() > 1)
+   {
+@q ***** (5) @>
+
+       temp_strm.str("");
+
+       temp_strm << "a=`mktemp " << log_dir << "/temp_file.XXXXXX` && "
+                 << "head -n " << (line_num_vector.back() - 1) << " " 
+                 << filename << " > " << old_filename << " "
+                 << "&& tail -n +" << line_num_vector.back() << " " 
+                 << filename << " > $a && mv $a " << filename;
+
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           pthread_mutex_lock(mutex_1_ptr); 
+           *out_strm << "temp_strm.str() == " << temp_strm.str() << endl;
+           pthread_mutex_unlock(mutex_1_ptr); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|rotate_log_file| definition@>=
+
+       status = system(temp_strm.str().c_str());
+
+       if (status == -1 || !WIFEXITED(status))
+       {
+           pthread_mutex_lock(mutex_1_ptr); 
+           *out_strm << "ERROR!  In `rotate_log_file':  "
+                     << "`system' failed, returning " << status << "."
+                     << endl;
+
+           if (WIFEXITED(status))
+              *out_strm << "WEXITSTATUS(status) == " << WEXITSTATUS(status) 
+                        << endl;
+           else
+              *out_strm << "Process failed to exit."
+                        << endl;
+ 
+           *out_strm << "Exiting function unsuccessfully with return value 1."
+                     << endl;
+           pthread_mutex_unlock(mutex_1_ptr); 
+
+           pthread_mutex_unlock(&mutex); 
+
+           return 1;
+
+       }   /* |(status == -1 || !WIFEXITED(status))|  */
+
+@q ***** (5) @>
+@
+@<|rotate_log_file| definition@>=
+
+       else if (WEXITSTATUS(status) != 0)
+       {
+                pthread_mutex_lock(mutex_1_ptr); 
+                *out_strm << "ERROR!  In `rotate_log_file':  "
+                          << "`mktemp', `head', `tail' or `mv' command "
+                          << "(called via `system') failed, "
+                          << "returning " << WEXITSTATUS(status) << "."
+                          << endl
+                          << "Failed to rotate log file `" << filename << "'."
+                          << endl 
+                          << "Exiting function unsuccessfully with return value 1."
+                          << endl;
+                pthread_mutex_unlock(mutex_1_ptr); 
+
+                pthread_mutex_unlock(&mutex); 
+
+                return 1;
+
+       }       /* |else if (WEXITSTATUS(status) != 0)|  */
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           pthread_mutex_lock(mutex_1_ptr); 
+           *out_strm << "In `rotate_log_file':  `system' succeeded, returning 0."
+                     << endl
+                     << "Rotated log file `" << filename << "' successfully."
+                     << endl;
+           pthread_mutex_unlock(mutex_1_ptr);            
+
+       }  /* |else if (DEBUG)|  */
+#endif /* |DEBUG_COMPILE|  */ 
+
+       temp_strm.str("");
+
+@q ***** (5) @>
+
+   }  /* |if (line_num_vector.size() > 0 && line_num_vector.back() > 0)|  */
+
+@q **** (4) @>
+@
+@<|rotate_log_file| definition@>=
+
+   else 
+   {
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           pthread_mutex_lock(mutex_1_ptr); 
+           *out_strm << "In `rotate_log_file':"
+                     << endl 
+                     << "`line_num_vector.size()' == " << line_num_vector.size()
+                     << endl;
+
+           if (line_num_vector.size() > 0) 
+               *out_strm << "`line_num_vector.back()' == " << line_num_vector.back()
+                         << endl;
+
+           *out_strm << "`line_num_vector.size()' == 0 or `line_num_vector.back()' == 0"
+                     << endl
+                     << "Not rotating log file `" << filename << "'."
+                     << endl
+                     << "Exiting function successfully with return value 2."
+                     << endl;
+
+           pthread_mutex_unlock(mutex_1_ptr); 
+       
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       pthread_mutex_unlock(&mutex);
+
+       return 4;
+
+   }  /* |else|  */  
+
+   
+@q **** (4) @>
+@
+@<|rotate_log_file| definition@>=
+
+   pthread_mutex_unlock(&mutex);
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       pthread_mutex_lock(mutex_1_ptr); 
+       *out_strm << "Exiting `rotate_log_file' successfully with return value 0."
+                 << endl;
+       pthread_mutex_unlock(mutex_1_ptr); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    return 0;
+
+@q **** (4) @>
+
+} /* End of |rotate_log_file| definition  */
+
+@q *** (3) @>
+
+@q ** (2) Putting purgfncs together.  @>
+@ Putting purgfncs together.  
+
+This is what's compiled.
+\initials{LDF 2013.04.09.}
+@c 
+using namespace std;
+@<Include files@>@;@/
+using namespace gwrdifpk;
+@<|purge_server_logs| declaration@>@;@/
+@<|rotate_log_file| declaration@>@;@/
+@<|purge_server_logs| definition@>@;@/
+@<|rotate_log_file| definition@>@;@/
+
+@ This is what's written to the header file \filename{purgfncs.h}.
+\initials{LDF 2013.04.09.}
+
+@(purgfncs.h@>=
+#ifndef PURGFNCS_H
+#define PURGFNCS_H 1
+using namespace std;
+@<|purge_server_logs| declaration@>@;@/
+@<|rotate_log_file| declaration@>@;@/
+#endif 
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))                          @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+

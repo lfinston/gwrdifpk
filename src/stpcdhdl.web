@@ -1,0 +1,518 @@
+@q stpcdhdl.web @>
+@q [...]/gwrdifpk/src/stpcdhdl.web  @>
+
+@q Created by Laurence D. Finston (LDF) Wed Sep  4 13:43:04 CEST 2013  @>
+
+@q * (1) Top @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+@q ** (2) Include files@>
+
+@ Include files.
+\initials{LDF 2013.09.04.}
+
+@<Include files@>=
+
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <pthread.h>  /* POSIX threads  */
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
+
+#include <mysql.h>
+
+#include <expat.h>
+
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <fstream>
+#include <sstream>   
+#include <string>
+#include <getopt.h>
+
+#include <map>
+#include <vector>
+#include <deque>
+#include <set>
+#include <stack>
+#include <utility>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif 
+
+
+#include "rspercds.h++"
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "helper.h++"
+#include "tanfncs.h++"
+#include "pidfncs.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "usrinftp.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+
+#include "stpclopt.h++"
+
+
+@q ** (2) Create handle database tables                         @>
+@q ** (2) (default:  handlesystem or handlesystem_standalone).  @>
+
+@ Create handle database tables (default:  \.{handlesystem} or \.{handlesystem\_standalone}).
+\initials{LDF 2013.09.04.}
+
+@q *** (3) Declaration  @>
+
+@<|create_tables_handles| declaration@>=
+
+int
+create_tables_handles(Scan_Parse_Parameter_Type &param);
+
+
+@q *** (3) Definition @>
+@
+@<|create_tables_handles| definition@>=
+
+int
+create_tables_handles(Scan_Parse_Parameter_Type &param)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status;
+   stringstream sql_strm;
+
+   stringstream temp_strm;
+
+   MYSQL_RES* result = 0;
+   MYSQL_ROW curr_row;
+
+   size_t result_array_size = 16;
+
+   MYSQL_RES *result_array[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+   unsigned int row_ctr   = 0;
+   unsigned int field_ctr = 0;
+   long int affected_rows = 0;
+
+   vector<string> query_vector;
+
+   vector<unsigned int *> row_ctr_vector;
+   vector<unsigned int *> field_ctr_vector;
+   vector<long int *>     affected_rows_vector;
+
+   string comma_str;
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+         cerr << "Entering `create_tables_handles'."
+              << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+
+
+
+       sql_strm << "use " << handles_database_name;
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+       nas_table_create_str = "create table nas (na varchar(255) not null,  PRIMARY KEY(na))";
+
+       query_vector.push_back(nas_table_create_str);
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       nas_table_insert_str = "";
+
+       comma_str = "";
+
+       if (standalone_handle || prefix_vector.size() > 0)
+       {
+
+           nas_table_insert_str = "insert into nas (na) values ";       
+
+       }
+
+       if (standalone_handle)
+       {
+           nas_table_insert_str += "('0.NA/0.NA')";
+           comma_str = ",\n";
+       }
+
+@q **** (4) @>
+
+       if (prefix_vector.size() > 0)  
+       {
+
+          /* This should always be |true|.  \initials{LDF 2013.09.04.}  */
+
+          for (vector<string>::iterator iter = prefix_vector.begin();
+               iter != prefix_vector.end();
+               ++iter)
+          {
+              sql_strm << comma_str << "('0.NA/" << *iter << "')";
+
+              comma_str = ", ";
+
+          }  
+
+          comma_str = "";
+
+          nas_table_insert_str += sql_strm.str();
+
+       }  /* |if|  */
+
+
+       if (nas_table_insert_str.size() > 0)
+       {
+           query_vector.push_back(nas_table_insert_str);
+           row_ctr_vector.push_back(0);
+           field_ctr_vector.push_back(0);
+           affected_rows_vector.push_back(new long int(0L));
+
+       }
+       else
+       {
+            cerr << "`standalone_handle' == `false' and no prefixes specified."
+                 << endl
+                 << "Not inserting row(s) into `" << handles_database_name << ".nas' table."
+                 << endl;
+       }
+
+@q **** (4) @>
+
+       sql_strm.str("");
+
+       sql_strm << "create table handles (";
+
+    /* The following fields are specified by the Handle system.
+       LDF 2013.08.22.  */
+
+       sql_strm << "handle varchar(255) not null, "
+                   "idx int4 not null, "
+                   "type blob, "
+                   "data blob, "
+                   "ttl_type int2, "
+                   "ttl int4, "
+                   "timestamp int4, "
+                   "refs blob, "
+                   "admin_read bool, "
+                   "admin_write bool, "
+                   "pub_read bool, "
+                   "pub_write bool, ";
+
+    /* The following fields are additional, i.e., {\it not\/} specified or used by
+       the Handle system!
+       LDF 2013.08.22.  */
+
+       sql_strm << "created timestamp default 0, "
+                << "last_modified timestamp default 0, "
+                <<   "created_by_user_id int, "
+                << "irods_object_id bigint unsigned not null default 0, "
+                << "handle_id bigint unsigned not null default 0, "
+                << "handle_value_id bigint unsigned not null default 0, "
+                << "marked_for_deletion boolean not null default false, "
+                << "delete_from_database_timestamp timestamp default 0, "
+                << "PRIMARY KEY(handle, idx))";
+
+
+       handles_table_create_str = sql_strm.str();
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+       sql_strm << "alter table handles add foreign key(created_by_user_id) "
+                << "references gwirdsif.Users(user_id)";
+
+       handles_table_alter_str[0] = sql_strm.str();
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+       sql_strm << "alter table handles add constraint unique key (handle_id, handle_value_id)";
+
+       handles_table_alter_str[1] = sql_strm.str();
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+       sql_strm << "create table admin_data ("
+                << "handle varchar(255) not null, "
+                << "data blob)";
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+       sql_strm << "create table pid_counters ("
+                << "prefix varchar(16) primary key not null, "
+                << "pid_counter bigint unsigned not null)";
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+
+       sql_strm << "insert into pid_counters (prefix, pid_counter) "
+                << "values ('00001', 0), ('12345', 0)";
+
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(new long int(0L));
+
+       sql_strm.str("");
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           cerr << "`query_vector.size()' == " << query_vector.size()
+                << endl;
+
+           cerr << "`query_vector:'" << endl;
+
+           for (vector<string>::iterator iter = query_vector.begin();
+                iter != query_vector.end();
+                ++iter)
+           {
+               cerr << *iter << endl;
+
+           }
+
+           cerr << endl;
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+@q **** (4) @>
+@
+@<|create_tables_handles| definition@>=
+
+       if (query_vector.size() > result_array_size)
+       {
+           cerr << "[setupdbs] ERROR!  In `main':"
+                << endl 
+                << "`query_vector.size()' == " << query_vector.size() 
+                << "> `result_array_size' == " << result_array_size
+                << endl
+                << "Can't call `Scan_Parse_Parameter_Type::submit_mysql_queries'."
+                << endl
+                << "Exiting function unsuccessfully with exit status 1."
+                << endl;
+
+            exit(1);
+       }
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+            cerr << "query_vector.size() == " << query_vector.size() 
+                 << endl
+                 << "result_array_size ==   " << result_array_size 
+                 << endl;
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       status = param.submit_mysql_queries(query_vector, 
+                                           result_array, 
+                                           row_ctr_vector, 
+                                           field_ctr_vector, 
+                                           affected_rows_vector, 
+                                           false);
+
+       if (status != 0)
+       {
+            cerr << "ERROR!  In `main':  `submit_mysql_queries' failed, returning "
+                 << status << "."
+                 << endl
+                 << "Exiting `setupdbs' unsuccessfully with exit status 1."
+                 << endl;
+
+            delete_and_clear(result_array, 
+                             result_array_size, 
+                             row_ctr_vector, 
+                             field_ctr_vector,
+                             affected_rows_vector,
+                             query_vector);
+
+            exit(1);
+
+       }  /* |if (status != 0)|  */
+
+@q **** (4) @>
+@
+@<|create_tables_handles| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           cerr << "In `main':  `submit_mysql_queries' succeeded, returning 0."
+                << endl
+                << "Created tables in `" << handles_database_name << "' database successfully."
+                << endl;
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|create_tables_handles| definition@>=
+
+       delete_and_clear(result_array, 
+                        result_array_size, 
+                        row_ctr_vector, 
+                        field_ctr_vector,
+                        affected_rows_vector,
+                        query_vector);
+
+       sql_strm.str("");
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+         cerr << "Exiting `create_tables_handles' successfully with return value 0."
+              << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       return 0;
+
+}  /* End of |create_tables_handles| definition  */
+
+@q ** (2) This is what's compiled.  @>
+
+@ This is what's compiled.  
+\initials{LDF 2013.09.03.}
+
+@c
+using namespace std;
+@<Include files@>@;@/
+using namespace gwrdifpk;
+@<|create_tables_handles| definition@>@;@/
+
+
+@q ** (2) This is what's written to the header file `stpcdhdl.h'.  @>
+
+@ This is what's written to the header file \filename{stpcdhdl.h}.
+\initials{LDF 2013.09.03.}
+
+@(stpcdhdl.h@>=
+#ifndef STPCDHDL_H
+#define STPCDHDL_H 1
+@<|create_tables_handles| declaration@>@;@/
+#endif 
+
+@q (progn (cweb-mode) (outline-minor-mode))                                @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

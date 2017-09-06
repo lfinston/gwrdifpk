@@ -1,0 +1,1259 @@
+@q gwrdwbap.web  @>
+
+@q Created by Laurence D. Finston (LDF) Thu Jun 28 09:58:22 CEST 2012  @>
+
+@* FastCGI Web Application gwrdwbap.  For use with iRODS and the Handle System.
+\initials{LDF 2012.06.28.}
+
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q ** (2) Include files.  @>
+
+@ Include files.
+\initials{LDF 2012.06.28.}
+
+@<Include files@>=
+
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <getopt.h> 
+#include <time.h>
+
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+#include <sys/mman.h>
+
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <fstream>
+#include <sstream>   
+#include <string>
+#include <vector>
+#include <deque>
+#include <stack>
+#include <set>
+
+#include <sys/types.h>
+#include <sys/wait.h>
+
+/* Library is /usr/lib64/libfcgi.a */
+#include <fcgi_stdio.h>
+
+#include <pthread.h>
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+
+#include <mysql.h>
+
+#include <expat.h>
+
+#include <curl/curl.h>
+
+#undef NAME_LEN
+#undef LOCAL_HOST
+
+#ifdef HAVE_CONFIG_H
+   #include <config.h>
+#endif
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif 
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "cmdlnopt.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+
+typedef int YYSTYPE;
+
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+#include "pidfncs.h++"
+#include "tanfncs.h++"
+#include "clntfncs.h++"
+#include "ckietype.h++"
+#include "utlwbfcs.h++"
+
+@q ** (2) Global variables.  @>
+
+@ Global variables.  
+\initials{LDF 2012.06.28.}
+
+@<Global variables@>=
+
+extern char** environ;
+
+CURL *curl;
+CURLcode curl_res;
+
+const string sock_path = "/tmp/gwirdsif.sock";
+
+
+@q ** (2) Finish (exit handler).  @>
+@ Finish (exit handler).
+\initials{LDF 2012.07.24.}
+
+\LOG
+\initials{LDF 2012.07.24.}
+Added this function.
+
+\initials{LDF 2013.09.19.}
+Added code for unlocking the memory for |gpg_key_id| and |gpg_passphrase| 
+and deleting them.
+\ENDLOG
+
+@q ** (2) Definition  @>
+
+@<|finish| definition@>=
+void
+finish(void)
+{
+
+    bool DEBUG = false;  /* |true|  */
+    set_debug_level(DEBUG, 0, 0);
+
+    int status;
+
+    if (gpg_key_id != 0)
+    {
+        memset(gpg_key_id, 0, 10);
+        munlock(gpg_key_id, 10);
+        delete[] gpg_key_id;
+        gpg_key_id = 0;
+         
+    }
+
+    if (gpg_passphrase != 0)
+    {
+        memset(gpg_passphrase, 0, gpg_passphrase_length);      
+        munlock(gpg_passphrase, gpg_passphrase_length);
+        delete[] gpg_passphrase;
+        gpg_passphrase = 0;
+         
+    }
+
+    if (mysql_password != 0)
+    {
+        memset(mysql_password, 0, MYSQL_PASSWORD_LENGTH);
+        munlock(mysql_password, MYSQL_PASSWORD_LENGTH);
+        delete[] mysql_password;
+        mysql_password = 0;
+        
+    }
+
+    pthread_mutex_destroy(&cerr_mutex);
+    pthread_mutex_destroy(&session_data_mutex);
+    pthread_mutex_destroy(&gpg_passphrase_fifo_mutex);
+    pthread_mutex_destroy(&log_strm_mutex);
+    pthread_mutex_destroy(&cookie_vector_mutex);
+
+    if (gpg_passphrase_fifo_fd > 0)
+    {
+       close(gpg_passphrase_fifo_fd);
+       unlink(gpg_passphrase_fifo_name.c_str());
+    }
+
+    return;
+
+}   /* End of |finish| definition  */
+
+@q ** (2) Main function definition.  @>
+
+@ Main function definition.
+\initials{LDF 2012.06.28.}
+
+\LOG
+\initials{LDF 2012.07.24.}
+Added code for opening log file.
+\ENDLOG 
+
+
+@<|main| definition@>=
+int
+main(int argc, char *argv[])
+{
+@q **** (4) @>
+
+    is_gwrdwbap = true;
+
+    int loop_ctr = 0;
+
+    bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+    int j;
+
+ 
+    curl = curl_easy_init();
+
+    int temp_val = 0;
+
+    int args = 0;
+    char **arg_str_vector = 0;
+
+    pthread_mutex_init(&cerr_mutex, 0);         /* Required in |client_func|.  */
+    pthread_mutex_init(&session_data_mutex, 0);
+    pthread_mutex_init(&gpg_passphrase_fifo_mutex, 0);
+    pthread_mutex_init(&log_strm_mutex, 0);
+    pthread_mutex_init(&cookie_vector_mutex, 0);
+
+    map<string, Scan_Parse_Parameter_Type*> session_data_map;
+
+    char log_filename[] = "/tmp/gwrdwbap.log";
+
+    log_strm.open(log_filename, ios_base::app);
+
+    stringstream outer_temp_strm;
+
+    if (!(log_strm && log_strm.is_open()))
+    {
+         outer_temp_strm.str("");
+         outer_temp_strm << "[gwrdwbap]  ERROR!  In `main':  Failed to open `log_strm'."
+                         << endl
+                         << "Exiting `gwrdwbap.fcgi' unsuccessfully with exit status 1."
+                         << endl;
+         fprintf(stderr, outer_temp_strm.str().c_str());
+
+         exit(1);
+
+    }  /* |if|  */
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       chmod(log_filename, 0744);     
+       log_strm << "Here I am." << endl;
+       log_strm << flush;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+  int outer_status = atexit(finish);
+
+  if (outer_status != 0) 
+  {
+     log_strm << "ERROR!  In `main':  `atexit' failed, returning " << outer_status << "."
+              << endl 
+              << "Failed to set exit function `finish'."
+              << endl 
+              << "Exiting program `gwrdwbap.fcgi' with exit status 1." 
+              << endl;
+
+      exit(1);
+
+  }  /* |if|  */
+#if DEBUG_COMPILE
+  else if (DEBUG)
+  {
+     log_strm << "Set exit function `finish' successfully."
+              << endl;
+  
+  }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+/* !! TODO:  LDF 2012.07.24.  Fake some expired cookies to see if 
+   |Cookie_Type::delete_expired_cookies| works properly.  
+*/
+
+/* The global variables |admin_data| and |admin_data_length| 
+   aren't used by \.{gwrdwbap.fcgi}.
+   \initials{LDF 2013.01.11.}  */
+
+   memset(admin_data, 0, 64);  
+   admin_data_length = 0;
+
+@q **** (4) Start thread for deleting expired cookies.  @>
+
+@ Start thread for deleting expired cookies.  
+\initials{LDF 2012.07.24.}
+
+\LOG
+\initials{LDF 2012.07.24.}
+Added this section.
+
+\initials{LDF 2012.11.16.}
+Added |unsigned int sleep_val|.  Now passing it to |Cookie_Type::delete_expired_cookies|.
+\ENDLOG
+
+@<|main| definition@>=
+
+  pthread_attr_t attr;
+  pthread_attr_init(&attr);
+  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+
+  pthread_t delete_expired_cookies_thread_id;
+
+  unsigned int sleep_val = 10;  /* 900   */  /* $900 \rm{seconds} = 15 \rm{minutes}$  */
+
+  outer_status = pthread_create(&delete_expired_cookies_thread_id,
+                          &attr, /* Attribute  */
+                          Cookie_Type::delete_expired_cookies,
+                          static_cast<void*>(&sleep_val));
+
+  if (outer_status != 0)
+  {
+
+        log_strm <<  "ERROR!  In `main':  `pthread_create' failed for `delete_expired_cookies'."
+                 << endl
+                 << "Exiting `gwrdwbap.fcgi' unsuccessfully with exit status 1."
+                 << endl;
+
+        exit(1);
+       
+
+  }
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       log_strm << "In `main':  `pthread_create' succeeded for `delete_expired_cookies'."
+                << endl;
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+
+@q **** (4) |FCGI_Accept| loop.  @>
+
+@ |FCGI_Accept| loop.  
+\initials{LDF 2012.06.28.}
+
+This is the main ``accept'' loop.  It will iterate each time this web application is
+accessed, by means of a browser, \.{curl}, \.{wget} or some other way.
+\initials{LDF 2012.06.28.}
+
+@<|main| definition@>=
+
+  while((j = FCGI_Accept()) >= 0)
+  {
+
+@q ***** (5) @>
+
+      int status;
+      string temp_str;
+      string content_type;
+
+      string client_dn;
+
+      stringstream temp_strm;
+
+      stringstream atemp_strm;
+
+      char c;
+
+      char *temp_buff = 0;
+
+      Scan_Parse_Parameter_Type *param = 0;
+
+      ++loop_ctr;
+
+      bool post_data_present = false;
+      bool get_data_present  = false;
+
+      char *unescaped_str = 0;
+
+      int char_ctr = 0;
+
+      string session_id;
+
+      map<string, Scan_Parse_Parameter_Type*>::iterator session_data_iter;
+
+      log_strm << "********** " << time(0) << " " << get_datestamp() << endl;
+
+@q ***** (5) Check |HTTP_COOKIE|.  @>
+
+@ Check |HTTP_COOKIE|.
+\initials{LDF 2012.07.23.}
+
+\LOG
+\initials{LDF 2012.07.23.}
+Added this section.
+\ENDLOG
+
+@<|main| definition@>=
+
+
+     temp_buff = getenv("HTTP_COOKIE");
+
+     if (temp_buff && strlen(temp_buff) > 0)
+     { 
+#if DEBUG_COMPILE
+         if (DEBUG)
+         {
+             atemp_strm.str("");
+             atemp_strm << "HTTP_COOKIE == " << temp_buff << "." 
+                        << endl;
+       
+         }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */  
+
+         status = Cookie_Type::parse_cookies(temp_buff, 
+                                             session_id, 
+                                             atemp_strm);
+
+         if (status != 0)
+         {
+             atemp_strm << "WARNING!  `parser_cookies' failed, returning " << status << "."
+                       << "Failed to parse cookies.  Any session data present in a cookie "
+                       << "could not be processed."
+                       << endl
+                       << "Will try to continue."
+                       << endl;
+
+         }  /* |if (status != 0)|  */
+#if DEBUG_COMPILE
+         else if (DEBUG)
+         {
+             atemp_strm << "`parse_cookies' succeeded returning 0."
+                        << endl
+                        << "`session_id' == " << session_id
+                        << endl;
+
+         }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+      }  /* |if (temp_buff && strlen(temp_buff) > 0)|  */
+      else 
+      {
+#if DEBUG_COMPILE
+         if (DEBUG)
+         {
+             atemp_strm << "HTTP_COOKIE is empty."
+                        << endl;
+           
+         }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */  
+
+      }  /* |else|  */
+
+      if (session_id.empty())
+      {
+#if DEBUG_COMPILE
+          if (DEBUG)
+          {
+              atemp_strm << "`session_id' is empty.  Calling `Cookie_Type::generate_session_id'."
+                         << endl;
+
+          }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+          status = Cookie_Type::generate_session_id(session_id, atemp_strm);
+
+          if (status != 0)
+          {
+              atemp_strm << "ERROR!  In `main':  `Cookie_Type::generate_session_id' failed, "
+                         << "returning "
+                         << status << "." 
+                         << endl 
+                         << "Failed to generate session ID.  Continuing."
+                         << endl;
+
+          }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+          else if (DEBUG)
+          {
+               atemp_strm << "In `main':  `Cookie_Type::generate_session_id' succeeded, "
+                          << "returning 0."
+                          << endl
+                          << "`session_id' == " << session_id << endl;
+
+          }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+      }  /* |if (session_id.empty())|  */
+
+#if DEBUG_COMPILE
+      else if (DEBUG)
+      {
+          atemp_strm << "`session_id' is not empty.  "
+                     << "Not calling `Cookie_Type::generate_session_id'."
+                     << endl;
+
+      }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q ***** (5) Output HTML file headers, the counter for the |FCGI_Accept| @>
+@q ***** (5) loop and the return value of |FCGI_Accept|.                 @>
+
+@ Output HTML file headers, the counter for the |FCGI_Accept| loop and the return value of 
+|FCGI_Accept|. 
+\initials{LDF 2012.06.28.}
+
+@<|main| definition@>=
+
+      temp_strm.str("");
+
+      temp_strm << "Content-Type: text/plain;charset=iso-8859-1\n";
+
+      atemp_strm << "About to output header.  cookie_vector.size() == "
+                 << cookie_vector.size() << endl;
+
+      for (vector<Cookie_Type>::const_iterator iter = cookie_vector.begin();
+           iter != cookie_vector.end();
+           ++iter)
+      {
+
+         iter->show("Cookie:", &atemp_strm);
+
+         temp_strm << "Set-Cookie: " << iter->name << "=";
+
+         if (!iter->value.empty())
+            temp_strm << iter->value;
+
+         temp_strm << "; Expires=" << iter->expires_str
+                   << "; Domain=.pcfinston.gwdg.de"
+                   << endl;
+
+      }  /* |for|  */
+
+      temp_strm << "\n"
+                << "<!DOCTYPE html\n"
+                << "     PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\"\n"
+                << "      \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n";
+
+
+      temp_strm << atemp_strm.str();
+      atemp_strm.str("");
+
+      temp_strm << "loop_ctr == " << loop_ctr << endl;
+
+      if (temp_buff)
+      {
+         temp_strm << "HTTP_USER_AGENT == " << temp_buff << endl;
+            
+      }
+      else 
+         temp_strm << "HTTP_USER_AGENT == NULL" << endl;
+
+      printf("%s", temp_strm.str().c_str());
+
+@q ***** (5) Output environment variables.  @>
+
+@ Output environment variables.  
+\initials{LDF 2010.03.31.}
+
+@<|main| definition@>=
+
+      char* curr_var;
+      int k = 0;
+
+#if 0 /* 1   */
+
+       temp_strm << "Environment Variables\n\n";
+
+       while ((curr_var = environ[k++]))
+          temp_strm << curr_var << endl;
+
+       printf("%s", temp_strm.str().c_str());
+
+       temp_strm.str("");
+
+       k = 0;
+
+#endif 
+
+@q ***** (5) Get the value of |HTTP_USER_AGENT|.  @>
+
+@ Get the value of |HTTP_USER_AGENT| and output it.  
+\initials{LDF 2012.06.28.}
+
+@<|main| definition@>=
+
+  temp_buff = getenv("HTTP_USER_AGENT");
+
+@q ***** (5) Parse the value of the |QUERY_STRING| environment variable.  @>
+
+@ Parse the value of the |QUERY_STRING| environment variable.  
+It contains any keyword-value pairs passed in the URL.
+\initials{LDF 2010.03.31.}
+\initials{LDF 2010.09.30.}
+
+@<|main| definition@>=
+
+  vector<pair<string, string> > parameters;
+
+  string query_string = getenv("QUERY_STRING");
+
+  if (DEBUG)
+  {
+      temp_strm.str("");     
+      temp_strm << "Query String\n";
+
+  }  /* |if (DEBUG)|  */ 
+
+
+  if (query_string.empty())
+  {
+     if (DEBUG)        
+        temp_strm << "query_string = NULL." << endl;
+  }
+  else
+  {
+
+     int m = 0;
+
+     get_data_present = true;
+
+     if (DEBUG) 
+        temp_strm << "query_string = " << query_string << endl;
+
+
+  }  /* |else|  */
+
+  if (DEBUG) 
+     printf("%s", temp_strm.str().c_str());
+
+@q ***** (5) Get client Distinguished Name.  @>
+@ Get client Distinguished Name.  It's stored in the {\tt mod\_ssl}
+environment variable |SSL_CLIENT_S_DN|.  The client certificate is stored in
+the {\tt mod\_ssl} environment variable |SSL_CLIENT_CERT|.
+\initials{LDF 2012.06.28.}
+
+\LOG
+\initials{LDF 2012.07.27.}
+Added error handling.  Without |SSL_CLIENT_S_DN|, 
+|Scan_Parse_Parameter_Type::Distinguished_Name| can't be set, i.e.,
+the user can't be identified.
+\ENDLOG 
+
+@<|main| definition@>=
+
+  /* !! TODO:  LDF 2013.05.10.  Removed 
+     |Scan_Parse_Parameter_Type::Distinguished_Name|.   
+
+     I could put it back, if needed.  Not currently working on \.{gwrdwbap}.
+
+  */
+
+  temp_buff = getenv("SSL_CLIENT_S_DN");
+  temp_strm.str("");
+
+  if (temp_buff)
+  {
+     temp_strm << "SSL_CLIENT_S_DN == " << temp_buff << endl;
+     client_dn = temp_buff;
+     if (DEBUG)
+        printf("%s", temp_strm.str().c_str());
+  }
+  else  /* Error handling  */
+  {
+@q ****** (6) @>
+
+     temp_strm.str("");
+     temp_strm << "[gwrdwbap] ERROR!  In `main':  SSL_CLIENT_S_DN == NULL" 
+               << endl
+               << "No Distinguished Name.  This isn't allowed."
+               << endl 
+               << "Breaking."
+               << endl;
+     printf("%s", temp_strm.str().c_str());
+
+     goto END_OF_MAIN_ACCEPT_LOOP;
+
+  }  /* |else|  */
+
+
+@q ***** (5) @>
+@
+@<|main| definition@>=
+
+  if (DEBUG) 
+  {
+
+     temp_strm.str("");
+
+     temp_buff = getenv("SSL_PROTOCOL");
+
+     if (temp_buff)
+        temp_strm << "SSL_PROTOCOL == " << temp_buff << endl;
+      else 
+        temp_strm << "SSL_PROTOCOL == NULL" << endl;
+
+#if 0 
+
+     temp_buff = getenv("SSL_CLIENT_CERT");
+
+     if (temp_buff)
+        temp_strm << "SSL_CLIENT_CERT == " << temp_buff << endl;
+      else 
+        temp_strm << "SSL_CLIENT_CERT == NULL" << endl;
+
+     temp_buff = getenv("SSL_SERVER_CERT");
+
+     if (temp_buff)
+        temp_strm << "SSL_SERVER_CERT == " << temp_buff << endl;
+      else 
+        temp_strm << "SSL_SERVER_CERT == NULL" << endl;
+
+#endif 
+
+     temp_buff = getenv("SSL_CLIENT_V_END");
+
+     if (temp_buff)
+        temp_strm << "SSL_CLIENT_V_END == " << temp_buff << endl;
+      else 
+        temp_strm << "SSL_CLIENT_V_END == NULL" << endl;
+
+     printf("%s", temp_strm.str().c_str());
+
+
+  } /* |if (DEBUG)|  */ 
+
+@q ***** (5) Check |REQUEST_METHOD|.  @>
+
+@ Check |REQUEST_METHOD|.
+\initials{LDF 2012.07.09.}
+
+@<|main| definition@>=
+
+   temp_buff = getenv("REQUEST_METHOD");
+
+   if (temp_buff && strlen(temp_buff) > 0 && strcmp(temp_buff, "POST") == 0)
+   {
+      if (DEBUG)
+      {
+          temp_strm.str("");
+          temp_strm << "REQUEST_METHOD == POST.  Will process POST data." << endl;
+          printf("%s", temp_strm.str().c_str());
+        
+      }  /* |if (DEBUG)|  */ 
+
+   }
+   else 
+   {
+      if (DEBUG)
+      {
+          temp_strm.str("");
+          temp_strm << "REQUEST_METHOD == " << temp_buff << endl
+                    << "REQUEST_METHOD != POST. No POST data to process." << endl;
+          printf("%s", temp_strm.str().c_str());
+        
+      }  /* |if (DEBUG)|  */ 
+
+      goto END_PROCESS_POST_DATA;
+
+   }  /* |else|  */
+
+@q ***** (5) Check for POST data.  @>
+
+@ Check for POST data.  
+\initials{LDF 2012.07.03.}
+
+@<|main| definition@>=
+
+   /* !! TODO:  LDF 2012.07.26.  Check |CONTENT_TYPE| with other requests:  
+      I think \.{curl} may send POST data with other requests, too.
+   */
+
+   temp_str = "application/x-www-form-urlencoded";
+
+   temp_buff = getenv("CONTENT_TYPE");
+
+
+   temp_strm.str("");
+
+   if (temp_buff) 
+   {
+      temp_strm << "POST data is present." << endl;
+      content_type = temp_buff;
+      status = content_type.compare(0, temp_str.size(), temp_str);
+   }
+   else 
+   {
+      status = -1;
+      temp_strm << "No parameters submitted to stdin using POST." << endl;
+   } 
+
+   printf("%s", temp_strm.str().c_str());
+
+   if (status != 0)
+   {
+        temp_strm.str("");
+        temp_strm << "WARNING!  Content type = " << temp_buff << endl
+                  << "Should be \"application/x-www-form-urlencoded\"."
+                  << endl 
+                  << "Can't process POST data.  Will try to continue."
+                  << endl;
+
+        printf("%s", temp_strm.str().c_str());
+
+        goto END_PROCESS_POST_DATA;
+
+   }  /* |if (status != 0)|  */
+
+   else if (DEBUG)
+   {
+       temp_strm.str("");
+       temp_strm << "Content type is \"application/x-www-form-urlencoded\"."
+                 << endl 
+                 << "Will process POST data."
+                 << endl;
+
+       printf("%s", temp_strm.str().c_str());
+
+   }  /* |else if (DEBUG)|  */ 
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2012.07.27.}
+Moved this section above the one where POST data is processed.  This makes it possible
+to pass |param| to |parse_post_data| and put |param->Distinguished_Name| onto the 
+front of the POST data.
+\ENDLOG 
+
+@<|main| definition@>=
+
+   pthread_mutex_lock(&session_data_mutex);
+
+   session_data_iter = session_data_map.find(session_id);
+
+   if (session_data_iter == session_data_map.end())
+   {
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+        temp_strm.str("");
+        temp_strm << "`session_data_iter' == `session_data_map.end()'."
+                  << endl 
+                  << "New session.  Creating a new `Scan_Parse_Parameter_Type' object "
+                  << "and pushing new pair onto `map'."
+                  << endl; 
+
+        printf("%s", temp_strm.str().c_str());
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+           param = new Scan_Parse_Parameter_Type;
+
+           session_data_map[session_id] = param;
+
+   }  /* |if (session_data_iter == session_data_map.end())|  */
+
+   else
+   {
+       param = session_data_iter->second;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+        temp_strm.str("");
+        temp_strm << "`session_data_iter' != `session_data_map.end()'."
+                  << endl 
+                  << "Old session.  Will use existing `Scan_Parse_Parameter_Type' object."
+                  << endl; 
+
+        printf("%s", temp_strm.str().c_str());
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+   }  /* |else|  */
+
+   param->set_expires(7200);  /* Increase |Scan_Parse_Parameter_Type::expires|
+                                 value by two hours (7200 seconds).
+ 
+                                 |set_expires| is so unlikely to fail that
+                                 I don't bother checking the return value.
+
+                                 \initials{LDF 2012.07.27.}  */
+
+   if ((client_dn.length() + strlen("DISTINGUISHED_NAME") + 4) > BUFFER_SIZE)  
+   {
+       temp_strm.str("");
+       temp_strm << "[gwrdwbap] ERROR!  `main':  "
+                 << "`(client_dn.length() + strlen(\"DISTINGUISHED_NAME\") + 4)' "
+                 << "> `BUFFER_SIZE'."
+                 << endl 
+                 << "`client_dn.length()' == " << client_dn.length()
+                 << endl 
+                 << "`(client_dn.length() + strlen(\"DISTINGUISHED_NAME\") + 4)' == "
+                 << (client_dn.length() + strlen("DISTINGUISHED_NAME") + 4)
+                 << endl 
+                 << "`BUFFER_SIZE' == " << BUFFER_SIZE
+                 << endl 
+                 << "Breaking."
+                 << endl;
+       printf("%s", temp_strm.str().c_str());
+
+       if (param)
+       {
+           delete param;
+           param = 0;
+           session_data_map.erase(session_data_iter);
+       }
+
+       goto END_OF_MAIN_ACCEPT_LOOP;
+
+
+   }  /* |if|  */
+
+   strcpy(param->data_buffer, "DISTINGUISHED_NAME \"");
+   strcat(param->data_buffer, client_dn.c_str());
+   strcat(param->data_buffer, "\"\n");
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       char atemp_str[128];
+       temp_strm.str("");
+       temp_strm << "`param->get_expires()' == " << param->get_expires(atemp_str, 127) 
+                 << " == " << atemp_str << endl;
+       printf("%s", temp_strm.str().c_str());
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */     
+
+   pthread_mutex_unlock(&session_data_mutex);
+
+@q ***** (5) Read POST data from standard input.  @>
+
+@ Read POST data from standard input.
+\initials{LDF 2012.06.28.}
+
+@<|main| definition@>=
+
+@q ****** (6) @>
+
+  
+   status = parse_post_data(*param);
+
+@q ****** (6) |parse_post_data| failed, returning -1.  @>
+
+@ |parse_post_data| failed, returning -1.
+\initials{LDF 2012.07.27.}
+
+@<|main| definition@>=
+
+   if (status == -1)
+   {
+       temp_strm.str("");
+       temp_strm << "ERROR!  `parse_post_data' failed, returning -1."
+                 << endl 
+                 << "Failed to parse standard input, which contains the POST data."
+                 << endl 
+                 << "Breaking."
+                 << endl;
+       printf("%s", temp_strm.str().c_str());
+
+       if (param)
+       {
+           delete param;
+           param = 0;
+           session_data_map.erase(session_data_iter);
+       }
+
+       goto END_OF_MAIN_ACCEPT_LOOP;
+
+   }  /* |if (status != 0)|  */
+
+@q ****** (6) |parse_post_data| succeeded, returning 0.  @>
+@q ****** (6) POST data is in |param->data_buffer|.                  @>
+
+@ |parse_post_data| succeeded, returning 0.  POST data is in |param->data_buffer|.
+\initials{LDF 2012.07.27.}
+
+@<|main| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       temp_strm.str("");
+       temp_strm << "`parse_post_data' succeeded, returning " << status << "."
+                 << endl;
+       printf("%s", temp_strm.str().c_str());
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q ****** (6) Error handling:  |param->data_buffer| is NULL or empty.  @>
+
+@ Error handling:  |param->data_buffer| is NULL or empty.  
+\initials{LDF 2012.07.27.}
+
+@<|main| definition@>=
+
+   if (status == 0 && (param->data_buffer == 0 || strlen(param->data_buffer) == 0))
+   {
+       temp_strm.str("");
+       temp_strm << "ERROR!  `status' == 0, but `param->data_buffer' == 0 "
+                 << "or `strlen(param->data_buffer)' == 0."
+                 << endl 
+                 << "This isn't supposed to happen."
+                 << endl 
+                 << "Failed to parse standard input, which contains the POST data."
+                 << endl 
+                 << "Breaking."
+                 << endl;
+       printf("%s", temp_strm.str().c_str());
+
+       if (param)
+       {
+           delete param;
+           param = 0;
+           session_data_map.erase(session_data_iter);
+       }
+
+       goto END_OF_MAIN_ACCEPT_LOOP;
+
+   }  /* |if|  */
+
+@q ****** (6) @>
+@
+@<|main| definition@>=
+
+   else if (status == 0)
+   {
+
+       post_data_present = true;
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+          temp_strm.str("");
+          temp_strm << "`status' == 0, `param->data_buffer' != 0 "
+                    << "and `strlen(param->data_buffer)' > 0."
+                    << endl 
+                    << "POST data is contained in `param->data_buffer'."
+                    << endl;
+          printf("%s", temp_strm.str().c_str());
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+   }  /* |else if (status == 0)|  */
+
+@q ****** (6) |parse_post_data| returned 1:  POST data has been written to |out_strm|.  @>
+
+@ |parse_post_data| returned 1:  POST data has been written to |out_strm|.
+\initials{LDF 2012.07.27.}
+
+@<|main| definition@>=
+
+   else if (status == 1)
+   {
+#if DEBUG_COMPILE
+    if (DEBUG)
+    {
+       temp_strm.str("");
+       temp_strm << "`status' == 1.  POST data has been written to `out_strm'."
+                 << endl;
+       printf("%s", temp_strm.str().c_str());
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    post_data_present = true;
+
+   }  /* |else if (status == 1)|  */
+
+@q ****** (6) @>
+
+   END_PROCESS_POST_DATA:
+
+@q ***** (5)  Check for GET data.  @>
+@ Check for GET data.
+\initials{LDF 2012.07.03.}
+
+\LOG
+\initials{LDF 2012.07.03.}
+Added this section.
+\ENDLOG
+
+@<|main| definition@>=
+
+
+@q ***** (5) @>
+@ 
+@:TODO@> !! TODO:  Handle GET data.  
+\initials{LDF 2012.07.09.}
+
+@<|main| definition@>=
+
+    if (!(post_data_present || get_data_present))  
+    {
+        temp_strm.str("");
+        temp_strm << "WARNING!  No POST or GET data.  Nothing to do.  Quitting."
+                  << endl;
+        printf("%s", temp_strm.str().c_str());
+
+        goto END_OF_MAIN_ACCEPT_LOOP;
+
+    }  /* |if (!(post_data_present || get_data_present))|  */
+
+#if DEBUG_COMPILE
+    else if (DEBUG)
+    {
+        temp_strm.str("");
+        if (post_data_present)
+            temp_strm << "POST data is present." << endl;
+        if (get_data_present)
+            temp_strm << "GET data is present." << endl;
+
+        printf("%s", temp_strm.str().c_str());
+
+    }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+
+@q ***** (5) @>
+@
+@<|main| definition@>=
+
+    status = client_func(*param);
+
+    if (status != 0)
+    {
+        temp_strm.str("");
+        temp_strm << "ERROR!  `client_func' failed, returning " << status << "."
+                  << endl << "Breaking." << endl;
+        printf("%s", temp_strm.str().c_str());
+
+
+        if (param)
+        {
+            delete param;
+            param = 0;
+            session_data_map.erase(session_data_iter);
+        }
+
+        goto END_OF_MAIN_ACCEPT_LOOP;
+
+
+    }  /* |if (status != 0)|  */
+
+    else if (DEBUG)
+    {
+        printf("`client_func' succeeded, returning 0.\n");
+     
+    }  /* |else if (DEBUG)|  */ 
+
+
+@q ***** (5) End of |FCGI_Accept| loop.  @>
+@
+@<|main| definition@>=
+
+   END_OF_MAIN_ACCEPT_LOOP:
+   ;
+
+  }  /* |while|  */
+
+  curl_easy_cleanup(curl);
+
+  log_strm.close();
+
+  exit(0);
+
+@q **** (4) @>
+
+}  /* End of |main| definition  */
+
+@q *** (3) @>
+
+@q ** (2) This is what's compiled.  @>
+
+@ This is what's compiled.  
+\initials{LDF 2012.06.28.}
+
+@:NOTE@> !! PLEASE NOTE:  The |typedefs| for |jobject|, |JNIEnv| and | yyscan_t| below 
+are needed for types used in |class Scan_Parse_Parameter_Type| or its member functions
+and |int yydebug| is used in |process_command_line_options| in \filename{cmdlnopt.web}.
+If I add a scanner/parser pair for this program, I will need to 
+get rid of the |typedef| for |yyscan_t| and the declaration of |int yydebug|.
+\initials{LDF 2012.07.20.}
+
+@c
+typedef void* yyscan_t;  
+
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+GCRY_THREAD_OPTION_PTHREAD_IMPL;
+gnutls_anon_server_credentials_t anoncred;
+@<Global variables@>@;@/
+int yydebug;
+@<|finish| definition@>@;@/
+@<|main| definition@>@;@/
+
+/* !! TODO:  LDF 2012.07.20.  Put these definitions somewhere else
+   and include them here and in `gwirdcli.web'.  */
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode) (setq abbrev-mode t))     @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+

@@ -1,0 +1,534 @@
+@q gentans.web @>
+
+@q Created by Laurence D. Finston (LDF) Fri Jul 13 15:54:25 CEST 2012 @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q * (1) Generate TANs (gentans.web).  @>
+
+@*  Generate TANs (gentans\PERIOD web).
+
+\LOG
+\initials{LDF 2012.07.13.}
+Created this file.
+
+\initials{LDF 2012.07.16.}
+Rewrote this program.  It now calls |generate_tans|, which is defined in 
+\filename{utilfncs.web}.
+\ENDLOG 
+
+This program, \.{gentan}, is meant to run as a d{\ae}mon process in the background or as 
+a cron job.  If it is run as a d{\ae}mon process, then a cron job should check
+whether it's still running and restart it, if necessary.
+It checks the number of unassigned TANs in the database table \.{gwirdsif.TANs}
+and generates new ones, up to a target amount (default 1000).
+It generates them $x$ at a time, where the default for $x$ is 100.
+\par
+\.{gentans} calls the function |generate_tans| to generate new TANs.
+|generate_tans| checks the number of TANs in the database table \.{gwirdsif.TANs}
+and generates new ones, up to a target amount
+passed to the function as an argument.  The target value can be passed to this program
+as the first (optional) command-line argument.  Otherwise, a default of 1000 is used.
+If the target value is less than or equal to 0, a warning is issued and this program
+exits unsuccessfully with an exit status of 2.
+\par
+The number of TANs written to the database per iteration can be set using the 
+second (optional) command-line argument.  If no argument is used, or the argument is 0, 
+a default of 100 is used.  If the value passed is negative or positive and 
+greater than the target value, a warning is issued and |tans_per_iteration| is set 
+to the minimum of the target value or 100.
+\par
+A {\it sleep value\/} can be passed to \.{gentans} as the third (optional) 
+command-line argument.
+If this value is $> 0$, it will call |generate_tans| in a loop, sleeping for 
+this number of seconds after each call to |generate_tans| exits.  If no argument 
+is provided a sleep value of 0 is assumed and \.{gentans} simply exits after calling 
+|generate_tans| once.
+\par
+@:NOTE@> !! PLEASE NOTE: Depending on how many TANs are already in the
+\.{gwirdsif.TANs} database table, the values of |target| and
+|tans_per_iteration|, and the number of rows actually inserted into the table in
+|generate_tans|, the table may contain more TANs than
+|target| when this program exits.  This is because
+|generate_tans| will always try to insert |tans_per_iteration| rows, even when
+the number of rows in the table is already greater than 
+|target - tans_per_iteration|.  However, after a run of this program, the number
+of rows will never exceed |target + tans_per_iteration - 1|.
+\par
+The \.{IGNORE} keyword is used with the SQL \.{INSERT} 
+command, so that duplicates are not written to the table.
+\par
+Used or expired TANs are removed from the table, so it is possible for a TAN
+to be identical to one that existed formerly.  However, this shouldn't cause any
+problems.
+\initials{LDF 2012.07.13.}
+\initials{LDF 2012.07.16.}
+\initials{LDF 2012.07.19.}
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif 
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+#include <fstream>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <string>
+#include <sstream>  
+#include <map>  
+#include <vector>  
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#include <mysql.h>
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "tanfncs.h++"
+
+@q * (1) Finish (exit handler).  @>
+@ Finish (exit handler).
+\initials{LDF 2012.07.17.}
+
+\LOG
+\initials{LDF 2012.07.17.}
+Added this function.
+
+\initials{LDF 2013.09.19.}
+Added code for unlocking the memory for |gpg_key_id| and |gpg_passphrase| 
+and deleting them.
+\ENDLOG
+
+@q ** (2) Definition  @>
+
+@<|finish| definition@>=
+void
+finish(void)
+{
+
+    bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0);
+
+    int status;
+
+    if (DEBUG) 
+    {
+        lock_cerr_mutex(); 
+        cerr << "Entering `finish'." << endl;
+        unlock_cerr_mutex(); 
+    }
+
+@q ** (2) @>
+
+    if (gpg_key_id != 0)
+    {
+        memset(gpg_key_id, 0, 10);
+        munlock(gpg_key_id, 10);
+        delete[] gpg_key_id;
+        gpg_key_id = 0;
+         
+    }
+
+    if (gpg_passphrase != 0)
+    {
+        memset(gpg_passphrase, 0, gpg_passphrase_length);
+        munlock(gpg_passphrase, gpg_passphrase_length);
+        delete[] gpg_passphrase;
+        gpg_passphrase = 0;
+         
+    }
+
+   if (mysql_password != 0)
+   {
+       memset(mysql_password, 0, MYSQL_PASSWORD_LENGTH);
+       munlock(mysql_password, MYSQL_PASSWORD_LENGTH);
+       delete[] mysql_password;
+       mysql_password = 0;
+       
+   }
+
+   pthread_mutex_destroy(&cerr_mutex);
+
+   if (DEBUG) 
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `finish'." << endl;
+       unlock_cerr_mutex(); 
+   }
+
+   return;
+
+}   /* End of |finish| definition  */
+
+
+@q *** (3) Main definition.  @>
+
+@ Main definition.
+\initials{LDF 2012.07.13.}
+
+@<|main| definition@>=
+int
+main(int argc, char *argv[])
+{
+@q **** (4) @>
+
+   int status;
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0);
+
+   MYSQL *mysql_ptr;
+   
+
+   pthread_mutex_init(&cerr_mutex, 0);  /* Needed in |generate_tans|.  
+                                           Otherwise, not needed, since
+                                           this program doesn't use threads.
+                                           \initials{LDF 2012.07.17.}  */
+
+
+   int sleep_val = 0;   /* 0 $=$ don't sleep, but rather exit.
+                           43200 seconds $=$ 12 hours  */
+
+   int target = 1000;  /* Target number of TANs  */
+
+   int tans_per_iteration = 100;  /* Number of TANs written
+                                     to the \.{gwirdsif.TANs} database 
+                                     table per iteration.  
+                                     (See {\TeX} text, above).  */
+
+   if (argc > 1)
+      target = atoi(argv[1]);
+
+   if (target <= 0)
+   {
+       cerr << "[gentans] WARNING!  In `main':  (`target' == " << target << ") <= 0."
+            << endl 
+            << "Not generating TANs.  Exiting `gentans' unsuccessfully with "
+            << "exit status 2."
+            << endl;
+
+       exit(2);
+
+   }  /* |if (target <= 0)|  */
+
+   if (argc > 2)
+      tans_per_iteration = atoi(argv[2]);
+
+   if (tans_per_iteration == 0)
+   {
+       if (DEBUG) 
+          cerr << "[gentans] In `main':  `tans_per_iteration' == 0."
+               << endl
+               << "Setting it to default value of 100."
+               << endl;
+       tans_per_iteration = 100;
+   }
+
+   else if (tans_per_iteration < 0)
+   {
+       cerr << "[gentans] WARNING!  In `main':  (`tans_per_iteration' == " 
+            << tans_per_iteration << ") < 0."
+            << endl 
+            << "Setting `tans_per_iteration' to the minimum of `target' == "
+            << target << " and 100."
+            << endl
+            << "Continuing."
+            << endl;
+
+        tans_per_iteration = (target < 100) ? target : 100;
+
+   }  /* |if (target <= 0)|  */
+
+   if (tans_per_iteration > target)
+   {
+       cerr << "[gentans] WARNING!  In `main':  `tans_per_iteration' == "
+            << tans_per_iteration << " > `target' == " << target << "."
+            << endl
+            << "Setting `tans_per_iteration' to the minimum of `target' "
+            << "and 100."
+            << endl
+            << "Continuing."
+            << endl;
+
+       tans_per_iteration = (target < 100) ? target : 100;
+
+   }  /* |if (tans_per_iteration > target)|  */
+
+   if (argc > 3)
+      sleep_val = atoi(argv[3]);
+
+
+   if (DEBUG)    
+      cerr << "[gentans] In `main':  sleep_val == " << sleep_val << endl
+           << "`target' == " << target
+           << endl 
+           << "`tans_per_iteration' == " << tans_per_iteration
+           << endl;
+
+@q **** (4) Initialize the MySQL library.  @>
+
+@ Initialize the MySQL library.  
+\initials{LDF 2012.07.13.}
+
+@<|main| definition@>=
+
+    if (mysql_library_init(0, NULL, NULL)) 
+    {
+        cerr << "ERROR!  In `main':  Failed to initialize the MySQL library."
+             << endl
+             << "Exiting `gentans' unsuccessfully with exit status 1."
+             << endl;
+
+        exit(1);
+
+    }
+    else if (DEBUG)
+    {
+      cerr << "mysql_library_init succeeded." << endl;
+    }  
+
+
+@q **** (4) @>
+@
+@<|main| definition@>=
+
+      mysql_ptr = mysql_init(0);
+
+      if (mysql_ptr)
+      {
+         if (DEBUG)
+         {
+            cerr << "In `main':  `mysql_init' succeeded."
+                 << endl;
+
+         }  /* |if (DEBUG)|  */ 
+
+      }  /* |if (mysql_ptr)| */
+
+      else
+      {
+         cerr << "ERROR!  In `main':"
+              << endl
+              << "`mysql_init' failed.  Exiting `gentans' unsuccessfully with "
+              << "exit status 1."
+              << endl;
+         mysql_library_end(); 
+         exit(1);
+
+      }
+
+@q **** (4) Connect to the `gwirdsif' database.  @>
+
+@ Connect to the `gwirdsif' database.  
+\initials{LDF 2012.07.13.}
+
+@<|main| definition@>=
+
+     if (!mysql_real_connect(mysql_ptr, 
+                             0, 
+                             "root", 
+                             0, 
+                             0,
+                             0, 
+                             "/var/run/mysql/mysql.sock", 0))
+      {
+         cerr << "ERROR!  In `main':" 
+              << endl
+              << "`mysql_real_connect' failed.  "
+              << "Error:  " << mysql_error(mysql_ptr)
+              << endl 
+              << "Exiting `gentans' unsuccessfully with exit status 1."
+              << endl;
+
+          mysql_close(mysql_ptr); 
+          mysql_library_end();
+          exit(1);
+
+      }
+      else if (DEBUG)
+      {
+         cerr << "In `main':  `mysql_real_connect' succeeded."
+              << endl; 
+      } 
+
+@q **** (4) Select ``gwirdsif'' database.  @>
+
+@ Select ``gwirdsif'' database.  
+\initials{LDF 2012.07.13.}
+
+@<|main| definition@>=
+
+      status = mysql_select_db(mysql_ptr, "gwirdsif");
+
+      if (status == 0)
+      {
+        
+         if (DEBUG)
+         {
+            cerr << "In `main':  "
+                 << "`mysql_select_db succeeded'."
+                 << endl;
+
+         }  /* |if (DEBUG)|  */ 
+
+      }  /* |if (status == 0)| */
+
+      else /* |status != 0| */
+      {
+         cerr << "In `main':  "  
+              << "`mysql_select_db' failed, returning " << status 
+              << endl;
+
+         mysql_close(mysql_ptr); 
+         mysql_library_end();
+
+         exit(1);
+
+      }   /* |else| (|status != 0|) */
+
+
+@q **** (4) @>
+@
+@<|main| definition@>=
+
+      for (;;)
+      {
+         status = generate_tans(mysql_ptr, 1000, 100);
+  
+         if (status != 0)
+         {
+             cerr << "ERROR!  In `main':  `generate_tans' failed, returning "
+                  << status << "." 
+                  << endl
+                  << "Exiting `gentans' unsuccessfully with exit status 1."
+                  << endl;
+
+  
+             mysql_close(mysql_ptr); 
+             mysql_library_end();
+             exit(1);
+
+         }  /* |if (status != 0)|  */         
+
+         else if (DEBUG)
+         {
+             cerr << "`generate_tans' succeeded." << endl;
+
+         }  /* |else if (DEBUG)|  */
+
+         if (sleep_val > 0)
+         {
+             if (DEBUG) 
+                cerr << "[gentans] `sleep_val == '" << sleep_val << " > 0.  "
+                     << "Going to sleep for " << sleep_val << " seconds."
+                     << endl;
+
+             sleep(sleep_val);
+         }
+         else
+         {
+             if (DEBUG) 
+                cerr << "[gentans] `sleep_val == '" << sleep_val << " <= 0.  "
+                     << "Not sleeping.  Will exit."
+                     << endl;
+
+             break;
+         }
+
+      }  /* |for|  */
+
+
+@q **** (4) @>
+@
+@<|main| definition@>=
+
+
+   mysql_close(mysql_ptr); 
+   mysql_library_end();
+
+   exit(0);
+
+}  /* End of |main| definition  */
+
+
+@q ** (2) Putting Generate TANs together.  @>
+
+@ Putting Generate TANs together.  
+\initials{LDF 2012.07.13.}
+
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+@<|finish| definition@>@;@/
+@<|main| definition@>@;@/
+
+@
+@(gentans.h@>=
+/* Empty  */
+
+
+@q (progn (cweb-mode) (outline-minor-mode))                           @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

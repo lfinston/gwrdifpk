@@ -1,0 +1,620 @@
+@q connect.web  @>
+@q [...]/Finston/gwrdifpk/src/connect.web  @>
+
+@q Created by Laurence D. Finston (LDF) Mon Jul  2 12:09:35 CEST 2012  @>
+
+@q * (1) Top  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@* Connect function for server.
+\initials{LDF 2012.11.21.}
+
+@q * (1) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#include <sys/types.h>
+#include <pwd.h>
+#include <errno.h>
+#include <grp.h>
+#include <sys/wait.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+#include <time.h>
+#include <sys/stat.h>
+
+#include <string>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <stdarg.h>
+#include <limits.h>
+#include <algorithm>
+#include <fstream>
+#include <iterator>
+#include <time.h>
+#include <math.h>
+#include <sstream>   
+
+#include <map>
+#include <vector>
+#include <deque>
+#include <stack>
+#include <set>
+
+#include <pthread.h>
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+
+#if HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#include <mysql.h>
+
+#include <expat.h>
+
+#undef NAME_LEN
+#undef LOCAL_HOST
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "parser.h++"  
+#include "scanner.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+#include "exchncli.h++"
+
+@q * (1) Connection function.  @>
+
+@ Connection function. (|connect_func|).
+\initials{LDF 2012.07.02.}
+
+\initials{LDF 2013.03.21.}
+@:TODO@> !! TODO:  This function doesn't do anything significant other than call 
+|exchange_data_with_client|.  Consider whether it may be useful for some purpose
+in the future, or whether the latter could be modified and called as a thread
+function in the ``listen'' functions.
+
+@<|connect_func| declaration@>=
+void*
+connect_func(void* v);
+
+@q *** (3) Definition  @>
+@
+@<|connect_func| definition@>=
+void*
+connect_func(void* v)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0);
+
+   string error_warning_str;
+   stringstream temp_strm;
+
+   char buffer[BUFFER_SIZE];
+   memset(buffer, 0, BUFFER_SIZE);
+
+   int status;
+
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `connect_func'." << endl << flush;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+
+@q **** (4) @>
+@
+@<|connect_func| definition@>=
+
+   Scan_Parse_Parameter_Type *param  = static_cast<Scan_Parse_Parameter_Type *>(v);
+
+   param->PARSER_DEBUG = false;  /* |true|  */
+
+#if 0 
+   if (DEBUG)
+   {
+       lock_cerr_mutex();
+       param->show("param"); 
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+#endif 
+
+   pthread_cleanup_push(cleanup_handler, 0);
+
+@q **** (4) @>
+@
+@<|connect_func| definition@>=
+
+
+   status = exchange_data_with_client(*param);
+
+   {
+
+       int temp_width = 0;
+
+       int i =   (param->errors_occurred > param->warnings_occurred) 
+               ? param->errors_occurred : param->warnings_occurred;
+
+       do
+       { 
+           ++temp_width;
+
+           i /= 10;
+           
+       } while (i > 0);
+
+
+       temp_strm.str("");
+
+       temp_strm << "   " << setw(temp_width) << param->errors_occurred << " error"
+                 << ((param->errors_occurred == 1) ? "" : "s") << "."
+                 << endl
+                 << "   " << setw(temp_width) << param->warnings_occurred << " warning" 
+                 << ((param->warnings_occurred == 1) ? "" : "s") << "."
+                 << endl;
+
+       error_warning_str = temp_strm.str();
+
+       temp_strm.str("");        
+   
+   }
+
+
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2013.04.18.}
+Added this section.
+\ENDLOG
+
+@<|connect_func| definition@>=
+
+   if (status == 2)
+   {
+
+@q ***** (5) @>
+
+        pthread_cleanup_push(cleanup_handler, 0);
+
+        lock_cerr_mutex(); 
+        cerr << "In `connect_func':  `exchange_data_with_client' succeeded, returning 2:"
+             << endl
+             << "`END_SERVER' command succeeded."
+             << endl
+             << "Will exit `gwirdsif' with exit status 0."
+             << endl
+             << error_warning_str;
+        unlock_cerr_mutex(); 
+
+@q ***** (5) @>
+
+        pthread_mutex_lock(&thread_ctr_id_map_mutex);
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "Before erase:  thread_ctr_id_map.size() == " 
+                 << thread_ctr_id_map.size() << endl;
+
+            for (map<unsigned int, pthread_t>::iterator iter = thread_ctr_id_map.begin();
+                 iter != thread_ctr_id_map.end();
+                 ++iter)
+                cerr << "iter->first == " << iter->first << endl
+                     << "iter->second == " << iter->second << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+@ The current thread may exit before |finish| has a chance to call |pthread_cancel| on it.
+In this case, the latter will fail, because the thread will no longer exist.
+This would not be a problem, however.
+On the other hand, if |finish| exits and the process ends before the current thread 
+reaches the call |pthread_exit| below, there's no harm done either, because this code doesn't 
+do anything significant between the calls to 
+|pthread_kill| and |pthread_exit|.  Therefore, we might as well remove 
+the thread counter and ID (i.e., |param->thread_ctr| and |pthread_self()|, respectively) 
+from |thread_ctr_id_map| and |thread_id_ctr_map| so that we don't get the error message
+if |pthread_cancel| should fail in |finish|.
+\initials{LDF 2013.04.23.}
+
+@<|connect_func| definition@>=
+
+        pthread_t save_thread_id = thread_ctr_id_map[param->thread_ctr];
+
+        status = thread_ctr_id_map.erase(param->thread_ctr);  
+
+        if (status == 1)
+           status = thread_id_ctr_map.erase(pthread_self());  
+
+        if (status != 1)
+        {
+            lock_cerr_mutex(); 
+            cerr << "ERROR!  In `connect_func':  "
+                 << "`map<unsigned int, pthread_t>::erase' or "
+                 << "`map<pthread_t, unsigned int>::erase' failed, returning "
+                 << status << "."
+                 << endl
+                 << "Failed to erase entries for thread counter and thread ID for current thread "
+                 << "from `thread_ctr_id_map' and `thread_id_ctr_map':"
+                 << endl
+                 << "Current thread number:  " << param->thread_ctr
+                 << endl
+                 << "Current thread ID:      " << thread_ctr_id_map[param->thread_ctr]
+                 << endl 
+                 << "Will try to continue."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (status != 1)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "Removed entries for thread counter and ID for current thread "
+                 << "(" << param->thread_ctr << ") "
+                 << "from `thread_ctr_id_map' and `thread_id_ctr_map' successfully."
+                 << endl
+                 << "Current thread ID:  " << save_thread_id
+                 << endl;
+
+            for (map<unsigned int, pthread_t>::iterator iter = thread_ctr_id_map.begin();
+                 iter != thread_ctr_id_map.end();
+                 ++iter)
+                cerr << "iter->first == " << iter->first << endl
+                     << "iter->second == " << iter->second << endl;
+
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */          
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "In `connect_func':  `thread_ctr_id_map.size()' == " 
+                 << thread_ctr_id_map.size() 
+                 << endl;
+
+            if (thread_ctr_id_map.size() > 0)
+                cerr << "`thread_ctr_id_map':" << endl;
+            else
+                cerr << "`thread_ctr_id_map' is empty.  Not showing." << endl;
+
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+        pthread_mutex_unlock(&thread_ctr_id_map_mutex);
+
+@q ***** (5) Call |exit|.  @>
+
+@ Call |exit|.  This is the only way to exit the program, since the threads that 
+|connect_func| run in are detached.  It would be possible to use a condition variable
+to announce that the program should exit, but there's no advantage to doing it that way.
+\initials{LDF 2013.04.18.}
+
+Call |pthread_cleanup_pop| with an argument $> 1$ to call |cleanup_handler|.
+Cleanup handlers are not automatically popped and executed when |exit| is called,
+so |pthread_cleanup_pop| must be called explicitly here, if we want a cleanup handler
+to be executed.  However, as of this date, |cleanup_handler| doesn't do anything 
+significant.
+\initials{LDF 2013.04.18.}
+
+@<|connect_func| definition@>=
+
+        delete param;
+        param = 0;
+
+        pthread_cleanup_pop(0);  /* 1  */
+
+        status = pthread_kill(thread_ctr_id_map[0], SIGINT);
+
+        if (status != 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << "ERROR!  In `connect_func':  `pthread_kill' failed, returning " 
+                 << status << ":"
+                 << endl
+                 << strerror(status)
+                 << endl 
+                 << "Failed to send SIGINT to main thread."
+                 << endl
+                 << endl
+                 << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            exit(1);
+
+        }  /* |if (status != 0)|  */
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "In `connect_func':  `pthread_kill' succeeded, returning 0."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        pthread_exit(0);
+
+   }  /* |if (status == 2)|  */
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2013.04.23.}
+Added code for removing the entry for the current thread from 
+|map<unsigned int, pthread_t> thread_ctr_id_map| and 
+|map<pthread_t, unsigned int> thread_id_ctr_map|.
+\ENDLOG 
+@<|connect_func| definition@>=
+
+   else if (status != 0)
+   {
+
+        lock_cerr_mutex(); 
+        cerr << "ERROR!  In `connect_func':  `exchange_data_with_client' failed, "
+             << "returning " << status << "."
+             << endl
+             << error_warning_str
+             << "Exiting thread function unsuccessfully with exit status 0."
+             << endl;
+        unlock_cerr_mutex(); 
+
+        pthread_mutex_lock(&thread_ctr_id_map_mutex);
+        thread_ctr_id_map.erase(param->thread_ctr);
+        thread_id_ctr_map.erase(pthread_self());
+        pthread_mutex_unlock(&thread_ctr_id_map_mutex);
+
+        delete param;
+        param = 0;
+
+        pthread_exit(0);
+
+   }  /* |else if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+        lock_cerr_mutex(); 
+        cerr << "In `connect_func':  `exchange_data_with_client' succeeded, returning 0."
+             << endl;
+        unlock_cerr_mutex(); 
+        
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2013.04.23.}
+Added code for removing the entry for the current thread from 
+|map<unsigned int, pthread_t> thread_ctr_id_map| and 
+|map<pthread_t, unsigned int> thread_id_ctr_map|.
+\ENDLOG 
+
+@<|connect_func| definition@>=
+
+#if DEBUG_COMPILE 
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting thread function `connect_func' successfully with return value 0." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   lock_cerr_mutex(); 
+   lock_cout_mutex(); 
+   cout << "[Thread " << param->thread_ctr << "] Exiting thread:"
+        << endl 
+        << error_warning_str
+        << endl;
+   unlock_cout_mutex(); 
+   unlock_cerr_mutex(); 
+
+   /* !! TODO:  LDF 2012.07.27.  Don't delete |param|, if we keep it around in case a 
+      session is resumed.  */
+
+   pthread_mutex_lock(&thread_ctr_id_map_mutex);
+   thread_ctr_id_map.erase(param->thread_ctr);
+   thread_id_ctr_map.erase(pthread_self());
+   pthread_mutex_unlock(&thread_ctr_id_map_mutex);
+
+   delete param;
+   param = 0;
+
+   pthread_cleanup_pop(0);
+
+   pthread_exit(0);
+
+}  /* End of |connect_func| definition  */
+
+@q *** (3) @>
+
+@q ** (2) Cleanup handler.  @>
+
+@ Cleanup handler.  
+\initials{LDF 2013.04.18.}
+
+\LOG
+\initials{LDF 2013.04.18.}
+Added this function.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|cleanup_handler| declaration@>=
+void
+cleanup_handler(void *arg);
+
+@q *** (3) Definition  @>
+@
+@<|cleanup_handler| definition@>=
+void
+cleanup_handler(void *arg)
+{
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0);
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `cleanup_handler'." << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `cleanup_handler'." << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return;
+
+}  /* End of |cleanup_handler| definition  */
+
+
+@q ** (2) @>
+
+@ Putting connect together.
+\initials{LDF 2012.06.26.}
+
+@q *** (3) @>
+
+@ This is what's compiled.
+\initials{LDF 2012.06.26.}
+
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+@<|connect_func| declaration@>@;@/
+@<|cleanup_handler| declaration@>@;@/
+@<|connect_func| definition@>@;@/
+@<|cleanup_handler| definition@>@;@/
+
+@q *** (3) This is what's written to the header file.  @>
+
+@ This is what's written to the header file.  
+\initials{LDF 2012.07.02.}
+
+@(connect.h@>=
+
+#ifndef CONNECT_H
+#define CONNECT_H 1
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif 
+@<|connect_func| declaration@>@;@/
+@<|cleanup_handler| declaration@>@;@/
+#endif 
+
+
+@q Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))     @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

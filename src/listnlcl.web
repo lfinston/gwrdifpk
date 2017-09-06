@@ -1,0 +1,790 @@
+@q listnlcl.web  @>
+@q Created by Laurence D. Finston (LDF) Wed Sep 19 13:53:39 CEST 2012  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q ** (2)  listnlcl.web  @>
+@* Listen function for local connections.
+\initials{LDF 2012.09.19.}
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#include <sys/types.h>
+#include <pwd.h>
+#include <errno.h>
+#include <grp.h>
+#include <sys/wait.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+#include <time.h>
+#include <sys/stat.h>
+#include <dirent.h>
+
+#include <string>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <stdarg.h>
+#include <limits.h>
+#include <algorithm>
+#include <fstream>
+#include <iterator>
+#include <time.h>
+#include <math.h>
+#include <sstream>   
+
+#include <map>
+#include <vector>
+#include <deque>
+#include <stack>
+#include <set>
+
+#include <pthread.h>
+
+#if HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+
+#include <mysql.h>
+
+#include <expat.h>
+
+#undef NAME_LEN
+#undef LOCAL_HOST
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "parser.h++"  
+#include "scanner.h++"
+#include "rspnstp.h++" 
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+#include "connect.h++"
+
+@q ** (2) |listen_local|  @>
+@ |listen_local|.
+\initials{LDF 2012.09.19.}
+
+\LOG
+\initials{LDF 2012.09.19.}
+Added this function.  It contains code formerly in |main| of the server program 
+\.{gwirdsif}.
+\ENDLOG
+
+@q *** (3) Declaration @>
+
+@<|listen_local| declaration@>=
+void*
+listen_local(void *v);
+
+@q *** (3) Definition @>
+@
+@<|listen_local| definition@>=
+void*
+listen_local(void *v)
+{
+
+    bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0);
+
+    int status = 0;
+
+    int s; 
+
+    int listen_local_thread_ctr = *static_cast<int*>(v); 
+
+@q **** (4) Get name for socket and delete, if present.  @>
+
+@ Get name for socket and delete, if present.
+\initials{LDF 2012.07.02.}
+
+We just try deleting it instead of testing whether it exists.  If it doesn't exist,
+we ignore the error.
+\initials{LDF 2012.07.03.}
+
+@<|listen_local| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG) 
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+            << "] In `listen_local':  socket_path == " << socket_path << endl;
+       unlock_cerr_mutex(); 
+   }
+
+#endif  /* |DEBUG_COMPILE|  */  
+
+   errno = 0;
+   status = unlink(socket_path.c_str());
+
+   if (status == -1)
+   {
+
+       if (errno == ENOENT)
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+                    << "] In `listen_local':  File `" 
+                    << socket_path << "' doesn't exist.  " 
+                    << "Continuing." << endl;
+               unlock_cerr_mutex(); 
+           }
+
+#endif  /* |DEBUG_COMPILE|  */  
+       } 
+
+       else
+       {
+           lock_cerr_mutex(); 
+           cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+                << "] ERROR!  In `listen_local':  `unlink' failed to delete `" 
+                << socket_path << "', returning -1:"
+                << endl
+                << "unlink error:  " << strerror(errno)
+                << endl 
+                << "Exiting thread function `listen_local' unsuccessfully "
+                << "with exit status 0."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           pthread_exit(0);
+
+       }  /* |else|  */
+
+   }  /* |if (status == -1)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+            << "] In `listen_local':  `unlink' succeeded."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q **** (4) Get socket.  @>
+
+@ Get socket.  
+\initials{LDF 2011.07.14.}
+
+@<|listen_local| definition@>=
+
+        int t;
+        int len;
+
+        pthread_attr_t attr;
+
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+
+        struct sockaddr_un local; 
+        struct sockaddr_un remote;
+
+        errno = 0;
+
+        s = socket(AF_UNIX, SOCK_STREAM, 0);
+
+        if (s == -1) 
+        {
+            lock_cerr_mutex(); 
+            cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+                 << "] ERROR!  In `listen_local':  `socket' failed, returning -1:"
+                 << endl
+                 << "socket error:" << strerror(errno)
+                 << endl 
+                 << "Exiting thread function `listen_local' unsuccessfully "
+                 << "with exit status 0."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+           pthread_exit(0);
+   
+        }  /* |if (s == -1) |  */
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+                 << "] In `listen_local':  `socket' succeeded." << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */  
+
+        local.sun_family = AF_UNIX;
+
+        strcpy(local.sun_path, socket_path.c_str());
+
+        len = strlen(local.sun_path) + sizeof(local.sun_family);
+
+        errno = 0;
+
+@q **** (4) Bind socket.  @>
+
+@ Bind socket.  
+\initials{LDF 2012.07.02.}
+
+@<|listen_local| definition@>=
+
+        errno = 0;
+
+        status = bind(s, reinterpret_cast<sockaddr *>(&local), len);
+
+        if (s == -1) 
+        {
+            lock_cerr_mutex(); 
+            cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+                 << "] ERROR!  In `listen_local':  `bind' failed, returning -1:"
+                 << endl
+                 << "bind error:" << strerror(errno)
+                 << endl 
+                 << "Exiting thread function `listen_local' unsuccessfully "
+                 << "with exit status 0."
+                 << endl;
+            unlock_cerr_mutex(); 
+ 
+            close(s);
+
+            pthread_exit(0);
+  
+
+        }  /* |if (s == -1) |  */
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+                 << "] In `listen_local':  `bind' succeeded." << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2012.01.31.}
+Added this section.
+\ENDLOG
+
+@<|listen_local| definition@>=
+
+        status = chmod(socket_path.c_str(), 
+                         S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP 
+                       | S_IWGRP | S_IXGRP | S_IROTH | S_IWOTH | S_IXOTH);
+
+        if (status == -1)
+        {
+             lock_cerr_mutex(); 
+             cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+                  << "] ERROR!  In `listen_local':  `chmod' failed, returning -1:"
+                  << endl
+                  << "chmod error:" << strerror(errno)
+                  << endl 
+                  << "Exiting thread function `listen_local' unsuccessfully "
+                  << "with exit status 0."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+             close(s);
+
+             pthread_exit(0);
+
+        }
+
+@q **** (4) Listen.  @>
+
+@ Listen.  
+\initials{LDF 2012.07.02.}
+
+@<|listen_local| definition@>=
+
+        status = listen(s, 128);
+
+        if (status == -1) 
+        {
+            lock_cerr_mutex(); 
+            cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+                 << "] In `listen_local':  `listen' failed, returning -1:"
+                 << endl 
+                 << "listen error:  " << strerror(errno)
+                 << endl 
+                 << "Exiting thread function `listen_local' unsuccessfully "
+                 << "with exit status 0."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            close(s);
+            pthread_exit(0);
+   
+        }
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+                 << "] In `listen_local':  `listen' succeeded." << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q **** (4) Main accept loop.  @>
+
+@ Main accept loop.
+\initials{LDF 2012.07.02.}
+
+@<|listen_local| definition@>=
+
+        stringstream temp_strm;
+
+        temp_strm << "[Thread " << listen_local_thread_ctr << "]  "
+                  << "In `listen_local':         Server ready. Listening to Unix domain socket "
+                  << "`" << socket_path << "'."
+                  << endl;
+
+        lock_cout_mutex(); 
+        lock_cerr_mutex(); 
+        cout << temp_strm.str();
+        unlock_cerr_mutex(); 
+        unlock_cout_mutex(); 
+
+        temp_strm.str("");  
+
+
+        Scan_Parse_Parameter_Type *param = 0;
+        pthread_t id = 0UL;
+
+
+
+
+        for(;;) 
+        {
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2012.07.13.}
+Added |try| $\ldots$ |catch| block.
+\ENDLOG 
+@<|listen_local| definition@>=  
+
+            param = 0;
+            id = 0UL;        
+
+            try 
+            {
+#if DEBUG_COMPILE
+                if (DEBUG) 
+                {
+                    lock_cerr_mutex(); 
+                    cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+                         << "] [Thread " << listen_local_thread_ctr << "] "
+                         << "In `listen_local':  Creating new `Scan_Parse_Parameter_Type' object."
+                         << endl;
+                    unlock_cerr_mutex();                
+
+                }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */  
+
+                param = new Scan_Parse_Parameter_Type;
+                param->connection_type = Scan_Parse_Parameter_Type::LOCAL_NULL_AUTH_TYPE;
+
+            }  /* |try|  */
+ 
+            catch (Initialize_Exception_Type)  /* Currently, the 
+                                                  |Scan_Parse_Parameter_Type| constructor
+                                                  doesn't throw any other exceptions.
+                                                  \initials{LDF 2012.07.13.}  */
+            {
+                lock_cerr_mutex(); 
+                cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+                     << "] ERROR!  In `listen_local':  "
+                     << "The `Scan_Parse_Parameter_Type' constructor "
+                     << "failed, throwing exception `Initialize_Exception_Type'."
+                     << endl
+                     << "Failed to create `Scan_Parse_Parameter_Type' object."
+                     << endl 
+                     << "Exiting thread function `listen_local' unsuccessfully "
+                     << "with exit status 0."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                close(s);
+                pthread_exit(0);
+
+            }  /* |catch|  */
+             
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                     lock_cerr_mutex(); 
+                     cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+                          << "] In `listen_local':  "
+                          << "Finished creating new `Scan_Parse_Parameter_Type' object."
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+ 
+@q ***** (5) @>        
+@    
+@<|listen_local| definition@>=
+
+#if DEBUG_COMPILE
+            if (DEBUG) 
+            {
+                lock_cerr_mutex(); 
+                cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+                     << "] In `listen_local':  Waiting for a connection...\n";
+                unlock_cerr_mutex(); 
+            }
+#endif  /* |DEBUG_COMPILE|  */  
+
+
+            t = sizeof(remote);
+
+            int sock;
+
+            sock = accept(s, 
+                          (struct sockaddr *) &remote, 
+                          (socklen_t*) &t);
+
+            lock_cout_mutex(); 
+            lock_cerr_mutex(); 
+            cout << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+                 << "] In `listen_local':  New local connection through Unix Domain socket " 
+                 << "`" << socket_path << "'."
+                 << endl;
+            unlock_cerr_mutex();
+            unlock_cout_mutex();  
+
+            if (sock == -1) 
+            {
+                lock_cerr_mutex(); 
+                cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+                     << "] ERROR!  In `listen_local':  `accept' failed, returning -1:"
+                     << endl
+                     << "accept error:" << strerror(errno)
+                     << endl 
+                     << "Can't connect.  Will try to continue."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                continue;
+
+            }  /* |if (sock == -1) |  */
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+                     << "] In `listen_local':  `accept' succeeded.  "
+                     << "`sock' == " << sock << "." << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */  
+
+#if DEBUG_COMPILE
+            if (DEBUG) 
+            {
+               lock_cerr_mutex(); 
+               cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+                    << "] In `listen_local':  Connected." << endl;
+               unlock_cerr_mutex(); 
+            }
+#endif  /* |DEBUG_COMPILE|  */  
+
+            param->sock = sock;            
+
+@q ***** (5) @>
+@    
+\LOG
+\initials{LDF 2013.05.23.}
+Added code for setting |global_thread_ctr| after it has wrapped around.
+This should never happen, unless \.{gwirdsif} runs for a {\it long\/} time without 
+being stopped.
+\ENDLOG 
+
+@<|listen_local| definition@>=
+      
+            pthread_mutex_lock(&thread_ctr_mutex);
+
+            param->thread_ctr = 0;
+
+            if (global_thread_ctr_wrapped_around == false)
+            {
+                param->thread_ctr = ++global_thread_ctr;
+                
+                if (global_thread_ctr == UINT_MAX)
+                {
+                     global_thread_ctr_wrapped_around == true;
+                     global_thread_ctr = save_global_thread_ctr;
+                }
+            }
+
+@q ***** (5) @>
+@
+@<|listen_local| definition@>=
+
+            else
+            {
+@q ****** (6) @>
+
+                 map<unsigned int, pthread_t>::iterator iter;
+
+                 for (int i = global_thread_ctr; i <= UINT_MAX; ++i)
+                 {
+                     iter = thread_ctr_id_map.find(i);
+
+                     if (iter == thread_ctr_id_map.end())
+                     {
+                         param->thread_ctr = i;
+
+                         if (i == UINT_MAX)
+                            global_thread_ctr = save_global_thread_ctr;
+                         else
+                            global_thread_ctr = i + i;   
+                         
+ 
+                         break;
+                     }
+                        
+                 }  /* |for|  */
+
+@q ****** (6) @>
+
+                 if (param->thread_ctr == 0)  
+                 {
+                     /* Try again once more from the beginning. 
+                        \initials{LDF 2013.05.23.}  */
+
+                     for (unsigned int i = save_global_thread_ctr; 
+                          i <= UINT_MAX; 
+                          ++i)
+                     {
+                        iter = thread_ctr_id_map.find(i);
+
+                        if (iter == thread_ctr_id_map.end())
+                        {
+ 
+                            param->thread_ctr = i;
+
+                            if (i == UINT_MAX)
+                               global_thread_ctr = save_global_thread_ctr;
+                            else
+                               global_thread_ctr = i + i;   
+
+                           break;
+                        }
+                        
+                     }
+
+                 }  /* |if|  */
+
+@q ****** (6) @>
+
+                 if (param->thread_ctr == 0)  
+                 {
+
+                     /* If we still couldn't set |param->thread_ctr|, we quit.
+                        \initials{LDF 2013.05.23.}  */
+
+                     lock_cerr_mutex();
+                     cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr 
+                          << "] ERROR!  In `listen_local':  Failed to set `param->thread_ctr'."
+                          << endl
+                          << "Exiting thread unsuccessfully with return value 0."
+                          << endl;
+                     unlock_cerr_mutex();  
+
+                     pthread_mutex_unlock(&thread_ctr_mutex);
+
+                     delete param;
+                     param = 0;
+
+                     close(s);
+
+                     pthread_exit(0);
+
+                 }
+
+@q ****** (6) @>
+
+            } /* |else|  */
+
+            pthread_mutex_unlock(&thread_ctr_mutex);
+
+@q ***** (5) @>
+@
+@<|listen_local| definition@>=
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr << "] "
+                     << "In `listen_local':  "
+                     << "Calling `connect_func' via `pthread_create'."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            status = pthread_create(&id,
+                                    &attr, /* Attribute  */
+                                    connect_func, 
+                                    static_cast<void*>(param));
+
+            thread_ctr_id_map[param->thread_ctr] = id;
+            thread_id_ctr_map[id]                = param->thread_ctr;
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[gwirdsif] [Thread " << listen_local_thread_ctr << "] "
+                     << "In `listen_local':  "
+                     << "`pthread_create' returned " << status << "." 
+                     << endl
+                     << "`thread_ctr_id_map.size()' == " << thread_ctr_id_map.size() << endl;
+                unlock_cerr_mutex(); 
+
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+        }  /* |for|  */
+
+       close(s);
+
+       pthread_exit(0);  /* Will normally never be reached.  \initials{LDF 2012.09.19.}  */
+
+}  /* End of |listen_local| definition  */
+
+@q **** (4) @>
+@
+@<Garbage@>=
+
+@q **** (4) @>
+
+@q *** (3) Putting `listnlcl.web' together.  @>
+
+@ Putting {\tt listnlcl\PERIOD web} together.
+
+@q **** (4) This is what's compiled.  @>
+@ This is what's compiled.
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+@<|listen_local| declaration@>@;@/
+@<|listen_local| definition@>@;@/
+
+#if 0 
+@<Garbage@>@;@/
+#endif 
+
+@q **** (4) This is what's written to the header file `listnlcl.h'.  @>
+
+@ This is what's written to the header file \filename{listnlcl.h}.
+\initials{LDF 2012.06.27.}
+
+@(listnlcl.h@>=
+#ifndef LISTNLCL_H
+#define LISTNLCL_H 1
+using namespace std;
+using namespace gwrdifpk;
+@<|listen_local| declaration@>@;@/
+#endif 
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))                          @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+

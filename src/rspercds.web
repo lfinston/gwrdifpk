@@ -1,0 +1,364 @@
+@q rspercds.web  @>
+@q Created by Laurence D. Finston (LDF) Thu Jul 25 18:44:00 CEST 2013  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q ** (2) Response and error codes (rspercds.web)  @>
+@ Response and error codes.  \filename{rspercds.web}.
+\initials{LDF 2013.07.25.}
+
+\LOG
+\initials{LDF 2013.07.25.}
+Added this file.
+\ENDLOG
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+#include <stdlib.h>
+#include <stdio.h>
+#include <fstream>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <limits.h>
+#include <map>
+#include <string>
+#include <time.h>
+#include <math.h>
+#include <sstream>   
+#include <pthread.h>
+#include <signal.h>
+
+#include <map>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+@q * (1) Response and error codes.  @>
+@ Response and error codes.
+\initials{LDF 2013.07.25.}
+
+\LOG
+\initials{LDF 2013.07.25.}
+Added this section.
+
+\initials{LDF 2013.08.22.}
+Added the |extern int| constants |GW_HANDLE_NOT_FOUND|,
+|GW_HANDLE_NOT_MARKED_FOR_DELETION|,
+|GW_IRODS_OBJECT_ALREADY_MARKED_FOR_DELETION|
+and
+|GW_IRODS_OBJECT_NOT_MARKED_FOR_DELETION|.
+
+\initials{LDF 2013.09.12.}
+Added the |extern const int| variables 
+|GW_NO_PRIVILEGE_ERROR|,
+|GW_HANDLE_VALUE_ERROR|,
+|GW_INVALID_HANDLE_VALUE_SPECIFIER|,
+|GW_HANDLE_VALUE_NOT_MARKED_FOR_DELETION|
+and
+|GW_HANDLE_VALUE_ALREADY_MARKED_FOR_DELETION|.
+
+\initials{LDF 2013.11.21.}
+Added the |extern const int| variables 
+|GW_IRODS_OBJECT_NOT_FOUND|,
+|GW_DC_METADATA_NOT_FOUND|,
+|GW_DC_METADATA_NOT_MARKED_FOR_DELETION|
+and
+|GW_DC_METADATA_ALREADY_MARKED_FOR_DELETION|.
+
+\initials{LDF 2013.12.06.}
+Added |extern const int GW_WARNING|.
+
+\initials{LDF 2014.02.12.}
+Added the |extern const int| variables |GW_IRODS_OBJECT_UNCHANGED| and |GW_NOTICE|.
+\ENDLOG 
+
+@<Response and error code declarations@>=
+
+extern const int GW_SUCCESS                                  =  0;
+extern const int GW_ERROR                                    =  1;
+extern const int GW_WARNING                                  =  3;
+extern const int GW_NOTICE                                   =  4;
+
+extern const int GW_SERVER_SIDE_DATABASE_ERROR               = 10;
+
+extern const int GW_NO_PRIVILEGE_ERROR                       = 20;
+
+extern const int GW_HANDLE_NOT_FOUND                         = 50;   
+extern const int GW_HANDLE_NOT_MARKED_FOR_DELETION           = 51;
+extern const int GW_HANDLE_ALREADY_MARKED_FOR_DELETION       = 52; 
+
+extern const int GW_HANDLE_VALUE_ERROR                       = 60; 
+extern const int GW_INVALID_HANDLE_VALUE_SPECIFIER           = 61;
+extern const int GW_HANDLE_VALUE_NOT_FOUND                   = 62; 
+extern const int GW_LAST_HANDLE_VALUE                        = 63;   
+extern const int GW_HS_ADMIN_HANDLE_VALUE                    = 64;
+extern const int GW_LAST_HS_ADMIN_HANDLE_VALUE               = 65;   
+extern const int GW_HANDLE_VALUE_NOT_MARKED_FOR_DELETION     = 66;   
+extern const int GW_HANDLE_VALUE_ALREADY_MARKED_FOR_DELETION = 67;
+
+extern const int GW_IRODS_OBJECT_NOT_FOUND                   = 70;
+extern const int GW_IRODS_OBJECT_NOT_MARKED_FOR_DELETION     = 71;
+extern const int GW_IRODS_OBJECT_ALREADY_MARKED_FOR_DELETION = 72;
+extern const int GW_IRODS_OBJECT_UNCHANGED                   = 73;
+
+extern const int GW_DC_METADATA_NOT_FOUND                    = 80;
+extern const int GW_DC_METADATA_NOT_MARKED_FOR_DELETION      = 81;
+extern const int GW_DC_METADATA_ALREADY_MARKED_FOR_DELETION  = 82;
+
+
+
+@q ** (2) Extern declarations for response and error codes.  @>
+
+@ Extern declarations for response and error codes.
+\initials{LDF 2013.07.25.}
+
+@<|extern| declarations for response and error codes@>=
+
+extern const int GW_SUCCESS;
+extern const int GW_ERROR;
+extern const int GW_WARNING;
+extern const int GW_NOTICE;
+
+extern const int GW_SERVER_SIDE_DATABASE_ERROR;
+extern const int GW_NO_PRIVILEGE_ERROR;
+
+extern const int GW_HANDLE_NOT_FOUND;   
+extern const int GW_HANDLE_NOT_MARKED_FOR_DELETION;
+extern const int GW_HANDLE_ALREADY_MARKED_FOR_DELETION;
+
+extern const int GW_HANDLE_VALUE_ERROR;
+extern const int GW_INVALID_HANDLE_VALUE_SPECIFIER;
+extern const int GW_HANDLE_VALUE_NOT_FOUND;
+extern const int GW_LAST_HANDLE_VALUE;   
+extern const int GW_HS_ADMIN_HANDLE_VALUE;
+extern const int GW_LAST_HS_ADMIN_HANDLE_VALUE;   
+extern const int GW_HANDLE_VALUE_NOT_MARKED_FOR_DELETION;
+extern const int GW_HANDLE_VALUE_ALREADY_MARKED_FOR_DELETION;
+
+extern const int GW_IRODS_OBJECT_NOT_FOUND;
+extern const int GW_IRODS_OBJECT_NOT_MARKED_FOR_DELETION;
+extern const int GW_IRODS_OBJECT_ALREADY_MARKED_FOR_DELETION;
+extern const int GW_IRODS_OBJECT_UNCHANGED;
+
+extern const int GW_DC_METADATA_NOT_FOUND;
+extern const int GW_DC_METADATA_NOT_MARKED_FOR_DELETION;
+extern const int GW_DC_METADATA_ALREADY_MARKED_FOR_DELETION;
+
+@q ** (2) |gwstrerror|.  @>
+@ |gwstrerror|.
+\initials{LDF 2013.07.25.}
+
+\LOG
+\initials{LDF 2013.07.25.}
+Added this function.
+
+\initials{LDF 2013.09.12.}
+Added optional argument |bool suppress_if_unknown = false|.
+\ENDLOG
+
+@q *** (3) Declaration @>
+
+@<|gwstrerror| declaration@>=
+string
+gwstrerror(int code, bool suppress_if_unknown = false);
+
+
+@q *** (3) Definition  @>
+@
+@<|gwstrerror| definition@>=
+string
+gwstrerror(int code, bool suppress_if_unknown)
+{
+
+   stringstream s;
+      
+   map<int, string>::iterator iter = gw_code_map.find(code);
+
+   if (iter != gw_code_map.end())
+      s << iter->second;
+   else if (suppress_if_unknown == false)
+      s << "Unknown response or error code:  " << code;   
+
+   return s.str();
+
+}
+
+@q ** (2) |init_gw_code_map|.  @>
+@ |init_gw_code_map|
+\initials{LDF 2013.07.25.}
+
+\LOG
+\initials{LDF 2013.07.25.}
+Added this function.
+\ENDLOG
+
+@q *** (3) Declaration @>
+
+@<|init_gw_code_map| declaration@>=
+int
+init_gw_code_map(void);
+
+@q *** (3) Definition  @>
+@
+@<|init_gw_code_map| definition@>=
+int
+init_gw_code_map(void)
+{
+    gw_code_map[GW_SUCCESS]                            = "GW_SUCCESS";            
+    gw_code_map[GW_ERROR]                              = "GW_ERROR";
+    gw_code_map[GW_WARNING]                            = "GW_WARNING";
+    gw_code_map[GW_NOTICE]                             = "GW_NOTICE";
+
+    gw_code_map[GW_SERVER_SIDE_DATABASE_ERROR]         = "GW_SERVER_SIDE_DATABASE_ERROR";
+    gw_code_map[GW_NO_PRIVILEGE_ERROR]                 = "GW_NO_PRIVILEGE_ERROR";
+
+    gw_code_map[GW_HANDLE_NOT_FOUND]                   = "GW_HANDLE_NOT_FOUND";
+    gw_code_map[GW_HANDLE_NOT_MARKED_FOR_DELETION]     = "GW_HANDLE_NOT_MARKED_FOR_DELETION";
+    gw_code_map[GW_HANDLE_ALREADY_MARKED_FOR_DELETION] = "GW_HANDLE_ALREADY_MARKED_FOR_DELETION";
+    gw_code_map[GW_HANDLE_VALUE_NOT_MARKED_FOR_DELETION]
+       = "GW_HANDLE_VALUE_NOT_MARKED_FOR_DELETION";
+    gw_code_map[GW_HANDLE_VALUE_ALREADY_MARKED_FOR_DELETION]
+       = "GW_HANDLE_VALUE_ALREADY_MARKED_FOR_DELETION";
+
+    gw_code_map[GW_HANDLE_VALUE_ERROR]                 = "GW_HANDLE_VALUE_ERROR";
+    gw_code_map[GW_INVALID_HANDLE_VALUE_SPECIFIER]     = "GW_INVALID_HANDLE_VALUE_SPECIFIER";
+    gw_code_map[GW_HANDLE_VALUE_NOT_FOUND]             = "GW_HANDLE_VALUE_NOT_FOUND";
+    gw_code_map[GW_LAST_HANDLE_VALUE]                  = "GW_LAST_HANDLE_VALUE";
+    gw_code_map[GW_HS_ADMIN_HANDLE_VALUE]              = "GW_HS_ADMIN_HANDLE_VALUE";
+    gw_code_map[GW_LAST_HS_ADMIN_HANDLE_VALUE]         = "GW_LAST_HS_ADMIN_HANDLE_VALUE";
+
+    gw_code_map[GW_IRODS_OBJECT_NOT_FOUND] = "GW_IRODS_OBJECT_NOT_FOUND";
+
+    gw_code_map[GW_IRODS_OBJECT_NOT_MARKED_FOR_DELETION]
+       = "GW_IRODS_OBJECT_NOT_MARKED_FOR_DELETION";
+
+    gw_code_map[GW_IRODS_OBJECT_ALREADY_MARKED_FOR_DELETION]
+       = "GW_IRODS_OBJECT_ALREADY_MARKED_FOR_DELETION";
+
+    gw_code_map[GW_IRODS_OBJECT_UNCHANGED]
+       = "GW_IRODS_OBJECT_UNCHANGED";
+
+    gw_code_map[GW_DC_METADATA_NOT_FOUND]  = "GW_DC_METADATA_NOT_FOUND";
+
+    gw_code_map[GW_DC_METADATA_NOT_MARKED_FOR_DELETION] 
+       = "GW_DC_METADATA_NOT_MARKED_FOR_DELETION";
+
+    gw_code_map[GW_DC_METADATA_ALREADY_MARKED_FOR_DELETION] 
+       = "GW_DC_METADATA_ALREADY_MARKED_FOR_DELETION";
+
+    return 0;
+
+}  /* End of |init_gw_code_map| definition  */
+
+
+@q ** (2) Putting `rspercds.web' together.  @>
+
+@ Putting {\tt rspercds\PERIOD web} together.
+
+@q *** (3) This is what's compiled.  @>
+
+This is what's compiled.  
+\initials{LDF 2012.07.02.}
+
+@c
+@<Include files@>@;@/
+
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif 
+
+using namespace std;
+namespace gwrdifpk
+{
+
+   @<Response and error code declarations@>@;@/
+
+   map<int, string> gw_code_map;
+
+   @<|init_gw_code_map| definition@>@;@/
+   @<|gwstrerror| definition@>@;@/
+};
+
+
+@q *** (3) This is what's written to the header file.  @>
+
+@ This is what's written to the header file.  
+\initials{LDF 2012.07.02.}
+
+@(rspercds.h@>=
+
+#ifndef RSPERCDS_H
+#define RSPERCDS_H 1
+
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif 
+
+using namespace std;
+namespace gwrdifpk
+{
+   @<|extern| declarations for response and error codes@>@;@/
+
+   extern map<int, string> gw_code_map;
+
+   @<|init_gw_code_map| declaration@>@;@/
+   @<|gwstrerror| declaration@>@;@/
+
+};
+#endif 
+
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode) (abbrev-mode t))           @>
+
+@q * (1) Local variables for Emacs @>
+
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode: t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

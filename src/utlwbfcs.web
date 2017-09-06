@@ -1,0 +1,606 @@
+@q utlwbfcs.web  @>
+
+@q Created by Laurence D. Finston (LDF) Wed Jul 25 11:29:24 CEST 2012  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+@*1 Utility functions for the FastCGI web application \.{gwrdwbap\PERIOD fcgi}.
+\initials{LDF 2012.07.25.}
+
+\LOG
+\initials{LDF 2012.07.25.}
+Added this file.
+\ENDLOG
+
+@q ** (2) Include files.  @>
+
+@ Include files.
+\initials{LDF 2012.07.25.}
+
+@<Include files@>=
+
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <getopt.h> 
+#include <time.h>
+
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <fstream>
+#include <sstream>   
+#include <string>
+#include <vector>
+#include <deque>
+#include <stack>
+#include <set>
+
+#include <sys/types.h>
+#include <sys/wait.h>
+
+/* Library is /usr/lib64/libfcgi.a (on pcfinston LDF 2012.09.03.)  */
+#include <fcgi_stdio.h>
+
+#include <pthread.h>
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+
+#include <mysql.h>
+
+#include <expat.h>
+
+#include <curl/curl.h>
+
+#undef NAME_LEN
+#undef LOCAL_HOST
+
+#ifdef HAVE_CONFIG_H
+   #include <config.h>
+#endif
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif 
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+typedef int YYSTYPE;
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+#include "pidfncs.h++"
+#include "tanfncs.h++"
+#include "clntfncs.h++"
+#include "ckietype.h++"
+
+@q ** (2) |parse_post_data|.  @>
+@ |parse_post_data|.
+\initials{LDF 2012.07.25.}
+
+\LOG
+\initials{LDF 2012.07.25.}
+Added this function.
+
+\initials{LDF 2012.07.27.}
+Added argument |string &out_filename| for storing the filename, if a temporary
+file is created.
+
+\initials{LDF 2012.07.27.}
+
+\initials{LDF 2012.07.27.}
+Added argument |Scan_Parse_Parameter_Type &param|.  Removed the arguments |char *buffer|,
+|size_t buffer_size|, |ofstream &out_strm| and |string &out_filename|.  
+Now using |Scan_Parse_Parameter_Type| data members instead.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|parse_post_data| declaration@>=
+
+int
+parse_post_data(Scan_Parse_Parameter_Type &param);
+
+@q *** (3) Definition  @>
+@
+@<|parse_post_data| definition@>=
+
+int
+parse_post_data(Scan_Parse_Parameter_Type &param)
+{
+@q **** (4) @>
+
+    int status;
+    bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+ 
+    stringstream temp_strm;
+
+    ofstream out_strm;
+ 
+@q **** (4) @>
+@ We shouldn't have to worry about |stdin| blocking, because this function will only be
+called if POST data is present.
+\initials{LDF 2012.07.26.}
+
+@<|parse_post_data| definition@>=
+
+    bool file_open = false;
+
+    char *unescaped_str = 0;
+
+    char *res = 0;
+
+    int char_ctr = 0;
+
+    const size_t MAX_LINE = 1024;
+
+    char line_buffer[MAX_LINE];
+
+    for (;;)
+    {
+@q ***** (5) @>
+
+        memset(line_buffer, 0, MAX_LINE);
+
+        res = fgets(line_buffer, MAX_LINE, stdin);  /* |fread| reads |MAX_LINE - 1| 
+                                                       characters.
+                                                       \initials{LDF 2012.07.27.}  */
+
+        if (res == 0 && strlen(param.data_buffer) == 0 && file_open == false)
+        {
+            temp_strm.str("");
+            temp_strm << "ERROR!  In `parse_post_data':  "
+                      << "`fgets' returned 0 and `strlen(param.data_buffer)' == 0 "
+                      << "and `file_open' == `false'."
+                      << endl 
+                      << "Failed to read any characters."
+                      << endl 
+                      << "Exiting function unsuccessfully with return value -1."
+                      << endl;
+            printf("%s", temp_strm.str().c_str()); 
+ 
+            memset(param.data_buffer, 0, BUFFER_SIZE);
+
+            return -1;
+        }
+        else if (res == 0)
+        {
+            break;
+
+        }
+  
+        res = 0;
+
+        unescaped_str = curl_easy_unescape(curl, line_buffer, strlen(line_buffer), 0); 
+
+        if (unescaped_str == 0)
+        {
+            temp_strm.str("");
+            temp_strm << "ERROR!    In `parse_post_data':  "
+                      << "`curl_easy_unescape' failed, returning 0."
+                      << endl 
+                      << "Exiting function unsuccessfully with return value -1."
+                      << endl;
+            printf("%s", temp_strm.str().c_str()); 
+ 
+            memset(param.data_buffer, 0, BUFFER_SIZE);
+
+            return -1;
+        }
+
+        else if (strlen(unescaped_str) == 0)
+        {
+
+            temp_strm.str("");
+            temp_strm << "ERROR!  `curl_easy_unescape' returned an empty string."
+                      << endl 
+                      << "Exiting function unsuccessfully with return value -1."
+                      << endl;
+            printf("%s", temp_strm.str().c_str()); 
+ 
+            memset(param.data_buffer, 0, BUFFER_SIZE);
+
+            curl_free(unescaped_str);
+            unescaped_str = 0;
+
+            return -1;
+
+
+        }
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+          temp_strm.str("");
+          temp_strm << "`unescaped_str' == " 
+                    << endl 
+                    << unescaped_str
+                    << endl 
+                    << "`strlen(unescaped_str)' == " << strlen(unescaped_str) << "."
+                    << endl;
+        }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|parse_post_data| definition@>=
+
+@q ***** (5) @>
+
+/* !! TODO:  LDF 2012.12.13.  In other places, I'm using |BUFFER_SIZE| instead
+   of |BUFFER_SIZE - 1|.  I may want to do this here, too.
+*/
+
+        if (   file_open == false 
+            && strlen(unescaped_str) + strlen(param.data_buffer) > (BUFFER_SIZE - 1))
+        {
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                  temp_strm.str("");
+                  temp_strm << "In `parse_post_data':  "
+                            << "`file_open' == `false' and `strlen(unescaped_str)' + "
+                            << "`strlen(param.data_buffer)' > (`BUFFER_SIZE' - 1):"
+                            << endl 
+                            << "`strlen(unescaped_str)' == " << strlen(unescaped_str)
+                            << endl 
+                            << "`strlen(param.data_buffer)' == " 
+                            << strlen(param.data_buffer) 
+                            << endl
+                            << "`BUFFER_SIZE' == " << BUFFER_SIZE
+                            << endl
+                            << "Will open `out_strm' and write `unescaped_str' to it."
+                            << endl;
+                  printf("%s", temp_strm.str().c_str()); 
+
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             file_open = true;
+             @<Open output stream@>@;
+             out_strm << unescaped_str;
+             memset(param.data_buffer, 0, BUFFER_SIZE);
+
+        }  /* |if|  */
+
+@q ***** (5) @>
+
+        else if (file_open == true)
+        {
+
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                  temp_strm.str("");
+                  temp_strm << "In `parse_post_data':  `file_open' == `true'."
+                            << endl;
+                  printf("%s", temp_strm.str().c_str()); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             out_strm << unescaped_str;
+
+        }  /* |else if|  */
+
+@q ***** (5) @>
+
+        else if (file_open == false)
+        {
+
+
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                  temp_strm.str("");
+                  temp_strm << "In `parse_post_data':  `file_open' == `false'."
+                            << endl;
+                  printf("%s", temp_strm.str().c_str()); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             strcat(param.data_buffer, unescaped_str);
+
+        }  /* |else if|  */
+
+        curl_free(unescaped_str);
+        unescaped_str = 0;
+         
+@q ***** (5) @>
+
+    }  /* |for|  */
+
+
+@q **** (4) @>
+@
+@<|parse_post_data| definition@>=
+
+    if (file_open == false && (param.data_buffer == 0 || strlen(param.data_buffer) == 0))
+    {
+
+       temp_strm.str("");
+       temp_strm << "ERROR!  In `parse_post_data':  `file_open' == `false' and "
+                 << "`param.data_buffer' == 0 or `strlen(param.data_buffer)' == 0."
+                 << endl
+                 << "Failed to read POST data.  This shouldn't happen."
+                 << endl 
+                 << "Exiting function `parse_post_data' unsuccessfully with return value -1."
+                 << endl;
+       printf("%s", temp_strm.str().c_str());
+
+       memset(param.data_buffer, 0, BUFFER_SIZE);
+
+       return -1;
+
+
+    }  /* |if|  */
+
+    else if (file_open)
+    {
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            temp_strm.str("");
+            temp_strm << "In `parse_post_data':  `file_open' == `true'.  Closing `out_strm'."
+                      << endl
+                      << "Exiting `parse_post_data' successfully with return value 1.";
+            printf("%s", temp_strm.str().c_str());
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        out_strm.close();
+
+        return 1;
+
+    }  /* |if (out_strm.is_open())|  */
+
+    else 
+    {
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            temp_strm.str("");
+            temp_strm << "In `parse_post_data':  `file_open' == `false'.  "
+                      << "POST data is in `param.data_buffer':"
+                      << endl
+                      << "`strlen(param.data_buffer)' == " << strlen(param.data_buffer)
+                      << endl
+                      << "`param.data_buffer' == "
+                      << endl
+                      << param.data_buffer
+                      << endl 
+                      << "Exiting `parse_post_data' successfully with return value 0."
+                      << endl;
+            printf("%s", temp_strm.str().c_str());
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        out_strm.close();
+        return 0;
+
+    }  /* |else|  */
+
+}  /* End of |parse_post_data| definition.  */
+
+@q *** (3) Open output stream |ofstream &out_strm|.  @>
+@ Open output stream |ofstream &out_strm|.  
+\initials{LDF 2012.07.26.}
+
+\LOG
+\initials{LDF 2012.07.26.}
+Added this section.  It's used in |@<|parse_post_data| definition@>|. 
+\ENDLOG
+
+@<Open output stream@>=
+
+{
+@q **** (4) @>
+
+   int fd;
+   char temp_filename[] = "/tmp/gwrdwbap.XXXXXX";      
+
+   errno =0;
+   fd = mkostemp(temp_filename, S_IRWXU | S_IRGRP | S_IROTH);
+
+   if (fd == -1)
+   {
+       temp_strm.str("");
+       temp_strm << "ERROR!  In `@@<Open output stream@@>':  `mkostemp' failed, returning -1."
+                 << endl
+                 << "Failed to open temporary file."
+                 << endl 
+                 << "mkostemp error:  " << strerror(errno)
+                 << endl 
+                 << "Exiting function `parse_post_data' unsuccessfully with return value -1."
+                 << endl;
+       printf("%s", temp_strm.str().c_str());
+
+       return -1;
+
+   }  /* |if (fd == -1)|  */
+   else if (DEBUG)
+   {
+       temp_strm.str("");
+       temp_strm << "In `@@<Open output stream@@>':  `mkostemp' succeeded.  "
+                 << "`temp_filename' == " << temp_filename
+                 << endl;
+       printf("%s", temp_strm.str().c_str());
+
+   }  /* |else if (DEBUG)|  */ 
+
+   errno = 0;
+   status = fchmod(fd, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+
+   if (status == -1)
+   {
+       temp_strm.str("");
+       temp_strm << "ERROR!  In `@@<Open output stream@@>':  `fchmod' failed, returning -1."
+                 << endl
+                 << "Failed to change mode of temporary file."
+                 << endl 
+                 << "fchmod error:  " << strerror(errno)
+                 << endl 
+                 << "Exiting function `parse_post_data' unsuccessfully with return value -1."
+                 << endl;
+       printf("%s", temp_strm.str().c_str());
+
+       close(fd);
+
+       return -1;
+
+   }  /* |if (status == -1)|  */
+
+   close(fd);  /* We just need the name.  \initials{LDF 2012.07.03.}  */
+   fd = 0;
+
+   out_strm.open(temp_filename);
+
+   if (!(out_strm && out_strm.is_open()))
+   {
+       temp_strm.str("");
+       temp_strm << "ERROR!  In `@@<Open output stream@@>':  Failed to open `out_strm'."
+                 << endl 
+                 << "Exiting function `parse_post_data' unsuccessfully with return value -1."
+                 << endl;
+       printf("%s", temp_strm.str().c_str());
+
+       return -1;
+
+   }  /* |!out_strm|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       temp_strm.str("");
+       temp_strm << "In `@@<Open output stream@@>':  Opened `out_strm' successfully.  "
+                 << endl;
+       printf("%s", temp_strm.str().c_str());
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+   param.data_filename = temp_filename;
+
+
+@q **** (4) @>
+
+}  /* End of section |@<Open output stream@>|  */
+
+@q *** (3) @>
+
+@q ** (2) This is what's compiled.  @>
+
+@ This is what's compiled.  
+\initials{LDF 2012.06.28.}
+
+@:NOTE@> !! PLEASE NOTE:  The |typedefs| for |jobject|, |JNIEnv| and | yyscan_t| below 
+are needed for types used in |class Scan_Parse_Parameter_Type| or its member functions
+and |int yydebug| is used in |process_command_line_options| in \filename{cmdlnopt.web}.
+If I add a scanner/parser pair for this program, I will need to 
+get rid of the |typedef| for |yyscan_t| and the declaration of |int yydebug|.
+\initials{LDF 2012.07.20.}
+
+@c
+typedef void* yyscan_t;  
+
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+extern CURL *curl;
+extern CURLcode curl_res;
+@<|parse_post_data| declaration@>@;@/
+@<|parse_post_data| definition@>@;@/
+
+@q *** (3) This is what's written to the header file `utlwbfcs.h'.  @>
+
+@ This is what's written to the header file \filename{utlwbfcs.h}.  
+\initials{LDF 2008.12.05.}
+
+@(utlwbfcs.h@>=
+#ifndef UTLWBFCS_H
+#define UTLWBFCS_H 1
+using namespace std;
+using namespace gwrdifpk;
+@<|parse_post_data| declaration@>@;@/
+#endif 
+
+
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode) (setq abbrev-mode t))     @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+

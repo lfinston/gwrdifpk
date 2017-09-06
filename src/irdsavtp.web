@@ -1,0 +1,1604 @@
+@q irdsavtp.web @>
+
+@q Created by Laurence D. Finston (LDF) Thu Jan 10 09:39:07 CET 2013  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q * (1) Irods_AVU_Type (irdsavtp.web).  @>
+
+@*  \.{Irods\_AVU\_Type} (irdsavtp\PERIOD web).
+
+\LOG
+\initials{LDF 2013.01.10.}
+Added this file.  It contains the |class| declaration of |Irods_AVU_Type|, which was 
+formerly in \filename{irdsavtp.web}.
+\ENDLOG
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif 
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stddef.h>
+#include <unistd.h>
+
+#include <time.h>
+
+#if 0 
+#include <sys/time.h>
+#include <sys/stat.h>
+#endif 
+
+#include <sys/types.h>
+
+#if 0 
+#include <dirent.h>
+#endif 
+
+#include <string.h>
+#if 0 
+#include <pwd.h>
+#endif 
+
+#include <errno.h>
+
+#include <pthread.h>
+
+#include <fstream>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <string>
+#include <sstream>  
+#include <deque>    
+#include <map>   
+#include <vector>   
+#include <stack>
+#include <set>
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+#include <mysql.h>
+
+#include <expat.h>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#undef NAME_LEN
+#undef LOCAL_HOST
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "rspnstp.h++"
+#include "irdsavtp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dstngnmt.h++"
+#include "x509cert.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+#include "usrinftp.h++"
+
+
+@q ** (2) |class Irods_AVU_Type|.  @>
+@ \.{class String\_Triple} declaration.
+\initials{LDF 2012.10.11.}
+
+\LOG
+\initials{LDF 2012.10.11.}
+Added this |class| declaration.
+
+\initials{LDF 2013.07.17.}
+Added |string irods_object_path|.
+
+\initials{LDF 2013.07.18.}
+Added |int user_id|.
+
+\initials{LDF 2013.07.21.}
+Added |bool deleted_from_archive| and |bool deleted_from_gwirdsif_db|.
+
+\initials{LDF 2013.07.21.}
+Added the functions |get_deleted_from_archive| and |get_deleted_from_gwirdsif_db|.
+\ENDLOG
+
+@<Declare |class Irods_AVU_Type|@>=
+
+class Irods_AVU_Type
+{
+
+    friend class Irods_Object_Type;   
+    friend class Scan_Parse_Parameter_Type;
+
+    friend int zzparse(yyscan_t);
+
+    unsigned long id;
+
+    int user_id;
+
+    unsigned long irods_object_id;
+
+    bool deleted_from_archive; 
+    bool deleted_from_gwirdsif_db;
+
+
+    string attribute;
+    string value;
+    string units;
+    unsigned int time_set;
+
+    string irods_object_path;
+
+
+    public:
+
+    @<|Irods_AVU_Type| function declarations@>@;@/
+
+    unsigned long get_id(void) const {return id;}
+
+    bool get_deleted_from_archive(void) const {return deleted_from_archive;}
+
+    bool get_deleted_from_gwirdsif_db(void) const {return deleted_from_gwirdsif_db;}
+   
+
+};
+
+@q *** (3) Default constructor.  @>
+@ Default constructor.
+\initials{LDF 2012.10.11.}
+
+\LOG
+\initials{LDF 2012.10.11.}
+Added this function.
+\ENDLOG
+
+
+@<|Irods_AVU_Type| function declarations@>=
+
+Irods_AVU_Type(void);
+
+@
+@<|Irods_AVU_Type| constructor definitions@>=
+
+Irods_AVU_Type::Irods_AVU_Type(void)
+{
+
+   id = irods_object_id = 0UL;
+
+   user_id = 0;   
+
+   time_set = 0U;
+
+   deleted_from_archive = deleted_from_gwirdsif_db = false;
+
+   return;
+
+
+}
+
+@q *** (3) Non-default constructor.  @>
+@ Non-default constructor.
+\initials{LDF 2012.10.11.}
+
+\LOG
+\initials{LDF 2012.10.11.}
+Added this function.
+
+\initials{LDF 2013.06.07.}
+Added optional argument |unsigned int iirods_object_id = 0|.
+
+\initials{LDF 2013.07.21.}
+Added optional arguments |bool ddeleted_from_archive = false| and 
+|bool ddeleted_from_gwirdsif_db = false|.
+\ENDLOG
+
+@<|Irods_AVU_Type| function declarations@>=
+
+Irods_AVU_Type(string attrib, 
+               string val, 
+               string u = "", 
+               unsigned int t = 0U, 
+               unsigned int iirods_object_id = 0U,
+               int uuser_id = 0,
+               bool ddeleted_from_archive = false,
+               bool ddeleted_from_gwirdsif_db = false);
+
+@
+@<|Irods_AVU_Type| constructor definitions@>=
+
+Irods_AVU_Type::Irods_AVU_Type(string attrib, 
+                               string val, 
+                               string u, 
+                               unsigned int t, 
+                               unsigned int iirods_object_id,
+                               int uuser_id,
+                               bool ddeleted_from_archive,
+                               bool ddeleted_from_gwirdsif_db)
+{
+
+   irods_object_id = iirods_object_id;
+
+   user_id = uuser_id;
+
+   id  = 0UL;
+
+   attribute = attrib;
+   value = val;
+   units = u;
+   time_set = (t == 0) ? time(0) : t;
+
+   deleted_from_archive = ddeleted_from_archive;
+   deleted_from_gwirdsif_db = ddeleted_from_gwirdsif_db;
+
+   return;
+
+}  /* End of |Irods_AVU_Type| non-default constructor definition  */
+
+
+@q *** (3) Copy constructor.  @>
+@ Copy constructor.
+\initials{LDF 2013.06.06.}
+
+\LOG
+\initials{LDF 2013.06.06.}
+Added this function.
+\ENDLOG
+
+@<|Irods_AVU_Type| function declarations@>=
+
+Irods_AVU_Type(const Irods_AVU_Type &i);
+
+@
+@<|Irods_AVU_Type| constructor definitions@>=
+
+Irods_AVU_Type::Irods_AVU_Type(const Irods_AVU_Type &i)
+{
+
+   operator=(i);
+
+   return;
+
+}  /* End of |Irods_AVU_Type| copy constructor definition  */
+
+@q *** (3) Assignment operator.  @>
+@ Assignment operator.
+\initials{LDF 2013.06.06.}
+
+\LOG
+\initials{LDF 2013.06.06.}
+Added this function.
+\ENDLOG
+
+@<|Irods_AVU_Type| function declarations@>=
+
+const Irods_AVU_Type&
+operator=(const Irods_AVU_Type &i);
+
+@
+@<|Irods_AVU_Type::operator=| definition@>=
+
+const Irods_AVU_Type&
+Irods_AVU_Type::operator=(const Irods_AVU_Type &i)
+{
+
+   id = i.id;
+
+   irods_object_id = i.irods_object_id;
+
+   user_id = i.user_id;
+
+   attribute = i.attribute;
+   value = i.value;
+   units = i.units;
+   time_set = i.time_set;
+
+   irods_object_path = i.irods_object_path;
+
+   deleted_from_archive = i.deleted_from_archive;
+   deleted_from_gwirdsif_db = i.deleted_from_gwirdsif_db;
+
+   return i;
+
+}  /* End of |Irods_AVU_Type::operator=|  definition  */
+
+
+@q *** (3) Set.  @>
+@ Set.
+\initials{LDF 2013.03.07.}
+
+\LOG
+\initials{LDF 2013.03.07.}
+Added this function.
+
+\initials{LDF 2013.06.07.}
+Added optional argument |unsigned int iirods_object_id = 0|.
+
+\initials{LDF 2013.07.21.}
+Added optional arguments |bool ddeleted_from_archive = false| and 
+|bool ddeleted_from_gwirdsif_db = false|.
+\ENDLOG
+
+@q **** (4) Declaration @>
+
+@<|Irods_AVU_Type| function declarations@>=
+
+void
+set(string attrib, 
+    string val, 
+    string u = "",  
+    unsigned int t = 0U, 
+    unsigned int iirods_object_id = 0U,
+    unsigned int iid = 0U,
+    string iirods_object_path = "",
+    int uuser_id = 0,
+    bool ddeleted_from_archive = false,
+    bool ddeleted_from_gwirdsif_db = false);
+
+@q **** (4) Definition  @>
+@
+@<|Irods_AVU_Type::set| definition@>=
+
+void
+Irods_AVU_Type::set(string attrib, 
+                    string val, 
+                    string u, 
+                    unsigned int t, 
+                    unsigned int iirods_object_id,
+                    unsigned int iid,
+                    string iirods_object_path,
+                    int uuser_id,
+                    bool ddeleted_from_archive,
+                    bool ddeleted_from_gwirdsif_db)
+{
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0);  
+
+   if (iirods_object_id > 0)
+      irods_object_id = iirods_object_id;
+
+   if (iid > 0U)
+      id = iid;
+
+   if (uuser_id > 0)
+      user_id = uuser_id;
+
+   irods_object_path = iirods_object_path;
+
+   attribute = attrib;
+   value = val;
+   units = u;
+
+   time_set = (t == 0) ? time(0) : t;
+
+   deleted_from_archive = ddeleted_from_archive;
+   deleted_from_gwirdsif_db = ddeleted_from_gwirdsif_db;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Irods_AVU_Type::set':"
+            << endl 
+            << "deleted_from_archive ==     " << deleted_from_archive << endl
+            << "deleted_from_gwirdsif_db == " << deleted_from_gwirdsif_db 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+
+   return;
+
+}  /* End of |Irods_AVU_Type::set| definition  */
+
+
+
+@q *** (3) Clear.  @>
+@ Clear.  
+\initials{LDF 2012.10.12.}
+
+\LOG
+\initials{LDF 2012.10.12.}
+Added this function.
+\ENDLOG
+
+@<|Irods_AVU_Type| function declarations@>=
+void 
+clear(void);
+
+@
+@<|Irods_AVU_Type::clear| definition@>=
+
+void 
+Irods_AVU_Type::clear(void) 
+{
+
+   id = irods_object_id = 0U;
+
+   user_id = 0;
+
+   irods_object_path = attribute = value = units = ""; 
+   time_set = 0; 
+
+   deleted_from_archive = deleted_from_gwirdsif_db = false;
+
+   return; 
+
+}
+
+@q *** (3) Delete iRODS AVU (|delete_irods_avu|).  @>
+@ Delete iRODS AVU (|delete_irods_avu|).  
+\initials{LDF 2013.07.17.}
+
+\LOG
+\initials{LDF 2013.07.17.}
+Added this |static| function.
+
+\initials{LDF 2013.08.02.}
+Added the optional argument |MYSQL *mysql_ptr = 0| and code for deleting
+the row corresponding to the |Irods_AVU_Type &irods_avu| argument from the 
+\.{gwirdsif.Irods\_AVUs} database table.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Irods_AVU_Type| function declarations@>=
+static
+int
+delete_irods_avu(Irods_AVU_Type &irods_avu, 
+                 bool delete_from_database = true, 
+                 MYSQL *mysql_ptr = 0);
+
+@q **** (4) Definition  @>
+@
+@<|Irods_AVU_Type::delete_irods_avu| definition@>=
+
+int
+Irods_AVU_Type::delete_irods_avu(Irods_AVU_Type &irods_avu, 
+                                 bool delete_from_database, 
+                                 MYSQL *mysql_ptr) 
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */  
+
+   MYSQL_RES *result = 0;
+   MYSQL_ROW curr_row;
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+   long int affected_rows;
+
+   set_debug_level(DEBUG, 0, 0);
+
+   stringstream cmnd_strm;
+
+   stringstream sql_strm;
+
+   int status;
+
+   FILE *fp;
+
+   char buffer[1024];
+
+   memset(buffer, 0, 1024);
+
+   int temp_val = 0;
+
+   int ret_val = 0;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `Irods_AVU_Type::delete_irods_avu'."
+            << endl;
+
+       irods_avu.show("irods_avu:");
+
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>   
+@
+@<|Irods_AVU_Type::delete_irods_avu| definition@>=
+
+   if (irods_avu.user_id <= 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `Irods_AVU_Type::delete_irods_avu':"
+            << endl
+            << "`irods_avu.user_id' == " << irods_avu.user_id << " (<= 0)"
+            << endl
+            << "Can't delete iRODS AVU."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (irods_avu.user_id <= 0)|  */
+
+
+@q ***** (5) @>   
+
+@ Contrary to what the iRODS documentation says, setting the environment variable 
+\.{clientUserName} does not work!  That is, a ``rodsadmin'' user can't 
+``alias'' as another user.  Therefore, we need a |User_Info_Type| object for
+each the owner of |*this|, so that we have access to the iRODS environment and authorization 
+files for that user.
+\par
+|global_user_info_map| may contain an entry for the user.  If so, we just take the |User_Info_Type|
+from it.  Otherwise, we must call |Scan_Parse_Parameter_Type::get_user|.  This requires declaring
+a |Scan_Parse_Parameter_Type| object, because |Scan_Parse_Parameter_Type::get_user| 
+isn't |static|.  It's a fairly complex function, so it doesn't pay to try to make a 
+|static| version or to program a member function of |User_Info_Type| that behaves similarly 
+(I tried this already). 
+\initials{LDF 2013.07.18.}
+
+@<|Irods_AVU_Type::delete_irods_avu| definition@>=
+
+   User_Info_Type user_info;
+
+   pthread_mutex_lock(&global_user_info_map_mutex);
+
+   map<int, User_Info_Type>::iterator iter = global_user_info_map.find(irods_avu.user_id);
+
+@q ***** (5) @>
+
+   if (iter == global_user_info_map.end())
+   {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `Irods_AVU_Type::delete_irods_avu':"
+                << endl
+                << "User info for user " << irods_avu.user_id << " not found on "
+                << "`global_user_info_map'."
+                << endl
+                << "Will call `Scan_Parse_Parameter_Type::get_user'."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */       
+
+       Scan_Parse_Parameter_Type param;
+
+       status = param.get_user(irods_avu.user_id, 0, "", &user_info, true);
+
+@q ****** (6) @>
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `Irods_AVU_Type::delete_irods_avu':"
+                << endl
+                << "`Scan_Parse_Parameter_Type::get_user' failed, returning " << status << "."
+                << endl
+                << "Can't delete iRODS AVU."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           pthread_mutex_unlock(&global_user_info_map_mutex);
+
+           return 1;
+
+       }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `Irods_AVU_Type::delete_irods_avu':"
+                << endl
+                << "`Scan_Parse_Parameter_Type::get_user' succeeded, returning 0."
+                << endl;
+
+#if 0 
+           param.show("param:");
+           user_info.show("user_info:");
+#endif 
+
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+        global_user_info_map[irods_avu.user_id] = user_info;
+
+@q ****** (6) @>
+
+   }  /* |if (iter == global_user_info_map.end())|  */
+
+@q ***** (5) @>
+
+   else 
+   {
+
+       user_info = iter->second;
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `Irods_AVU_Type::delete_irods_avu':"
+                << endl
+                << "User info for user " << irods_avu.user_id << " found on "
+                << "`global_user_info_map'."
+                << endl;
+
+#if 0 
+           user_info.show("user_info:");
+#endif 
+
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */       
+
+   }  /* |if (iter == global_user_info_map.end())|  */
+
+
+   pthread_mutex_unlock(&global_user_info_map_mutex);
+
+
+@q ***** (5) @>   
+@
+@<|Irods_AVU_Type::delete_irods_avu| definition@>=
+   
+
+   cmnd_strm << "export irodsEnvFile=" << user_info.get_irods_env_filename() << "; "
+             << "a=`imeta rm -d \"" << irods_avu.irods_object_path << "\" "
+             << "\"" << irods_avu.attribute << "\" \"" << irods_avu.value << "\" "
+             << "2>&1`; "
+             << "echo $?; echo $a";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "cmnd_strm.str() == " << cmnd_strm.str() << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+ 
+@q ***** (5) @>
+@
+@<|Irods_AVU_Type::delete_irods_avu| definition@>=
+
+   errno = 0;
+   fp = popen(cmnd_strm.str().c_str(), "r");
+
+   if (fp == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `Irods_AVU_Type::delete_irods_avu':"
+            << endl
+            << "`popen' failed, returning NULL."
+            << endl;
+
+       if (errno != 0)
+           cerr << "`errno' == " << errno
+                << endl
+                << strerror(errno)
+                << endl;
+
+       cerr << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (fp == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "`popen' succeeded." << endl; 
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+  
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.08.22.}
+@:BUG FIX@> BUG FIX:  Now calling |fread| and |sscanf| instead of |fscanf|.  
+Previously, this sometimes caused a ``broken pipe'' error in the shell created
+by |popen|.
+\ENDLOG 
+
+@<|Irods_AVU_Type::delete_irods_avu| definition@>=
+
+    memset(buffer, 0, 1024);
+    status = fread(buffer, 1, 1024, fp);
+
+    if (status == 0 || status == 1024)
+    {
+        memset(buffer, 0, 1024);
+        
+        lock_cerr_mutex(); 
+        cerr << "ERROR!  In `Irods_AVU_Type::delete_irods_avu':"
+             << endl
+             << "`fread' returned " << status << ".";
+
+        if (status == 0)
+             cerr << "Failed to read error output from `imeta' command."
+                  << endl;
+        else
+             cerr << "Too much error output from `imeta'.  This is not permitted."
+                  << endl;
+
+        cerr << "Exiting function unsuccessfully with return value 1."
+             << endl;
+        unlock_cerr_mutex(); 
+
+        pclose(fp);
+
+        return 1;
+
+    }  /* |if (status == 0 || status == 1024)|  */
+#if DEBUG_COMPILE
+
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Irods_AVU_Type::delete_irods_avu':"
+            << endl
+            << "`fread' succeeded, returning " << status << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Irods_AVU_Type::delete_irods_avu| definition@>=
+
+   status = sscanf(buffer, "%d", &temp_val);
+
+   if (status != 1)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `Irods_AVU_Type::delete_irods_avu':"
+            << endl
+            << "`sscanf' failed, returning " << status << ":"
+            << endl
+            << "Failed to set `temp_val'."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       pclose(fp);
+
+       return 1;
+
+   }  /* |if (status == 0 || status == 1024)|  */
+#if DEBUG_COMPILE
+
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Irods_AVU_Type::delete_irods_avu':"
+            << endl
+            << "`sscanf' succeeded, returning 1."
+            << endl
+            << "`temp_val' == " << temp_val
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Irods_AVU_Type::delete_irods_avu| definition@>=
+
+
+   if (temp_val == 4)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Unknown file.  File was probably deleted using `irm'."
+            << endl;
+
+       if (strlen(buffer) > 0)
+           cerr << "`imeta' error output:" 
+                << endl 
+                << buffer 
+                << endl;
+
+       cerr << "Exiting function successfully with return value 2."
+            << endl;
+
+       unlock_cerr_mutex(); 
+
+       ret_val = 2;
+     
+   }  /* |if (temp_val == 4)|  */
+
+@q ***** (5) @>
+@
+@<|Irods_AVU_Type::delete_irods_avu| definition@>=
+
+   else if (temp_val != 0)
+   {
+        lock_cerr_mutex(); 
+        cerr << "ERROR!  In `Irods_AVU_Type::delete_irods_avu':"
+             << endl
+             << "`imeta' command failed, returning " << temp_val << " (!= 0)";
+
+        if (strlen(buffer) > 0)
+            cerr << "`imeta' error output:" 
+                 << endl 
+                 << buffer 
+                 << endl;
+
+        cerr << "Exiting function unsuccessfully with return value 1."
+             << endl;
+        unlock_cerr_mutex(); 
+
+        pclose(fp);
+
+        return 1;
+
+   }  /* |else if (temp_val != 0)|  */
+
+@q ***** (5) @>
+@
+@<|Irods_AVU_Type::delete_irods_avu| definition@>=
+
+   pclose(fp);
+   fp = 0;
+
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.08.02.}
+Added this section.
+\ENDLOG
+
+@<|Irods_AVU_Type::delete_irods_avu| definition@>=
+
+   if (!delete_from_database)
+   {
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `Irods_AVU_Type::delete_irods_avu':  `delete_from_database' == `false'."
+                << endl 
+                << "Skipping to `END_DELETE_IRODS_AVU'."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+ 
+        goto END_DELETE_IRODS_AVU;
+
+
+   }  /* |if (!delete_from_database)|  */
+
+   else if (irods_avu.id <= 0)
+   {
+        lock_cerr_mutex(); 
+        cerr << "WARNING!  In `Irods_AVU_Type::delete_irods_avu':  `irods_avu.id' == "
+             << irods_avu.id << " (<= 0)"
+             << endl 
+             << "Can't delete row from `gwirdsif.Irods_AVUs' database table."
+             << endl 
+             << "Skipping to `END_DELETE_IRODS_AVU'."
+             << endl;
+        unlock_cerr_mutex(); 
+
+   }  /* |else if (irods_avu.id <= 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Irods_AVU_Type::delete_irods_avu':  `delete_from_database' == `true'."
+            << endl 
+            << "Will delete row from `gwirdsif.Irods_AVUs' database table."
+            << endl;
+
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Irods_AVU_Type::delete_irods_avu| definition@>=
+
+   sql_strm.str("");
+
+   sql_strm << "delete from gwirdsif.Irods_AVUs where irods_avu_id = " << irods_avu.id;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   status = submit_mysql_query(sql_strm.str(), 
+                               result, 
+                               mysql_ptr, 
+                               0, 
+                               0, 
+                               &affected_rows);
+
+   if (status != 0)
+   {
+        lock_cerr_mutex(); 
+        cerr << "ERROR!  In `Irods_AVU_Type::delete_irods_avu':"
+             << endl
+             << "`submit_mysql_query' failed, returning " << status << "."
+             << endl
+             << "Failed to delete row(s) from `gwirdsif.Irods_AVUs' database table."
+             << endl 
+             << "Exiting function unsuccessfully with return value 1."
+             << endl;
+        unlock_cerr_mutex(); 
+
+        if (result)
+          mysql_free_result(result);
+
+        return 1;
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Irods_AVU_Type::delete_irods_avu':"
+            << endl
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "Deleted row(s) from `gwirdsif.Irods_AVUs' database table successfully."
+            << endl
+            << "`affected_rows' == " << affected_rows
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   mysql_free_result(result);
+   result = 0;
+
+@q ***** (5) @>
+@
+@<|Irods_AVU_Type::delete_irods_avu| definition@>=
+
+END_DELETE_IRODS_AVU:
+
+   if (ret_val != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Irods_AVU_Type::delete_irods_avu':"
+            << endl
+            << "Exiting function with return value " << ret_val << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Irods_AVU_Type::delete_irods_avu':"
+            << endl
+            << "`imeta' command succeeded, returning 0."
+            << endl
+            << "Exiting function successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+   irods_avu.clear();
+
+@q ***** (5) @>
+
+   return ret_val; 
+
+}  /* End of |Irods_AVU_Type::delete_irods_avu| definition  */
+
+@q *** (3) Show.  @>
+@ Show.  
+\initials{LDF 2012.10.12.}
+
+\LOG
+\initials{LDF 2012.10.12.}
+Added this function.
+\ENDLOG
+
+@<|Irods_AVU_Type| function declarations@>=
+void 
+show(string s = "", stringstream *strm = 0) const;
+
+@
+@<|Irods_AVU_Type::show| definition@>=
+
+void 
+Irods_AVU_Type::show(string s, stringstream *strm) const
+{
+
+   char buffer[64];
+   memset(buffer, 0, 64);
+
+   stringstream temp_strm;
+
+   temp_strm << time_set;
+
+   struct tm tm;
+
+   if (strptime(temp_strm.str().c_str(), "%s", &tm))
+   {
+       strftime(buffer, 64, "%Y-%m-%d %H:%M:%S %Z %z", &tm);
+   }
+
+   temp_strm.str("");
+
+   if (s.empty())
+      s = "Irods_AVU_Type:";
+
+   temp_strm << s 
+             << endl 
+             << "id ==                       " << id
+             << endl 
+             << "irods_object_id ==          " << irods_object_id
+             << endl 
+             << "user_id ==                  " << user_id
+             << endl 
+             << "irods_object_path ==        " << irods_object_path;
+
+   if (irods_object_path.empty())
+       temp_strm << "(empty)";
+
+   temp_strm << endl 
+             << "attribute ==                " << attribute
+             << endl 
+             << "value ==                    " << value;
+
+   if (value.empty())
+       temp_strm << "(empty)";
+
+   temp_strm << endl 
+             << "units ==                    " << units;
+
+   if (units.empty())
+       temp_strm << "(empty)";
+
+   temp_strm << endl 
+             << "time_set ==                 " << time_set << " (seconds since epoch)";
+
+   if (strlen(buffer) > 0)
+      temp_strm << ":  " << buffer;
+
+   temp_strm << endl
+             << "deleted_from_archive ==     " << deleted_from_archive
+             << endl
+             << "deleted_from_gwirdsif_db == " << deleted_from_gwirdsif_db
+             << endl << endl;
+
+   if (strm)
+      *strm << temp_strm.str();
+   else
+      cerr << temp_strm.str();
+
+
+   return; 
+
+}  /* End of |Irods_AVU_Type::show| definition  */
+
+@q *** (3) Write to database (|write_to_database|).  @>
+
+@ Write to database (|write_to_database|).
+\initials{LDF 2013.06.06.}
+
+@q **** (4) Declaration  @>
+
+@<|Irods_AVU_Type| function declarations@>=
+
+int
+write_to_database(MYSQL *mysql_ptr, int thread_ctr = 0);
+
+@q **** (4) Definition  @>
+@
+@<|Irods_AVU_Type::write_to_database| definition@>=
+int
+Irods_AVU_Type::write_to_database(MYSQL *mysql_ptr, int thread_ctr)
+{
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status;
+
+   string thread_str;
+
+   stringstream temp_strm;
+
+   if (thread_ctr > 0)
+   {
+       temp_strm << "[Thread " << thread_ctr << "] ";
+       thread_str = temp_strm.str();
+
+       temp_strm.str("");
+   }
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Irods_AVU_Type::write_to_database'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Irods_AVU_Type::write_to_database| definition@>=
+
+   MYSQL_RES *result = 0;
+   MYSQL_ROW curr_row;
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+   long int affected_rows;
+
+   stringstream sql_strm;
+
+   int ret_val = 0;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       show();
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   if (irods_object_id == 0)
+   {
+        lock_cerr_mutex();
+        cerr << thread_str << "WARNING!  In `Irods_AVU_Type::write_to_database':"
+             << endl  
+             << "`irods_object_id' == 0.  Not writing `Irods_AVU_Type' to "
+             << "`gwirdsif.Irods_AVUs' database table."
+             << endl
+             << "Exiting function unsuccessfully with return value 3."
+             << endl;
+         unlock_cerr_mutex(); 
+
+         return 3;
+
+   }  /* |if (irods_object_id == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+        cerr << thread_str << "In `Irods_AVU_Type::write_to_database':"
+             << endl  
+             << "`irods_object_id' == " << irods_object_id
+             << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+   
+@q ***** (5) @>
+@
+@<|Irods_AVU_Type::write_to_database| definition@>=
+
+   pthread_mutex_lock(&sql_lock_tables_mutex);
+
+   status = submit_mysql_query("lock tables gwirdsif.Irods_AVUs write", 
+                                result, 
+                                mysql_ptr);
+
+   if (status != 0)
+   {
+        lock_cerr_mutex();
+        cerr << thread_str << "ERROR!  In `Irods_AVU_Type::write_to_database':"
+             << endl  
+             << "`submit_mysql_query' failed, returning " << status << "."
+             << endl
+             << "Failed to lock `gwirdsif.Irods_AVUs' table."
+             << endl 
+             << "Exiting function unsuccessfully with return value 1."
+             << endl;
+         unlock_cerr_mutex(); 
+
+         if (result)
+            mysql_free_result(result);
+
+         pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+         return 1;
+
+   }  /* |if (irods_object_id == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+        cerr << thread_str << "In `Irods_AVU_Type::write_to_database':"
+             << endl 
+             << "`submit_mysql_query' succeeded, returning 0."
+             << endl
+             << "Locked `gwirdsif.Irods_AVUs' table successfully."
+             << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+
+@q ***** (5) @>
+@
+@<|Irods_AVU_Type::write_to_database| definition@>=
+
+
+   status = Scan_Parse_Parameter_Type::get_highest_value(mysql_ptr, 
+                                                         "gwirdsif.Irods_AVUs", 
+                                                         "irods_avu_id", 
+                                                         id,
+                                                         true);
+
+
+   if (status != 0)
+   {
+        lock_cerr_mutex();
+        cerr << thread_str << "ERROR!  In `Irods_AVU_Type::write_to_database':"
+             << endl  
+             << "`Scan_Parse_Parameter_Type::get_highest_value' failed, returning " 
+             << status << "."
+             << endl
+             << "Failed to retrieve highest value of `irods_avu_id' from the "
+             << "`gwirdsif.Irods_AVUs' database table."
+             << endl
+             << "Will try to unlock `gwirdsif.Irods_AVUs' and exit unsuccessfully with return "
+             << "value 1."
+             << endl;
+         unlock_cerr_mutex(); 
+
+         if (result)
+            mysql_free_result(result);
+
+         id = 0;
+
+         ret_val = 1;
+
+         goto UNLOCK_TABLES;
+         
+
+   }  /* |if (irods_object_id == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+        cerr << thread_str << "In `Irods_AVU_Type::write_to_database':"
+             << endl 
+             << "`submit_mysql_query' succeeded, returning 0."
+             << endl
+             << "Retrieved highest value of `irods_avu_id' from the "
+             << "`gwirdsif.Irods_AVUs' database table successfully."
+             << endl
+             << "`id' == " << id
+             << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   mysql_free_result(result);
+  
+   result = 0;
+
+@q ***** (5) @>
+@
+@<|Irods_AVU_Type::write_to_database| definition@>=
+
+   sql_strm << "insert into gwirdsif.Irods_AVUs (irods_avu_id, "
+            << "irods_object_id, attribute, value, units, time_set) " 
+            << "values (" << id << ", " << irods_object_id << ", "
+            << "'" << attribute << "', '" << value << "', " 
+            << "'" << units << "', " << "from_unixtime(" << time_set << "))";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+        cerr << thread_str << "In `Irods_AVU_Type::write_to_database':"
+             << endl 
+             << "`sql_strm.str()' == " << sql_strm.str()
+             << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, &affected_rows);
+
+   if (status != 0)
+   {
+        lock_cerr_mutex();
+        cerr << thread_str << "ERROR!  In `Irods_AVU_Type::write_to_database':"
+             << endl  
+             << "`submit_mysql_query' failed, returning " << status << "."
+             << endl
+             << "Failed to insert row into  `gwirdsif.Irods_AVUs' table."
+             << endl 
+             << "Will try to unlock tables before exiting function unsuccessfully "
+             << "with return value 1."
+             << endl;
+         unlock_cerr_mutex(); 
+
+         ret_val = 1;
+
+         if (result)
+         {
+             mysql_free_result(result);
+             result = 0;
+         }
+
+         goto UNLOCK_TABLES;
+
+   }  /* |if (irods_object_id == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+        cerr << thread_str << "In `Irods_AVU_Type::write_to_database':"
+             << endl 
+             << "`submit_mysql_query' succeeded, returning 0."
+             << endl
+             << "Inserted row into `gwirdsif.Irods_AVUs' table successfully."
+             << endl
+             << "`affected_rows' == " << affected_rows
+             << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   mysql_free_result(result);
+   result = 0;
+
+@q ***** (5) @>
+@
+@<|Irods_AVU_Type::write_to_database| definition@>=
+
+UNLOCK_TABLES:
+
+   status = submit_mysql_query("unlock tables", result, mysql_ptr);
+
+   if (status != 0)
+   {
+        lock_cerr_mutex();
+        cerr << thread_str << "ERROR!  In `Irods_AVU_Type::write_to_database':"
+             << endl  
+             << "`submit_mysql_query' failed, returning " << status << "."
+             << endl
+             << "Failed to unlock `gwirdsif.Irods_AVUs' table."
+             << endl 
+             << "Exiting function unsuccessfully with return value 1."
+             << endl;
+         unlock_cerr_mutex(); 
+
+         if (result)
+            mysql_free_result(result);
+
+         pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+         return 1;
+
+   }  /* |if (irods_object_id == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+        cerr << thread_str << "In `Irods_AVU_Type::write_to_database':"
+             << endl 
+             << "`submit_mysql_query' succeeded, returning 0."
+             << endl
+             << "Unlocked `gwirdsif.Irods_AVUs' table successfully."
+             << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   mysql_free_result(result);
+   result = 0;
+   pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+@q ***** (5) @>
+@
+@<|Irods_AVU_Type::write_to_database| definition@>=
+
+
+   if (ret_val != 0)
+   {
+        lock_cerr_mutex();
+        cerr << thread_str << "In `Irods_AVU_Type::write_to_database':"
+             << endl  
+             << "Exiting function unsuccessfully with return value `ret_val' == " 
+             << ret_val << "."
+             << endl;
+         unlock_cerr_mutex(); 
+
+         if (result)
+            mysql_free_result(result);
+
+         return ret_val;
+
+   }  /* |if (ret_val != 0)|  */
+
+@q ***** (5) @>
+@
+@<|Irods_AVU_Type::write_to_database| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "Exiting `Irods_AVU_Type::write_to_database' successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+
+}  /* End of |Irods_AVU_Type::write_to_database| definition  */
+
+@q *** (3) @>
+
+@q ** (2) Putting iRODS AVU Type together.@>
+
+@ Putting \.{iRODS\_AVU\_Type} together.
+\initials{LDF 2013.01.10.}
+
+The header file \filename{irdsavtp.h++} generated from this CWEB file 
+is included in |@<Include files@>|, so |@<Declare |class Irods_AVU_Type|@>| is not
+inserted here.
+\initials{LDF 2013.06.06.} 
+
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+class Irods_Object_Type;   
+@<|Irods_AVU_Type| constructor definitions@>@;@/
+@<|Irods_AVU_Type::operator=| definition@>@;@/
+@<|Irods_AVU_Type::set| definition@>@;@/
+@<|Irods_AVU_Type::clear| definition@>@;@/
+@<|Irods_AVU_Type::delete_irods_avu| definition@>@;@/
+@<|Irods_AVU_Type::show| definition@>@;@/
+@<|Irods_AVU_Type::write_to_database| definition@>@;@/
+
+@q *** (3) This is what's written to the header file `irdsavtp.h'.  @>
+
+@ This is what's written to the header file \filename{irdsavtp.h}.  
+\initials{LDF 2008.12.05.}
+
+@(irdsavtp.h@>=
+#ifndef IRDSAVTP_H
+#define IRDSAVTP_H 1
+using namespace std;
+using namespace gwrdifpk;
+class Irods_Object_Type;   
+@<Declare |class Irods_AVU_Type|@>@;@/
+#endif 
+
+
+@q (progn (cweb-mode) (outline-minor-mode))                           @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

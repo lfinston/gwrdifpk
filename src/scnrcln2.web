@@ -1,0 +1,865 @@
+@q scnrcln2.web                                                @>
+@q Created by Laurence Finston Sat Feb  1 19:02:32 CET 2014    @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q  * (1) Client Scanner 2.  @>
+@* Client Scanner 2.
+\initials{LDF 2014.02.01.}
+
+@
+@<Include files@>=
+
+#include <stdlib.h>
+#include <stdio.h>
+
+#include <fstream>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <string>
+#include <time.h>
+#include <math.h>
+
+#include <sstream>   
+
+#include <vector>
+#include <deque>
+#include <stack>
+#include <set>
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+
+#include <pthread.h>
+
+#include <mysql.h>
+#include <expat.h>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+
+#undef NAME_LEN
+#undef LOCAL_HOST
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "utilfncs.h++"
+#include "prsrcln2.h++"
+
+@q  ** (2) Options.  @>
+@ Options.
+
+@<Options@>=
+@=%option header-file="scnrcln2.hxx"@>
+@=%option bison-bridge@>
+@=%option reentrant@>
+@=%option prefix="xx"@>
+
+@q  * (1) Local variables for |xxlex|.  @>
+@ Local variables for {\bf xxlex}.
+\initials{LDF 2012.07.30.}
+
+@<Local variables for |xxlex|@>=
+
+bool SCANNER_DEBUG = false;  /* |true|  */
+
+@q ** (2) Code to be executed each time |xxlex| is entered.  @>
+
+@ Code to be executed each time {\bf xxlex} is entered.  This code must be
+indented or it causes an error when FLEX is run.  The start condition on entry
+to {\bf xxlex} can be set here.
+\initials{LDF 2012.07.30.}
+
+@<Execute on entry to |xxlex|@>=
+
+@= Scan_Parse_Parameter_Type* param = static_cast<Scan_Parse_Parameter_Type*>(yyextra); @>
+@= if (scanner_trace) SCANNER_DEBUG = true;  @>
+
+
+@q  ** (2) Rules.  @>
+@ Rules.
+
+@q *** (3) Punctuation.  @>
+
+@ Punctuation.
+
+@q *** (3) Whitespace.  @>
+@ Whitespace.
+
+@<Rules@>=
+@=[[:space:]\x0d]+ {@>
+
+@=}@>
+
+@q *** (3) Comments.  @>
+@ Comments.  
+\initials{LDF 2012.07.30.}
+
+@<Rules@>=
+@=#.*$ {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+      
+      lock_cerr_mutex(); 
+      cerr << "In `xxlex':  Comment." << endl;
+      unlock_cerr_mutex(); 
+      
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+
+   /* Ignore  */
+
+@=}@>
+
+@q *** (3) Integer.  @>
+@ Integer.  
+\initials{LDF 2012.06.27.}
+
+\LOG
+\initials{LDF 2012.06.27.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=[-+]?[0-9][0-9]* {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "In `xxlex':  integer: " << yytext 
+           << endl
+           << "Returning `INTEGER_XX'."
+           << endl;
+      unlock_cerr_mutex(); 
+      
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+   sscanf(yytext, "%d", &yylval->int_value);
+   
+   return INTEGER_XX;
+
+@=}@>
+
+
+@q *** (3) Unsigned Integer.  @>
+@ Unsigned Integer.  
+\initials{LDF 2012.10.12.}
+
+\LOG
+\initials{LDF 2012.10.12.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=[0-9][0-9]*[uU] {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "In `xxlex':  unsigned integer: " << yytext 
+           << endl
+           << "Returning `UNSIGNED_INTEGER_XX'."
+           << endl;
+      unlock_cerr_mutex(); 
+      
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+   sscanf(yytext, "%u", &yylval->uint_value);
+   
+   return UNSIGNED_INTEGER_XX;
+
+@=}@>
+
+@q *** (3) Unsigned Long Integer.  @>
+@ Unsigned Long Integer.  
+\initials{LDF 2012.10.16.}
+
+\LOG
+\initials{LDF 2012.10.16.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=[0-9][0-9]*[uU][lL] {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "In `xxlex':  unsigned integer: " << yytext 
+           << endl
+           << "Returning `UNSIGNED_LONG_INTEGER_XX'."
+           << endl;
+      unlock_cerr_mutex(); 
+      
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+   sscanf(yytext, "%lu", &yylval->ulint_value);
+   
+   return UNSIGNED_LONG_INTEGER_XX;
+
+@=}@>
+
+
+
+@q *** (3) ADD.  @>
+@ ADD.
+\initials{LDF 2014.02.16.}
+
+\LOG
+\initials{LDF 2014.02.16.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=ADD|add {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "In `xxlex': `yytext' == " << yytext 
+           << endl
+           << "Returning `ADD_XX'."
+           << endl;
+      unlock_cerr_mutex(); 
+      
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+
+   return ADD_XX;
+
+@=}@>
+
+
+@q *** (3) PULL.  @>
+@ PULL.
+\initials{LDF 2014.02.16.}
+
+\LOG
+\initials{LDF 2014.02.16.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=PULL|pull {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "In `xxlex': `yytext' == " << yytext 
+           << endl
+           << "Returning `PULL_XX'."
+           << endl;
+      unlock_cerr_mutex(); 
+      
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+
+   return PULL_XX;
+
+@=}@>
+
+@q *** (3) PATH.  @>
+@ PATH.
+\initials{LDF 2014.02.16.}
+
+\LOG
+\initials{LDF 2014.02.16.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=PATH|path {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "In `xxlex': `yytext' == " << yytext 
+           << endl
+           << "Returning `PATH_XX'."
+           << endl;
+      unlock_cerr_mutex(); 
+      
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+   return PATH_XX;
+
+@=}@>
+
+@q *** (3) PATHS.  @>
+@ PATHS.
+\initials{LDF 2014.02.20.}
+
+\LOG
+\initials{LDF 2014.02.20.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=PATHS|paths {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "In `xxlex': `yytext' == " << yytext 
+           << endl
+           << "Returning `PATHS_XX'."
+           << endl;
+      unlock_cerr_mutex(); 
+      
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+   return PATHS_XX;
+
+@=}@>
+
+
+@q *** (3) USER_ID.  @>
+@ \.{USER\_ID}.
+\initials{LDF 2014.02.19.}
+
+\LOG
+\initials{LDF 2014.02.19.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=USER_ID|user_id {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "In `xxlex': `yytext' == " << yytext 
+           << endl
+           << "Returning `USER_ID_XX'."
+           << endl;
+      unlock_cerr_mutex(); 
+      
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+
+   return USER_ID_XX;
+
+@=}@>
+
+@q *** (3) USERNAME.  @>
+@ \.{USERNAME}.
+\initials{LDF 2014.02.19.}
+
+\LOG
+\initials{LDF 2014.02.19.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=USERNAME|username {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "In `xxlex': `yytext' == " << yytext 
+           << endl
+           << "Returning `USERNAME_XX'."
+           << endl;
+      unlock_cerr_mutex(); 
+      
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+
+   return USERNAME_XX;
+
+@=}@>
+
+@q *** (3) DISTINGUISHED_NAME.  @>
+@ \.{DISTINGUISHED\_NAME}.
+\initials{LDF 2014.02.19.}
+
+\LOG
+\initials{LDF 2014.02.19.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=DISTINGUISHED_NAME|distinguished_name {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "In `xxlex': `yytext' == " << yytext 
+           << endl
+           << "Returning `DISTINGUISHED_NAME_XX'."
+           << endl;
+      unlock_cerr_mutex(); 
+      
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+
+   return DISTINGUISHED_NAME_XX;
+
+@=}@>
+
+@q *** (3) SERVER_IP_ADDRESS.  @>
+@ \.{SERVER\_IP\_ADDRESS\.
+\initials{LDF 2014.02.19.}
+
+\LOG
+\initials{LDF 2014.02.19.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=SERVER[-_]IP[-_]ADDRESS|server[-_]ip[-_]address {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "In `xxlex': `yytext' == " << yytext 
+           << endl
+           << "Returning `SERVER_IP_ADDRESS_XX'."
+           << endl;
+      unlock_cerr_mutex(); 
+      
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+
+   return SERVER_IP_ADDRESS_XX;
+
+@=}@>
+
+@q *** (3) SERVER_HOSTNAME.  @>
+@ \.{SERVER\_HOSTNAME}.
+\initials{LDF 2014.02.19.}
+
+\LOG
+\initials{LDF 2014.02.19.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=SERVER[-_]HOSTNAME|server[-_]ip[-_]hostname {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "In `xxlex': `yytext' == " << yytext 
+           << endl
+           << "Returning `SERVER_HOSTNAME_XX'."
+           << endl;
+      unlock_cerr_mutex(); 
+      
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+
+   return SERVER_HOSTNAME_XX;
+
+@=}@>
+
+@q *** (3) CLIENT_IP_ADDRESS.  @>
+@ \.{CLIENT\_IP\_ADDRESS\.
+\initials{LDF 2014.02.19.}
+
+\LOG
+\initials{LDF 2014.02.19.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=CLIENT[-_]IP[-_]ADDRESS|client[-_]ip[-_]address {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "In `xxlex': `yytext' == " << yytext 
+           << endl
+           << "Returning `CLIENT_IP_ADDRESS_XX'."
+           << endl;
+      unlock_cerr_mutex(); 
+      
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+
+   return CLIENT_IP_ADDRESS_XX;
+
+@=}@>
+
+@q *** (3) CLIENT_HOSTNAME.  @>
+@ \.{CLIENT\_HOSTNAME}.
+\initials{LDF 2014.02.19.}
+
+\LOG
+\initials{LDF 2014.02.19.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=CLIENT[-_]HOSTNAME|client[-_]ip[-_]hostname {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "In `xxlex': `yytext' == " << yytext 
+           << endl
+           << "Returning `CLIENT_HOSTNAME_XX'."
+           << endl;
+      unlock_cerr_mutex(); 
+      
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+
+   return CLIENT_HOSTNAME_XX;
+
+@=}@>
+
+@q *** (3) FORCE.  @>
+@ \.{FORCE}.
+\initials{LDF 2014.02.19.}
+
+\LOG
+\initials{LDF 2014.02.19.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=FORCE|force {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "In `xxlex': `yytext' == " << yytext 
+           << endl
+           << "Returning `FORCE_XX'."
+           << endl;
+      unlock_cerr_mutex(); 
+      
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+
+   return FORCE_XX;
+
+@=}@>
+
+@q *** (3) INTERVAL.  @>
+@ \.{INTERVAL}.
+\initials{LDF 2014.02.20.}
+
+\LOG
+\initials{LDF 2014.02.20.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=INTERVAL|interval {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "In `xxlex': `yytext' == " << yytext 
+           << endl
+           << "Returning `INTERVAL_XX'."
+           << endl;
+      unlock_cerr_mutex(); 
+      
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+
+   return INTERVAL_XX;
+
+@=}@>
+
+@q *** (3) DUMMY_STATEMENT.  @>
+@ \.{DUMMY_STATEMENT}.
+\initials{LDF 2014.02.26.}
+
+\LOG
+\initials{LDF 2014.02.26.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=DUMMY[_-]STATEMENT|dummy[_-]statement {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "In `xxlex': `yytext' == " << yytext 
+           << endl
+           << "Returning `DUMMY_STATEMENT_XX'."
+           << endl;
+      unlock_cerr_mutex(); 
+      
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+   return DUMMY_STATEMENT_XX;
+
+@=}@>
+
+
+
+@q *** (3) END.  @>
+@ END.
+\initials{LDF 2012.07.30.}
+
+@<Rules@>=
+@=END|end {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "In `xxlex': `yytext' == " << yytext 
+           << endl
+           << "Returning `END_XX'."
+           << endl;
+      unlock_cerr_mutex(); 
+      
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+
+   return END_XX;
+
+@=}@>
+
+@q *** (3) Delimited string:  "...".  @>
+@ Delimited string:  \.{\char`\"}$\ldots$\.{\char`\"}.  
+\initials{LDF 2014.02.16.}
+
+\LOG
+\initials{LDF 2014.02.16.}
+Added this rule.
+\ENDLOG 
+
+@<Rules@>=
+@=\"[^\"]*\" {@>
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Delimited string.  `yytext' == " << yytext
+            << endl;
+       unlock_cerr_mutex(); 
+   }
+#endif  /* |DEBUG_COMPILE|  */
+
+   string temp_str = yytext;
+
+   string::size_type s = temp_str.size();
+
+   temp_str.erase(0, 1);
+   temp_str.erase(s - 2, s - 1);
+
+   size_t pos = string::npos;
+
+   do 
+   {
+       pos = temp_str.find('\002');  /* ASCII STX (``Start of Text'') character  */
+       if (pos != string::npos)
+           temp_str.replace(pos, 1, 1, '\042');  /* Double quotation mark  */
+   }
+
+   while (pos != string::npos);
+
+   pos = string::npos;
+
+   do 
+   {
+       pos = temp_str.find('\003');  /* ASCII ETX (``End of Text'') character  */
+       if (pos != string::npos)
+           temp_str.replace(pos, 1, 1, '\042');  /* Double quotation mark  */
+   }
+   while (pos != string::npos);
+
+   do 
+   {
+        pos = temp_str.find("\\n");
+        if (pos != string::npos)
+           temp_str.replace(pos, 2, "\n");
+        
+    }
+    while (pos != string::npos);
+
+
+   strcpy(yylval->string_value, temp_str.c_str());
+  
+   return STRING_XX;
+
+@=}@>
+
+@q *** (3) Undelimited string:  "...".  @>
+@ Undelimited string.
+\initials{LDF 2012.07.30.}
+
+@<Rules@>=
+@=[[:alnum:]./=;:~@@()+\?=~$][[:alnum:]./:;\-_=~+@@()\?=~$]* {@>
+
+   strcpy(yylval->string_value, yytext);
+
+#if DEBUG_COMPILE
+   if (SCANNER_DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `xxlex':  Undelimited string == " << yytext
+            << endl
+            << "Returning `STRING_XX'."
+            << endl;
+        unlock_cerr_mutex(); 
+
+   }  
+#endif  /* |DEBUG_COMPILE|  */
+
+   return STRING_XX;
+
+@=}@>
+
+
+@q *** (3) Other characters.  @>
+@ Other characters.
+\initials{LDF 2012.07.30.}
+
+@<Rules@>=
+@=. {@>
+
+      lock_cerr_mutex();       
+      cerr << "In `xxlex':  Other character:  `" << yytext << "'.  Continuing." 
+           << endl;
+      unlock_cerr_mutex(); 
+      
+   /* Do nothing.  */
+
+@=}@>
+
+
+@q ** (2) Additional functions.  @>
+
+@ Additional functions.
+
+@<|xxwrap| definition@>=
+
+int
+xxwrap(yyscan_t parameter)
+{
+    return 1;
+}
+
+@
+@<|xxerror| definition@>=
+
+int
+xxerror(void* v, char const* s)
+{
+    return 0;
+}
+
+@ Putting client scanner together.
+@c
+@=%{@>
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+@=%}@>
+@<Options@>@;@/
+@=%%@>
+@=%{@>
+@<Local variables for |xxlex|@>@;@/
+@=%}@>
+@<Execute on entry to |xxlex|@>@;@/
+@q Rules @>
+@<Rules@>@;@/
+@=%%@>
+@q User code@>
+@<|xxwrap| definition@>@;@/
+@<|xxerror| definition@>@;@/
+
+ 
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))           @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+

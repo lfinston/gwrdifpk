@@ -1,0 +1,1092 @@
+@q ckietype.web @>
+@q Created by Laurence D. Finston (LDF) Thu Dec 22 13:07:17 CET 2011 @>
+
+@q * (1) Top @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+@*1 \.{Cookie\_Type}.  
+\initials{LDF 2011.12.22.}
+
+\LOG
+\initials{LDF 2011.12.22.}
+Created this file.
+
+\initials{LDF 2012.01.09.}
+Now including \filename{mysql.h}.
+
+\initials{LDF 2012.07.23.}
+Copied this file from the directory 
+\filename{$\lbrack\ldots\rbrack$/optinum/Installer/optwbsrv/src/} of the
+OptiNum-Grid project.
+\ENDLOG 
+
+@f Cookie_Type int
+
+@q ** (2) Include files.  @>
+
+@ Include files.
+@<Include files@>=
+
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <mysql.h>
+
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <fstream>
+#include <sstream>   
+#include <string>
+#include <vector>
+#include <algorithm>
+
+#include <pthread.h>
+
+#include <config.h>
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif 
+
+@q ** (2) Global variables for |Cookie_Type|.  @>
+@ Global variables for |Cookie_Type|.
+\initials{LDF 2012.07.24.}
+
+\LOG
+\initials{LDF 2012.07.24.}
+Added this section.
+\ENDLOG
+
+@<|Cookie_Type| Global variables@>=
+
+   pthread_mutex_t cookie_vector_mutex;
+   vector <Cookie_Type> cookie_vector;
+
+@
+@<|Cookie_Type| |extern| declarations for global variables@>=
+
+    extern pthread_mutex_t cookie_vector_mutex;
+
+    extern vector <Cookie_Type> cookie_vector;
+
+
+@q ** (2) |class Cookie_Type|.  @>
+@ |class Cookie_Type|.
+\initials{LDF 2011.12.22.}
+
+\LOG
+\initials{LDF 2011.12.22.}
+Added this |struct| declaration.
+
+\initials{LDF 2012.07.26.}
+Changed |Cookie_Type| from a |struct| to a |class|.
+Added data member |Scan_Parse_Parameter_Type *param|.
+
+\initials{LDF 2012.07.26.}
+Made |vector <Cookie_Type> cookie_vector| a |static| data member of |Cookie_Type|.
+\ENDLOG
+
+@<|class Cookie_Type| declaration@>=
+
+class Cookie_Type
+{
+
+    friend int main (int, char *[]);
+
+    string name;
+    string value;
+    string domain;
+    string path;
+    string expires_str;
+
+    time_t expires;
+
+    Scan_Parse_Parameter_Type *param;
+
+    vector<pair<string, string> > name_value_pairs;
+
+    public:
+
+    @<|class Cookie_Type| function declarations@>@;@/
+
+};
+
+@q *** (3) Default constructor.  @>
+@ Default constructor.
+\initials{LDF 2010.09.30.}
+
+\LOG
+\initials{LDF 2010.09.30.}
+Added this function.
+\ENDLOG
+
+@<|class Cookie_Type| function declarations@>=
+
+Cookie_Type(void);
+
+@
+@<|class Cookie_Type| constructor definitions@>=
+
+Cookie_Type::Cookie_Type(void)
+{
+
+    name    = "";
+    value   = "";
+    domain  = "";
+    path    = "";
+    expires_str = "";
+
+    expires = 0;
+
+    return;
+}
+
+@q *** (3) Copy constructor.  @>
+@ Copy constructor.
+\initials{LDF 2011.12.22.}
+
+\LOG
+\initials{LDF 2011.12.22.}
+Added this function.
+\ENDLOG
+
+@<|class Cookie_Type| function declarations@>=
+
+Cookie_Type(const Cookie_Type& c);
+
+@
+@<|class Cookie_Type| constructor definitions@>=
+
+Cookie_Type::Cookie_Type(const Cookie_Type& c)
+{
+
+    name        = c.name;
+    value       = c.value;
+    domain      = c.domain;
+    path        = c.path;
+    expires_str = c.expires_str;
+    expires     = c.expires;
+
+    for (vector<pair<string, string> >::const_iterator iter 
+            = c.name_value_pairs.begin();
+         iter != c.name_value_pairs.end();
+         ++iter)
+
+        name_value_pairs.push_back(*iter);
+
+    return;
+}
+
+@q *** (3) Assignment operator.  @>
+@ Assignment operator.
+\initials{LDF 2011.12.22.}
+
+\LOG
+\initials{LDF 2011.12.22.}
+Added this function.
+\ENDLOG
+
+@<|class Cookie_Type| function declarations@>=
+
+void
+operator=(const Cookie_Type& c);
+
+@
+@<|Cookie_Type::operator=| definition@>=
+void
+Cookie_Type::operator=(const Cookie_Type& c)
+{
+
+    name        = c.name;
+    value       = c.value;
+    domain      = c.domain;
+    path        = c.path;
+    expires_str = c.expires_str;
+    expires     = c.expires;
+
+    name_value_pairs.clear();
+
+    for (vector<pair<string, string> >::const_iterator iter 
+            = c.name_value_pairs.begin();
+         iter != c.name_value_pairs.end();
+         ++iter)
+
+        name_value_pairs.push_back(*iter);
+
+    return;
+}
+
+@q *** (3) Equality operator.  @>
+@ Equality operator.
+\initials{LDF 2012.07.23.}
+
+\LOG
+\initials{LDF 2012.07.23.}
+Added this function.
+
+\initials{LDF 2013.03.20.}
+Made this function |const|.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|class Cookie_Type| function declarations@>=
+
+int
+operator==(const Cookie_Type& c) const;
+
+@q **** (4) Definition  @>
+@
+@<|Cookie_Type::operator==| definition@>=
+int
+Cookie_Type::operator==(const Cookie_Type& c) const
+{
+
+    return (name == c.name && value == c.value && domain == c.domain && path == c.path);
+
+}
+
+@q *** (3) Less-than operator.  @>
+@ Less-than operator.
+\initials{LDF 2012.07.24.}
+
+\LOG
+\initials{LDF 2012.07.24.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|class Cookie_Type| function declarations@>=
+
+bool
+operator<(const Cookie_Type& c) const;
+
+@q **** (4) Definition  @>
+@
+@<|Cookie_Type::operator==| definition@>=
+bool
+Cookie_Type::operator<(const Cookie_Type& c) const
+{
+
+    return (expires < c.expires);
+
+}
+
+@q *** (3) Clear.  @>
+@ Clear.
+\initials{LDF 2011.12.22.}
+
+\LOG
+\initials{LDF 2011.12.22.}
+Added this function.
+\ENDLOG
+
+@<|class Cookie_Type| function declarations@>=
+
+void 
+clear();
+
+@
+@<|Cookie_Type::clear| definition@>=
+
+void 
+Cookie_Type::clear()
+{
+
+    name        = "";
+    value       = "";
+    domain      = "";
+    path        = "";
+    expires_str = "";
+    expires     = 0;
+
+    name_value_pairs.clear();
+
+    return;
+
+}
+
+@q *** (3) Show.  @>
+@ Show.
+\initials{LDF 2011.12.22.}
+
+\LOG
+\initials{LDF 2011.12.22.}
+Added this function.
+\ENDLOG
+
+@<|class Cookie_Type| function declarations@>=
+
+void 
+show(string s = "Cookie_Type:", stringstream* t = 0) const;
+
+@
+@<|Cookie_Type::show| definition@>=
+
+void 
+Cookie_Type::show(string s, stringstream *t) const
+{
+
+    stringstream temp_strm;
+
+    temp_strm << s << endl  
+              << "name        == " << name << endl
+              << "value       == " << value << endl
+              << "domain      == " << domain << endl
+              << "path        == " << path  << endl
+              << "expires_str == " << expires_str << endl
+              << "expires     == " << expires  
+              << endl;
+
+    if (name_value_pairs.size() > 0)
+        temp_strm << "name-value pairs:" << endl;
+    else 
+        temp_strm << "No name-value pairs." << endl;
+
+    for (vector<pair<string, string> >::const_iterator iter 
+            = name_value_pairs.begin();
+         iter != name_value_pairs.end();
+         ++iter)
+
+       temp_strm << iter->first << " = " << iter->second << endl;
+      
+    if (t)
+    {
+        *t << temp_strm.str();
+    }
+
+    else
+    {
+        printf("%s", temp_strm.str().c_str());
+    }
+
+    return;
+
+}  /* End of |Cookie_Type::show| definition  */
+
+@q ** (2) Parse Cookies.  @>
+@ Parse Cookies.  
+\initials{LDF 2011.12.22.}
+
+\LOG
+\initials{LDF 2011.12.22.}
+Added this function.
+
+\initials{LDF 2012.01.06.}
+Now handling cookie values correctly and filtering out 
+the |``LtpaToken''|, if present.  See the comment below for an explanation.
+
+\initials{LDF 2012.07.26.}
+Made this function a |static| member function of |class Cookie_Type|.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|class Cookie_Type| function declarations@>=
+
+static
+int 
+parse_cookies(const char *http_cookie_str, 
+              string &session_id, 
+              stringstream &out_strm);
+
+@q *** (3) Definition  @>
+
+@
+@<|Cookie_Type::parse_cookies| definition@>=
+int 
+Cookie_Type::parse_cookies(const char *http_cookie_str, 
+                                         string &session_id, 
+                                         stringstream &out_strm)    
+{
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0);
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+      out_strm << "Entering `parse_cookies'.\n";
+
+   } /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */  
+
+   Cookie_Type curr_cookie;
+
+   string cookie_str = http_cookie_str;
+
+   out_strm << "Before parsing:  `cookie_str' == " << cookie_str << endl;
+
+   while (!cookie_str.empty())
+   {
+      curr_cookie.name  = cookie_str;
+      curr_cookie.value = cookie_str;
+
+      string::size_type s = curr_cookie.name.find("=");
+ 
+      if (s != string::npos)
+      {
+         curr_cookie.name.erase(s);
+         curr_cookie.value.erase(0, s + 1);
+      }
+
+      s = curr_cookie.value.find(";");
+
+      if (s != string::npos)
+      {
+         curr_cookie.value.erase(s);
+      }
+
+      if (cookie_str.size() > curr_cookie.name.size() + curr_cookie.value.size() + 3)
+         cookie_str.erase(0, curr_cookie.name.size() + curr_cookie.value.size() + 3);
+      else
+         cookie_str = "";
+
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+         out_strm << "curr_cookie_name == "  << curr_cookie.name.c_str()
+                  << endl 
+                  << "curr_cookie_value == " << curr_cookie.value.c_str()
+                  << endl 
+                  << "cookie_str == "        << cookie_str.c_str()
+                  << endl;
+                                  
+      } /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */  
+      
+@  On \.{pcfinston.gwdg.de}, the ``LtpaToken'' 
+(|curr_cookie.name == "LtpaToken"|) is always present,
+but apparently not stored by the browser.  It seems that it always 
+has the same value when the application is accessed multiple times.
+I don't know when it changes, if ever.  Nor do I know what it's for.
+@:TODO@> !! TODO:  Look into this.  This is, however, not urgent.
+\par
+If I push it onto |cookie_vector|, it appears multiple times in the 
+|HTTP_COOKIE| environment variable, so I don't do this.
+\initials{LDF 2012.01.06.}
+\initials{LDF 2012.07.23.}
+
+\LOG
+\initials{LDF 2012.07.23.}
+Now only pushing a cookie onto |cookie_vector| if 
+|curr_cookie.name == "gwirdsif_session_id"|.  That is, no 
+longer pushing arbitrary cookies onto |cookie_vector|.  
+If I start using other cookies, they can be pushed onto it, too.
+\ENDLOG 
+
+@<|Cookie_Type::parse_cookies| definition@>=
+
+      if (curr_cookie.name == "gwirdsif_session_id")
+      {
+
+         pthread_mutex_lock(&session_data_mutex);
+
+         session_id = curr_cookie.value;
+
+         vector<Cookie_Type>::iterator iter = find(cookie_vector.begin(), 
+                                                   cookie_vector.end(), curr_cookie);
+
+         if (iter != cookie_vector.end())
+         {
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                 out_strm << "In `parse_cookies':  "
+                          << "Found matching cookie in `cookie_vector'."
+                          << endl
+                          << "Will update `expires_str' field."
+                          << endl;
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */            
+
+            iter->expires_str = get_datestamp(2, 0, &iter->expires);
+
+         }  /* |if| */
+
+         else
+         {
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                 out_strm << "In `parse_cookies':  "
+                          << "No matching cookie in `cookie_vector'."
+                          << endl
+                          << "Will push `curr_cookie' onto it."
+                          << endl;
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */            
+
+            curr_cookie.expires_str = get_datestamp(2, 0, &curr_cookie.expires);
+            cookie_vector.push_back(curr_cookie);
+
+         }  /* |else|  */
+
+         pthread_mutex_unlock(&session_data_mutex);
+
+      }  /* |if (curr_cookie.name == "gwirdsif_session_id")|  */
+
+   }  /* |while (!cookie_str.empty())|  */  
+
+@
+@<|Cookie_Type::parse_cookies| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+      out_strm << "Exiting `parse_cookies'.\n";
+
+   } /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */  
+
+   return 0;
+
+}  /* End of |Cookie_Type::parse_cookies| definition  */
+
+
+@q ** (2) Generate session ID (|generate_session_id|).  @>
+
+@ Generate session ID (|generate_session_id|).  
+\initials{LDF 2012.01.09.}
+
+\LOG
+\initials{LDF 2012.01.09.}
+Added this function.
+
+\initials{LDF 2012.07.26.}
+Made this function a |static| member function of |Cookie_Type|.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|class Cookie_Type| function declarations@>=
+static
+int
+generate_session_id(string &session_id, 
+                    stringstream &out_strm);
+
+@q *** (3) Definition  @>
+@
+@<|Cookie_Type::generate_session_id| definition@>=
+
+int
+Cookie_Type::generate_session_id(string &session_id, 
+                                 stringstream &out_strm)
+{
+@q **** (4) @>
+
+    bool DEBUG = false;  /* |true|  */
+    set_debug_level(DEBUG, 0, 0);
+
+    FILE *fp = 0;
+
+    int status;
+
+@q **** (4) @>
+@
+@<|Cookie_Type::generate_session_id| definition@>=
+
+    fp = fopen("/dev/urandom", "r");
+
+    if (fp == 0)
+    {
+
+      out_strm << "ERROR!  In `generate_session_id':  `fopen' failed:" << endl
+                << "fopen error:  " << strerror(errno)
+                << endl
+                << "Failed to open `/dev/urandom'.  Can't generate session ID."
+                << endl
+                << "Exiting function unsuccessfully "
+                << "with return value 1."
+                << endl;
+
+           return 1;
+
+    }  /* |if (fp == 0)|  */
+
+    else if (DEBUG)
+    {
+       out_strm << "In `generate_session_id':  `fopen' succeeded." << endl;
+
+    } /* |else if (DEBUG)|  */ 
+
+@q **** (4) @>
+@
+@<|Cookie_Type::generate_session_id| definition@>=
+
+    if (DEBUG)
+    {
+        out_strm.str("");
+
+        if (session_id_vector.size() == 0)
+           out_strm << "In `generate_session_id':  session_id_vector.size() == 0"
+                     << endl;
+
+        else
+        {
+            for (vector<string>::const_iterator iter = session_id_vector.begin();
+                 iter != session_id_vector.end();
+                 ++iter)
+               out_strm << "`*iter' == " << *iter << endl;
+
+        }
+
+
+    } /* |if (DEBUG)|  */ 
+
+@q **** (4) @>
+@
+@<|Cookie_Type::generate_session_id| definition@>=
+
+    char buffer[16];
+    char c;
+
+    int i;
+
+    vector<string>::const_iterator iter;
+
+    for(;;)
+    {
+@q ***** (5) @>
+
+       memset(buffer, 0, 16);
+
+       for (i = 0; i < 15;)  /* Increment |i| below, not here!  \initials{LDF 2012.01.09.}  */
+       {
+           c = fgetc(fp);
+
+           if (isalnum(c))
+           {
+#if DEBUG_COMPILE
+              if (DEBUG)
+              {
+                  out_strm << "i == " << i << ", c == " << c << endl;
+
+              } /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */  
+
+              buffer[i++] = c;
+           }
+
+       }  /* Inner |for|  */
+
+@q ***** (5) @>
+
+      if (session_id_vector.size() == 0)
+      {
+          session_id = buffer;
+
+          if (DEBUG)
+          {
+              out_strm << "In `generate_session_id':  "
+                        << "`session_id_vector' is empty.  Not comparing strings."
+                        << endl
+                        << "`buffer' == " << buffer << endl
+                        << "`session_id' == " << session_id << endl
+                        << "Breaking."
+                        << endl;
+
+
+         } /* |if (DEBUG)|  */ 
+
+         break;
+      
+      }  /* |if|  */
+
+@q ***** (5) @>
+
+      if (DEBUG)
+      {
+          out_strm << "`buffer' == " << buffer << endl;
+
+        
+      } /* |if (DEBUG)|  */ 
+
+      pthread_mutex_lock(&session_data_mutex);
+      iter = find(session_id_vector.begin(), session_id_vector.end(), string(buffer));
+       
+      if (iter != session_id_vector.end())
+      {
+
+          out_strm << "WARNING!  In `generate_session_id':  "
+                    << "Random string found in `session_id_vector'!"
+                    << endl
+                    << "This is very unlikely to happen, so something "
+                    << "has probably gone wrong."
+                    << endl
+                    << "`buffer' == " << buffer << endl
+                    << "`*iter' == " << *iter << endl
+                    << "Iterating."
+                    << endl;
+
+          pthread_mutex_unlock(&session_data_mutex);
+          continue;
+
+      }
+      else
+      {
+
+          session_id = buffer;
+
+          if (DEBUG)
+          {
+
+              out_strm << "In `generate_session_id':  "
+                        << "Found random string not in `session_id_vector'."
+                        << endl
+                        << "This is what's supposed to happen."
+                        << endl
+                        << "`buffer' == " << buffer << endl
+                        << "`session_id' == " << session_id << endl
+                        << "Breaking."
+                        << endl;
+
+
+ 
+         }  /* |if (DEBUG)|  */ 
+
+         pthread_mutex_unlock(&session_data_mutex);
+         break;
+
+      }  /* |else|  */
+     
+@q ***** (5) @> 
+
+    }  /* Outer |for|  */   
+
+    fclose(fp);
+    fp = 0;
+
+    Cookie_Type curr_cookie;
+
+    curr_cookie.name    = "gwirdsif_session_id";
+    curr_cookie.value   = session_id;
+    curr_cookie.expires_str = get_datestamp(2, 0, &curr_cookie.expires);
+
+    cookie_vector.push_back(curr_cookie);
+
+@q **** (4) @>
+
+    return 0;
+
+} /* End of |Cookie_Type::generate_session_id| definition.  */
+
+@q *** (3) Deleted expired cookies (|delete_expired_cookies|).  @>
+
+@ Deleted expired cookies (|delete_expired_cookies|).
+\initials{LDF 2012.07.24.}
+
+\LOG
+\initials{LDF 2012.07.24.}
+Added this thread function.
+
+\initials{LDF 2012.11.16.}
+Now passing |unsigned int sleep_val| to this function using the |void *v| argument.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|class Cookie_Type| function declarations@>=
+
+static
+void*
+delete_expired_cookies(void* v);
+
+@q **** (4) Definition  @>
+@
+@<|Cookie_Type::delete_expired_cookies| definition@>=
+void*
+Cookie_Type::delete_expired_cookies(void* v)
+{
+@q ***** (5) @>
+
+    bool DEBUG = false;  /* |true|  */
+    set_debug_level(DEBUG, 0, 0);
+
+#if DEBUG_COMPILE
+    if (DEBUG)
+    {
+        pthread_mutex_lock(&log_strm_mutex); 
+        log_strm << "Entering `delete_expired_cookies'."
+                 << endl;
+        pthread_mutex_unlock(&log_strm_mutex); 
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */
+
+    unsigned int sleep_val = *static_cast<unsigned int*>(v); 
+
+    time_t now;
+    vector<Cookie_Type>::iterator iter;
+
+@q ***** (5) Outer |for|.  @>
+@
+@<|Cookie_Type::delete_expired_cookies| definition@>=
+
+    for (;;)  /* Loop forever  */
+    { 
+@q ****** (6) @>
+
+        pthread_mutex_lock(&cookie_vector_mutex);
+
+        if (cookie_vector.size() == 0)
+        {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               pthread_mutex_lock(&log_strm_mutex);
+               log_strm << "In `delete_expired_cookies':  "
+                        << "`cookie_vector.size()' == 0.  Going to sleep."
+                        << endl; 
+               pthread_mutex_unlock(&log_strm_mutex); 
+
+               pthread_mutex_unlock(&cookie_vector_mutex);
+               goto DELETE_EXPIRED_COOKIES_SLEEP;
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+        }  /* |if (cookie_vector.size() == 0)|  */
+
+@q ****** (6) |cookie_vector| isn't empty.  @>
+
+@ |cookie_vector| isn't empty.  
+\initials{LDF 2012.07.24.}
+
+@<|Cookie_Type::delete_expired_cookies| definition@>=
+
+        now = time(0);
+
+        sort(cookie_vector.begin(), cookie_vector.end());
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            pthread_mutex_lock(&log_strm_mutex);
+            log_strm << "In `delete_expired_cookies':  "
+                     << "`cookie_vector.size()' == " << cookie_vector.size()
+                     << endl 
+                     << "Starting inner loop."
+                     << endl;
+            pthread_mutex_unlock(&log_strm_mutex); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+        for (iter =  cookie_vector.begin();
+             iter != cookie_vector.end();
+             ++iter)
+        {
+@q ******* (7) @>
+
+            if (iter->expires < now)
+            {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+                if (DEBUG)
+                {
+                    pthread_mutex_lock(&log_strm_mutex);
+                    log_strm << "In `delete_expired_cookies':  Expired cookie found.  "
+                             << "Will delete expired cookies."
+                             << endl;
+                    pthread_mutex_unlock(&log_strm_mutex); 
+
+                }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+           
+                break;   
+
+@q ******** (8) @>
+
+            }  /* |if (iter->expires < now)|  */
+            
+@q ******* (7) @>
+    
+        }  /* inner |for|  */
+
+@q ****** (6) @>
+@
+@<|Cookie_Type::delete_expired_cookies| definition@>=
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            pthread_mutex_lock(&log_strm_mutex);
+            log_strm << "In `delete_expired_cookies':  After inner loop."
+                     << endl;
+            pthread_mutex_unlock(&log_strm_mutex); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q ****** (6) @>
+@
+@<|Cookie_Type::delete_expired_cookies| definition@>=
+
+        if (iter != cookie_vector.end())
+        {
+             cookie_vector.erase(iter, cookie_vector.end());
+
+#if DEBUG_COMPILE
+                if (DEBUG)
+                {
+                    pthread_mutex_lock(&log_strm_mutex);
+                    log_strm << "In `delete_expired_cookies':  "
+                             << "Deleted expired cookies."
+                             << endl
+                             << "`cookie_vector.size()' == " << cookie_vector.size()
+                             << endl;
+                    pthread_mutex_unlock(&log_strm_mutex); 
+
+                }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+        }  /* |if (iter != cookie_vector.end())|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       pthread_mutex_lock(&log_strm_mutex); 
+       log_strm << "In `delete_expired_cookies':  `iter' == `cookie_vector.end()':  "
+                << "No expired cookies.  Not deleting."
+                << endl;
+       pthread_mutex_unlock(&log_strm_mutex);  
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+        pthread_mutex_unlock(&cookie_vector_mutex); 
+
+@q ****** (6) @>
+
+DELETE_EXPIRED_COOKIES_SLEEP:
+
+        pthread_mutex_lock(&log_strm_mutex);
+        log_strm << "In `delete_expired_cookies':  Going to sleep for " << sleep_val << " seconds "
+                 << "(" << (sleep_val * 60) << " minutes) ..."
+                 << endl;
+        pthread_mutex_unlock(&log_strm_mutex); 
+
+        sleep(sleep_val);  
+
+        pthread_mutex_lock(&log_strm_mutex);
+        log_strm << "In `delete_expired_cookies':  Woke up."
+                 << endl;
+        pthread_mutex_unlock(&log_strm_mutex); 
+
+        continue;
+     
+@q ****** (6) @>  
+
+    }  /* outer |for|  */
+
+@q ***** (5) @>
+
+    return 0;  /* Should never be reached.  \initials{LDF 2012.07.24.}  */
+
+}  /* End of |delete_expired_cookies| definition  */
+
+@q ** (2) Putting `ckietype.web' together.  @>
+
+@ Putting `ckietype.web' together.  
+\initials{LDF 2010.10.06.}
+
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+
+@<|class Cookie_Type| declaration@>@;@/
+@<|Cookie_Type| Global variables@>@;@/
+@<|class Cookie_Type| constructor definitions@>@;@/
+@<|Cookie_Type::operator=| definition@>@;@/
+@<|Cookie_Type::operator==| definition@>@;@/
+@<|Cookie_Type::clear| definition@>@;@/
+@<|Cookie_Type::show| definition@>@;@/
+@<|Cookie_Type::parse_cookies| definition@>@;@/
+@<|Cookie_Type::generate_session_id| definition@>@;@/
+@<|Cookie_Type::delete_expired_cookies| definition@>@;@/
+
+@q **** (4) This is what's written to the header file `ckietype.h'.  @>
+
+@ This is what's written to the header file \filename{ckietype.h}.
+@
+@(ckietype.h@>=
+#ifndef CKIETYPE_H
+#define CKIETYPE_H 1
+using namespace std;
+using namespace gwrdifpk;
+@<|class Cookie_Type| declaration@>@;@/
+@<|Cookie_Type| |extern| declarations for global variables@>@;@/
+#endif 
+
+
+
+
+
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode) (setq abbrev-mode t)  @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

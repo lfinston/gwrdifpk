@@ -1,0 +1,223 @@
+@q optpsgwv.web  @>
+
+@q Created by Laurence D. Finston (LDF) Thu May 24 16:02:45 CEST 2012  @>
+
+@q * (1) Top @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+@q * (1) TeX code for CWEAVE.  @>
+
+\newlinechar=`^^J
+
+\newtoks\parttoks
+
+\parttoks={Part V:  Generate Passwords/Passphrases}
+
+\def\docname{OptiNum Grid Installer}
+
+\font\ninerm=cmr9
+\let\mc=\ninerm % medium caps
+
+\def\filename#1{\.{#1}}
+
+\def\9#1{#1}
+
+\newif\ifdoinitials
+\doinitialstrue
+
+\def\initials#1{\ifdoinitials\leavevmode
+\hbox{{\ninerm $\lbrack$#1$\rbrack$\hskip .375em plus .5pt minus .5pt}}\fi}
+
+\def\<#1>{$\langle${\it #1\/}$\rangle$}
+
+\def\PERIOD{.}
+
+%% LDF 2002.10.27.  (Copied from GNU 3DLDF)  
+%% These macros are for my log comments.  Log
+%% comments describe changes I've made and 
+%% contain other information.  It may not always be desirable to print
+%% them, so they can be suppressed by setting \dologfalse.
+
+\newif\ifdolog
+
+\dologtrue
+%\dologfalse
+
+\ifdolog
+\message{^^JPrinting log entries.}
+\def\SUBLOG#1{\setbox1=\hbox{{\bf\kern1em #1\kern1em}}%
+\dimen0=1ex
+\dimen1=1ex\advance\dimen1 by -.375pt
+\dimen2=\hsize
+\advance\dimen2 by -\wd1
+\skip0=3pt}
+
+\def\LOG{\begingroup\doinitialstrue
+   \SUBLOG{Log}%
+   \medskip\par\noindent
+   \vbox{\line{\vrule height \dimen0 width .5\dimen2 depth -\dimen1
+   \copy1\vrule height \dimen0 width .5\dimen2 depth -\dimen1}%
+   \vskip\skip0}\nobreak\par\nobreak}
+
+\def\ENDLOG{\nobreak\par
+   \nobreak
+   \vskip\skip0
+   \vbox{\line{\vrule height \dimen0 width \hsize depth -\dimen1}}%
+   \endgroup}
+
+\else
+
+\message{^^JNot printing log entries.}
+\long\def\LOG#1{\ifx#1\ENDLOG\let\SUBLOG=\relax\else\def\SUBLOG{\LOG}\fi
+\SUBLOG}
+\fi
+
+%% ** (2) Datestamp
+
+\newcount\ampmhours
+\newtoks\AMPM
+\newcount\hours
+\newcount\minutes
+
+\newtoks\datestamp
+
+\hours=\time
+\divide\hours by 60
+\minutes=\time
+\multiply\hours by 60
+\advance\minutes by -\hours
+\divide\hours by 60
+\ifnum\minutes<10\def\minutestring{0\the\minutes}\else\def\minutestring{\the%
+\minutes}\fi
+
+\def\monthstring{\ifcase\the\month\or January\or February\or March\or April\or May%
+\or June\or July\or August\or September\or October\or November\or
+December\else\errmessage{This can't happen!}\fi}
+
+\ampmhours=\hours
+
+\ifnum\ampmhours>12
+\advance\ampmhours by -12
+\AMPM={PM}\else
+\AMPM={AM}\fi
+
+\def\datestamp{\the\ampmhours :\minutestring\space\the\AMPM\space%
+on \monthstring\space \the\day, \the\year}
+
+@q ** (2) Function declarations.  @>
+
+@q ** (2) Title.  @>
+
+@** Generate Passwords/Passphrases.
+Additionally, a checksum can be generated for each 
+password or passphrase, using one of several checksum utilities.  See below 
+for more information.
+\initials{LDF 2012.03.07.}
+                  
+@s bitset int
+
+@s bool   int
+@s bools   bool
+
+@s ifstream int
+@s ifstreams ifstream
+
+@s iterator int
+@s iterators iterator 
+
+@s key_type int 
+@s key_types key_type 
+
+@s mapped_type int 
+@s mapped_types mapped_type 
+
+@s map int
+@s maps map
+
+@s multimap map
+@s multimaps multimap
+
+@s ofstream int
+@s ofstreams ofstream
+
+@s stat int
+
+@s pair int
+@s pairs pair
+
+@s stringstream int
+@s stringstreams stringstream
+
+@s numeric_limits int
+
+@s pair   int
+@s pairs pair
+
+@s string char
+@s strings string
+
+@s tm int
+
+@s typedefs typedef
+
+@s valarray int
+@s valarrays valarray
+
+@s vector int 
+@s vectors vector
+
+@i optpsgen.web
+
+@i optpsgsb.web
+
+@q * (1) @>
+
+
+@q (progn (cweb-mode) (outline-minor-mode))                                @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

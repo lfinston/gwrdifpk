@@ -1,0 +1,842 @@
+@q rspnstp.web  @>
+@q Created by Laurence D. Finston (LDF) Mon Jul 30 12:10:02 CEST 2012  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q ** (2)  rspnstp.web  @>
+@* {\bf class Response\_Type}.
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+#include <stdlib.h>  /* Standard Library for C  */
+#include <stdio.h>
+
+#if 0 
+#include <errno.h>
+#endif 
+
+#include <fstream> /* Standard Template Library (STL) for C++  */
+#include <iomanip>
+#include <ios>
+#include <iostream>
+
+#include <map>
+#include <set>
+#include <deque>
+#include <string>
+#include <vector>
+
+#if 0 
+#include <time.h>
+#include <math.h>
+#endif 
+
+#include <sstream>  
+
+#include <pthread.h>  /* POSIX threads  */
+
+#include <mysql.h>
+
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif 
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "hndlvltp.h++"
+#include "rspnstp.h++"
+#include "irdsavtp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "pullrqtp.h++"
+
+@q ** (2) |class Response_Type|. @>
+@ {\bf class Response\_Type}.
+\initials{LDF 2012.07.30.}
+
+\LOG
+\initials{LDF 2012.07.30.}
+Added this type declaration.
+
+\initials{LDF 2012.10.16.}
+Added |static const unsigned int SEND_HANDLE_TYPE| and |Handle_Value_Type *handle|.
+
+\initials{LDF 2012.11.22.}
+Added |unsigned int pid_options| and the |string| 
+data members |pid_str|, |pid_prefix_str|, |pid_suffix_str|, 
+|pid_institute_str| and |temporary_filename|.
+
+\initials{LDF 2012.11.27.}
+Added |static const unsigned int LS_TYPE|.
+
+\initials{LDF 2012.12.13.}
+Added |static const unsigned int SEND_METADATA_TYPE|.
+
+\initials{LDF 2012.12.31.}
+Added |unsigned int metadata_options|.
+
+\initials{LDF 2013.03.06.}
+Added |friend| declaration for |client_sending_file_rule_func|.
+
+\initials{LDF 2013.04.03.}
+Added data members |static const unsigned int END_SERVER_TYPE|,
+|static const unsigned int PWD_TYPE|, |static const unsigned int CD_TYPE|
+and |string dirname|.
+
+\initials{LDF 2013.04.04.}
+Added |static const unsigned int GET_TYPE|.
+
+\initials{LDF 2013.04.19.}
+Added |static const unsigned int SLEEP_TYPE| and |int int_val|.
+
+\initials{LDF 2013.04.25.}
+Added |vector<string> string_vector|.
+
+\initials{LDF 2013.04.25.}
+Added |static const unsigned int MKDIR_TYPE|.
+
+\initials{LDF 2013.05.03.}
+Added |static const unsigned int SHOW_CERTIFICATE_TYPE|.
+
+\initials{LDF 2013.05.22.}
+Added |friend| declarations for |distinguished_name_rule_func| and |get_user_info_func|.
+
+\initials{LDF 2013.05.23.}
+Added the following |static const unsigned int| data members:
+|RM_TYPE|,
+|GET_METADATA_TYPE|,
+|GET_HANDLE_TYPE|,
+|SEND_TAN_LIST_TYPE|.
+|PROCESS_PENDING_TYPE|.
+
+\initials{LDF 2013.05.24.}
+Made |unsigned int pid_options| and |unsigned int metadata_options| separate variables.
+Formerly, they were in a union.
+
+\initials{LDF 2013.05.24.}
+Added |static const unsigned int GET_USER_INFO_TYPE|, 
+|static const unsigned int CREATE_HANDLE_TYPE|, 
+|string string_val|
+and |bool no_delay|.
+
+\initials{LDF 2013.05.27.}
+Added |static const unsigned int MAX_RESPONSE_TYPE|.
+
+\initials{LDF 2013.06.15.}
+Added |static const unsigned int ADD_HANDLE_VALUE_TYPE|.
+
+\initials{LDF 2013.06.16.}
+Added private data member |Handle_Value_Triple hvt|.
+
+\initials{LDF 2013.07.04.}
+Added |static const unsigned int DELETE_HANDLE_TYPE|.
+
+\initials{LDF 2013.08.07.}
+Added |unsigned int options| and |unsigned long int delay_val|.
+
+\initials{LDF 2013.08.15.}
+Replaced |static const unsigned int RM_TYPE| with |UNDELETE_FILE_TYPE|.
+The former was no longer being used.
+
+\initials{LDF 2013.08.21.}
+Added |static const unsigned int UNDELETE_HANDLE_TYPE|.
+
+\initials{LDF 2013.08.26.}
+Renamed |unsigned long int delay_val| to |delay_value| to match 
+|Scan_Parse_Parameter_Type::delay_value|.
+
+\initials{LDF 2013.08.30.}
+Added |static const unsigned int DELETE_HANDLE_VALUE_TYPE| and 
+|static const unsigned int UNDELETE_HANDLE_VALUE_TYPE|.
+
+\initials{LDF 2013.09.11.}
+Added |friend| declaration for |class Handle_Value_Type|.
+
+\initials{LDF 2013.10.31.}
+Added the |static const unsigned int| constants |DELETE_METADATA_TYPE|
+and |UNDELETE_METADATA_TYPE|.
+
+\initials{LDF 2013.11.21.}
+Added |friend| declaration for |class Dublin_Core_Metadata_Type|.
+
+\initials{LDF 2013.12.06.}
+Added |static const unsigned int SHOW_METADATA_TYPE|.
+
+\initials{LDF 2013.12.06.}
+Added |vector<int> int_vector|.  It's used in |yyparse|.
+
+\initials{LDF 2013.12.18.}
+Changed the name of |static const unsigned int SHOW_METADATA_TYPE| 
+to |static const unsigned int FETCH_DC_METADATA_TYPE|.
+
+\initials{LDF 2013.12.19.}
+Added |static const unsigned int MV_TYPE|.
+
+\initials{LDF 2013.12.25.}
+Added the |static const unsigned int| variables 
+|GENERATE_CHECKSUM_TYPE| and |VERIFY_CHECKSUM_TYPE|.
+
+\initials{LDF 2014.01.10.}
+Added |string gpg_key_id|.
+
+\initials{LDF 2014.01.13.}
+Changed name of |string gpg_key_id| to |gpg_key_fingerprint|.
+
+\initials{LDF 2014.01.21.}
+Added |static const unsigned int STORE_PUBLIC_KEY_TYPE|.
+
+\initials{LDF 2014.01.22.}
+Added |static const unsigned int SEND_PUBLIC_KEY_TYPE|.
+
+\initials{LDF 2014.01.31.}
+Added |static const unsigned int REGISTER_PULL_TYPE|.
+
+\initials{LDF 2014.02.03.}
+Added |void *pointer_val|.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|class Response_Type| declaration@>=
+
+class Response_Type
+{
+   friend int yyparse(yyscan_t parameter);
+
+   friend class Scan_Parse_Parameter_Type;
+
+   friend class Irods_Object_Type;
+
+   friend class Handle_Value_Type;
+
+   friend class Dublin_Core_Metadata_Type;
+
+   friend int exchange_data_with_server(Scan_Parse_Parameter_Type&);
+   friend int exchange_data_with_client(Scan_Parse_Parameter_Type&);
+
+   friend int client_sending_file_rule_func(Scan_Parse_Parameter_Type *param, 
+                                            string filename, 
+                                            int reference,
+                                            unsigned int options);
+
+   friend int distinguished_name_rule_func(Scan_Parse_Parameter_Type*, const char*);
+
+   friend int get_user_info_func(Scan_Parse_Parameter_Type*, const char*);
+
+   private:
+
+      unsigned int type;
+      string local_filename;
+
+      string remote_filename;
+
+      string temporary_filename;
+
+      string dirname;
+
+      string command;
+  
+      string flags;
+
+      unsigned int options;  /* For general use.  \initials{LDF 2013.08.07.}  */
+
+      unsigned int metadata_options;
+      unsigned int pid_options;
+
+
+      string pid_str;             
+      string pid_prefix_str;
+      string pid_suffix_str;
+      string pid_institute_str;
+
+      string gpg_key_fingerprint;
+
+      Handle_Type *handle;
+
+      Handle_Value_Triple hvt;
+
+      int int_val;
+      string string_val;
+
+      bool no_delay;
+
+      unsigned long int delay_value;
+
+      vector<string> string_vector;
+      vector<int>    int_vector;
+
+      void *pointer_val;
+
+   public:
+
+      static map<unsigned int, string> typename_map;
+
+      static const unsigned int NULL_RESPONSE_TYPE;
+      static const unsigned int COMMAND_ONLY_TYPE;
+      static const unsigned int SEND_FILE_TYPE;
+      static const unsigned int RECEIVE_PUT_FILE_TYPE;
+      static const unsigned int RECEIVE_METADATA_FILE_TYPE;
+      static const unsigned int SEND_HANDLE_TYPE;
+      static const unsigned int LS_TYPE;
+      static const unsigned int MV_TYPE;
+      static const unsigned int PWD_TYPE;
+      static const unsigned int CD_TYPE;
+      static const unsigned int MKDIR_TYPE;
+      static const unsigned int UNDELETE_FILE_TYPE;
+      static const unsigned int MARK_IRODS_OBJECTS_FOR_DELETION_TYPE;
+      static const unsigned int GET_TYPE;
+      static const unsigned int SEND_METADATA_TYPE;
+      static const unsigned int END_SERVER_TYPE;
+      static const unsigned int SLEEP_TYPE;
+      static const unsigned int SHOW_CERTIFICATE_TYPE;
+      static const unsigned int GET_METADATA_TYPE;
+      static const unsigned int GET_HANDLE_TYPE;
+      static const unsigned int SEND_TAN_LIST_TYPE;
+      static const unsigned int PROCESS_PENDING_TYPE;
+      static const unsigned int GET_USER_INFO_TYPE;
+      static const unsigned int CREATE_HANDLE_TYPE;
+      static const unsigned int ADD_HANDLE_VALUE_TYPE;
+      static const unsigned int DELETE_HANDLE_TYPE;
+      static const unsigned int UNDELETE_HANDLE_TYPE;
+      static const unsigned int DELETE_HANDLE_VALUE_TYPE;
+      static const unsigned int UNDELETE_HANDLE_VALUE_TYPE;
+      static const unsigned int DELETE_METADATA_TYPE;
+      static const unsigned int UNDELETE_METADATA_TYPE;
+      static const unsigned int FETCH_DC_METADATA_TYPE;
+      static const unsigned int GENERATE_CHECKSUM_TYPE;
+      static const unsigned int VERIFY_CHECKSUM_TYPE;
+      static const unsigned int STORE_PUBLIC_KEY_TYPE; 
+      static const unsigned int SEND_PUBLIC_KEY_TYPE; 
+      static const unsigned int REGISTER_PULL_TYPE; 
+
+      static const unsigned int MAX_RESPONSE_TYPE;
+
+   @<|Response_Type| function declarations@>@;
+
+};
+
+@q *** (3) Initialize |static| |Response_Type| member variables.  @>
+
+@ Initialize {\bf static} {\bf Response\_Type} member variables.  
+\initials{LDF 2012.07.30.}
+
+@<Initialize |static| constant |Response_Type| member variables@>=
+
+   const unsigned int Response_Type::NULL_RESPONSE_TYPE                   =  0;   
+   const unsigned int Response_Type::COMMAND_ONLY_TYPE                    =  1;  
+   const unsigned int Response_Type::SEND_FILE_TYPE                       =  2;
+   const unsigned int Response_Type::RECEIVE_PUT_FILE_TYPE                =  3;
+   const unsigned int Response_Type::RECEIVE_METADATA_FILE_TYPE           =  4;
+   const unsigned int Response_Type::SEND_HANDLE_TYPE                     =  5;
+   const unsigned int Response_Type::LS_TYPE                              =  6;
+   const unsigned int Response_Type::MV_TYPE                              =  7; 
+   const unsigned int Response_Type::PWD_TYPE                             =  8;
+   const unsigned int Response_Type::CD_TYPE                              =  9;
+   const unsigned int Response_Type::MKDIR_TYPE                           = 10; 
+   const unsigned int Response_Type::UNDELETE_FILE_TYPE                   = 11;   
+   const unsigned int Response_Type::MARK_IRODS_OBJECTS_FOR_DELETION_TYPE = 12;
+   const unsigned int Response_Type::GET_TYPE                             = 13;
+   const unsigned int Response_Type::SEND_METADATA_TYPE                   = 14;
+   const unsigned int Response_Type::END_SERVER_TYPE                      = 15;
+   const unsigned int Response_Type::SLEEP_TYPE                           = 16;
+   const unsigned int Response_Type::SHOW_CERTIFICATE_TYPE                = 17;
+   const unsigned int Response_Type::GET_METADATA_TYPE                    = 18;
+   const unsigned int Response_Type::GET_HANDLE_TYPE                      = 19;
+   const unsigned int Response_Type::SEND_TAN_LIST_TYPE                   = 20;
+   const unsigned int Response_Type::PROCESS_PENDING_TYPE                 = 21;
+   const unsigned int Response_Type::GET_USER_INFO_TYPE                   = 22;
+   const unsigned int Response_Type::CREATE_HANDLE_TYPE                   = 23;
+   const unsigned int Response_Type::ADD_HANDLE_VALUE_TYPE                = 24;
+   const unsigned int Response_Type::DELETE_HANDLE_TYPE                   = 25;
+   const unsigned int Response_Type::UNDELETE_HANDLE_TYPE                 = 26;
+   const unsigned int Response_Type::DELETE_HANDLE_VALUE_TYPE             = 27;
+   const unsigned int Response_Type::UNDELETE_HANDLE_VALUE_TYPE           = 28;
+   const unsigned int Response_Type::DELETE_METADATA_TYPE                 = 29;
+   const unsigned int Response_Type::UNDELETE_METADATA_TYPE               = 30;
+   const unsigned int Response_Type::FETCH_DC_METADATA_TYPE               = 31;
+   const unsigned int Response_Type::GENERATE_CHECKSUM_TYPE               = 32;
+   const unsigned int Response_Type::VERIFY_CHECKSUM_TYPE                 = 33;
+   const unsigned int Response_Type::STORE_PUBLIC_KEY_TYPE                = 34;
+   const unsigned int Response_Type::SEND_PUBLIC_KEY_TYPE                 = 35;
+   const unsigned int Response_Type::REGISTER_PULL_TYPE                   = 36; 
+
+   const unsigned int Response_Type::MAX_RESPONSE_TYPE                    = 36; 
+      /* |MAX_RESPONSE_TYPE| should always have the highest value assigned
+         to another |Response_Type| constant.
+         \initials{LDF 2013.05.27.}
+
+      */
+
+   map<unsigned int, string> Response_Type::typename_map;
+
+
+@q *** (3) Response_Type functions.  @>
+@  {\bf Response\_Type\_Functions}.
+\initials{LDF 2012.07.30.}
+
+
+@q **** (4) Default constructor.  @>
+@ Default constructor.
+\initials{LDF 2012.07.30.}
+
+@q ***** (5) Declaration  @>
+
+@<|Response_Type| function declarations@>=
+Response_Type(void);
+
+@q ***** (5) Definition  @>
+@
+@<|Response_Type| constructor definitions@>=
+
+Response_Type::Response_Type(void)
+{
+
+   type = NULL_RESPONSE_TYPE;
+
+   options = metadata_options = pid_options = 0U;
+
+   handle = 0;
+
+   int_val = 0;
+
+   delay_value = 0UL;
+
+   no_delay = false;
+ 
+   pointer_val = static_cast<void*>(0);
+
+   return;
+
+}  /* End of |Response_Type| default constructor definition  */
+
+@q **** (4) Copy constructor.  @>
+@ Copy constructor.
+\initials{LDF 2013.03.01.}
+
+\LOG
+\initials{LDF 2013.05.24.}
+Now calling assignment operator.
+\ENDLOG 
+
+@q ***** (5) Declaration  @>
+
+@<|Response_Type| function declarations@>=
+Response_Type(const Response_Type &r);
+
+@q ***** (5) Definition  @>
+@
+@<|Response_Type| constructor definitions@>=
+
+Response_Type::Response_Type(const Response_Type &r)
+{
+
+   operator=(r);
+
+   return;
+
+}  /* End of |Response_Type| copy constructor definition  */
+
+@q **** (4) Destructor.  @>
+@ Destructor.
+\initials{LDF 2012.09.06.}
+
+\LOG
+\initials{LDF 2012.09.06.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|Response_Type| function declarations@>=
+~Response_Type(void);
+
+@q ***** (5) Definition  @>
+@
+@<|Response_Type| destructor definition@>=
+
+Response_Type::~Response_Type(void)
+{
+
+   string_vector.clear();
+   int_vector.clear();
+
+   if (handle)
+      delete handle;
+
+   return;
+
+}  /* End of |Response_Type| destructor definition  */
+
+@q **** (4) Assignment operator  @>
+@ Assignment operator.
+\initials{LDF 2013.05.24.}
+
+@q ***** (5) Declaration  @>
+
+@<|Response_Type| function declarations@>=
+
+const Response_Type&
+operator=(const Response_Type &r);
+
+@q ***** (5) Definition  @>
+@
+@<|Response_Type::operator=| definition@>=
+
+const Response_Type&
+Response_Type::operator=(const Response_Type &r)
+{
+
+   type                = r.type;
+   local_filename      = r.local_filename;
+   remote_filename     = r.remote_filename;
+   temporary_filename  = r.temporary_filename;
+   dirname             = r.dirname;
+   command             = r.command;
+   flags               = r.flags;
+   int_val             = r.int_val;
+   delay_value         = r.delay_value;
+   string_val          = r.string_val;
+   no_delay            = r.no_delay;
+   pid_str             = r.pid_str;             
+   pid_prefix_str      = r.pid_prefix_str;
+   pid_suffix_str      = r.pid_suffix_str;
+   pid_institute_str   = r.pid_institute_str;
+   gpg_key_fingerprint = r.gpg_key_fingerprint;
+
+   hvt                 = r.hvt;
+
+   options             = r.options;
+   metadata_options    = r.metadata_options;
+   pid_options         = r.pid_options;
+ 
+   if (r.handle)
+   {
+       handle = new Handle_Type;
+       *handle = *(r.handle);
+   }
+   else 
+       handle = 0;
+
+   string_vector.clear();
+   string_vector = r.string_vector;
+
+   int_vector.clear();
+   int_vector = r.int_vector;
+
+   pointer_val = r.pointer_val;
+
+   return r;
+
+}  /* End of |Response_Type::operator=| definition  */
+
+
+
+@q **** (4) Initialize maps.  @>
+@ Initialize maps.
+\initials{LDF 2012.10.02.}
+
+\LOG
+\initials{LDF 2012.10.02.}
+Added this function.
+\ENDLOG
+
+@<|Response_Type| function declarations@>=
+
+static
+int
+initialize_maps(void);
+
+@
+@<|Response_Type| function definitions@>=
+int
+Response_Type::initialize_maps(void)
+{
+
+    typename_map[0]  = "NULL_RESPONSE_TYPE";    
+    typename_map[1]  = "COMMAND_ONLY_TYPE";    
+    typename_map[2]  = "SEND_FILE_TYPE";  
+    typename_map[3]  = "RECEIVE_PUT_FILE_TYPE";  
+    typename_map[4]  = "RECEIVE_METADATA_FILE_TYPE";  
+    typename_map[5]  = "SEND_HANDLE_TYPE";
+    typename_map[6]  = "LS_TYPE";
+    typename_map[7]  = "MV_TYPE";
+    typename_map[8]  = "PWD_TYPE";
+    typename_map[9]  = "CD_TYPE";
+    typename_map[10]  = "MKDIR_TYPE";
+    typename_map[11] = "UNDELETE_FILE_TYPE";
+    typename_map[12] = "MARK_IRODS_OBJECTS_FOR_DELETION_TYPE";
+    typename_map[13] = "GET_TYPE";
+    typename_map[14] = "SEND_METADATA_TYPE";
+    typename_map[15] = "END_SERVER_TYPE";
+    typename_map[16] = "SLEEP_TYPE";
+    typename_map[17] = "SHOW_CERTIFICATE_TYPE";
+    typename_map[18] = "GET_METADATA_TYPE";
+    typename_map[19] = "GET_HANDLE_TYPE";
+    typename_map[20] = "SEND_TAN_LIST_TYPE";
+    typename_map[21] = "PROCESS_PENDING_TYPE";
+    typename_map[22] = "GET_USER_INFO_TYPE";
+    typename_map[23] = "CREATE_HANDLE_TYPE";
+    typename_map[24] = "ADD_HANDLE_VALUE_TYPE";
+    typename_map[25] = "DELETE_HANDLE_TYPE";
+    typename_map[26] = "UNDELETE_HANDLE_TYPE";
+    typename_map[27] = "DELETE_HANDLE_VALUE_TYPE";
+    typename_map[28] = "UNDELETE_HANDLE_VALUE_TYPE";
+    typename_map[29] = "DELETE_METADATA_TYPE";
+    typename_map[30] = "UNDELETE_METADATA_TYPE";
+    typename_map[31] = "FETCH_DC_METADATA_TYPE";
+    typename_map[32] = "GENERATE_CHECKSUM_TYPE";
+    typename_map[33] = "VERIFY_CHECKSUM_TYPE";
+    typename_map[34] = "STORE_PUBLIC_KEY_TYPE";
+    typename_map[35] = "SEND_PUBLIC_KEY_TYPE";
+    typename_map[36] = "REGISTER_PULL_TYPE";
+
+    return 0;
+
+}
+
+@q **** (4) Clear.  @>
+@ Clear.
+\initials{LDF 2012.11.22.}
+
+\LOG
+\initials{LDF 2012.11.22.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|Response_Type| function declarations@>=
+void
+clear(void);
+
+@q ***** (5) Definition  @>
+@
+@<|Response_Type| function definitions@>=
+void
+Response_Type::clear(void)
+{
+
+    type = NULL_RESPONSE_TYPE;;
+
+    options = metadata_options = pid_options = 0U;
+
+    dirname = local_filename = remote_filename = temporary_filename = command = flags 
+       = pid_str = pid_prefix_str = pid_suffix_str 
+       = pid_institute_str = gpg_key_fingerprint = "";
+
+    handle = 0;  /* Not deleted!  It may be referenced by another object.
+                    \initials{LDF 2012.11.22.}  */
+
+    int_val = 0;
+
+    delay_value = 0UL;
+
+    string_val = "";
+
+    no_delay = false;
+
+    string_vector.clear();
+    int_vector.clear();
+
+    pointer_val = static_cast<void*>(0);
+
+    return;
+
+} /* |Response_Type::clear|  */
+
+
+@q **** (4) Show.  @>
+@ Show.
+\initials{LDF 2012.07.30.}
+
+\LOG
+\initials{LDF 2012.11.22.}
+Made this function |const|.
+\ENDLOG 
+
+@q ***** (5) Declaration  @>
+
+@<|Response_Type| function declarations@>=
+int
+show(string s = "") const;
+
+@q ***** (5) Definition  @>
+@
+@<|Response_Type| function definitions@>=
+int
+Response_Type::show(string s) const
+{
+
+   if (s.size() == 0)
+      s = "Response_Type:";
+
+   cerr << s << endl;
+
+   cerr << "`type'                 == " << "`" << typename_map[type] << "'" 
+        << endl
+        << "`local_filename'       == " << local_filename
+        << endl 
+        << "`remote_filename'      == " << remote_filename
+        << endl 
+        << "`temporary_filename'   == " << temporary_filename
+        << endl 
+        << "`dirname'              == " << dirname
+        << endl 
+        << "`command'              == " << command
+        << endl
+        << "`flags'                == " << flags 
+        << endl
+        << oct
+        << "`options'              == " << options << " (octal) "
+        << endl
+        << "`pid_options'          == " << pid_options << " (octal) "
+        << endl
+        << "`metadata_options'     == " << metadata_options << " (octal) "
+        << endl 
+        << dec
+        << "`pid_str'              == " << pid_str
+        << endl 
+        << "`pid_prefix_str'       == " << pid_prefix_str
+        << endl 
+        << "`pid_suffix_str'       == " << pid_suffix_str
+        << endl 
+        << "`pid_institute_str'    == " << pid_institute_str
+        << endl
+        << "`gpg_key_fingerprint' ==  " << gpg_key_fingerprint
+        << endl 
+        << "`int_val'              == " << int_val
+        << endl
+        << "`delay_value'          == " << delay_value
+        << endl
+        << "`string_val'           == " << string_val
+        << endl
+        << "`no_delay'             == " << no_delay
+        << endl;
+
+   if (handle)
+      handle->show("handle:");
+   else
+      cerr << "handle == NULL" << endl;
+
+   cerr << "`string_vector.size()' == " << string_vector.size() << endl;
+
+   if (string_vector.size() > 0)
+      cerr << "Strings:" << endl;
+
+   for (vector<string>::const_iterator iter = string_vector.begin();
+        iter != string_vector.end();
+        ++iter)
+      cerr << "   " << *iter << endl;
+
+   cerr << "`int_vector.size()' == " << int_vector.size() << endl;
+
+   if (int_vector.size() > 0)
+      cerr << "Integers:" << endl;
+
+   for (vector<int>::const_iterator iter = int_vector.begin();
+        iter != int_vector.end();
+        ++iter)
+      cerr << "   " << *iter << endl;
+
+   if (pointer_val != 0)
+     cerr << "`pointer_val' is non-null.  Address:  " 
+          << reinterpret_cast<unsigned long int>(pointer_val)
+          << endl;
+   else 
+     cerr << "`pointer_val' is NULL." << endl;
+
+   return 0;
+
+} /* |Response_Type::show|  */
+
+
+
+@q **** (4) @>
+
+@q *** (3) Putting `rspnstp.web' together.  @>
+
+@ Putting {\tt rspnstp\PERIOD web} together.
+
+@q **** (4) This is what's compiled.  @>
+@ This is what's compiled.
+@c
+using namespace std;
+@<Include files@>@;@/
+using namespace gwrdifpk;
+@<Initialize |static| constant |Response_Type| member variables@>@;@/
+@<|Response_Type| constructor definitions@>@;@/
+@<|Response_Type| destructor definition@>@;@/
+@<|Response_Type::operator=| definition@>@;@/
+@<|Response_Type| function definitions@>@;@/
+
+@q **** (4) This is what's written to the header file `rspnstp.h'.  @>
+
+@ This is what's written to the header file \filename{rspnstp.h}.
+@
+@(rspnstp.h@>=
+#ifndef RSPNSTP_H
+#define RSPNSTP_H 1
+class Scan_Parse_Parameter_Type;
+class Handle_Type;
+class Dublin_Core_Metadata_Type;
+@<|class Response_Type| declaration@>@;@/
+#endif 
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))                          @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

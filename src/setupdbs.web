@@ -1,0 +1,689 @@
+@q setupdbs.web                          @>
+@q [...]/gwrdifpk/database/setupdbs.web  @>
+
+@q Created by Laurence D. Finston (LDF) Mon Sep  2 14:20:37 CEST 2013  @>
+
+@q * (1) Top @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+@q * (1) Set up databases @>
+
+@* Set up databases.
+\initials{LDF 2013.09.02.}
+
+This query can be used to check what tables are created in database \.{YYY}:\hfil\break 
+|"select table_name from tables where table_schema = 'YYY' order by table_name"|\hfil\break 
+\initials{LDF 2013.09.05.}
+
+@q ** (2) Include files@>
+
+@ Include files.
+\initials{LDF 2013.09.02.}
+
+@<Include files@>=
+
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <pthread.h>  /* POSIX threads  */
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
+
+#include <mysql.h>
+
+#include <expat.h>
+
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <fstream>
+#include <sstream>   
+#include <string>
+#include <getopt.h>
+
+#include <map>
+#include <vector>
+#include <deque>
+#include <set>
+#include <stack>
+#include <utility>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif 
+
+
+#include "rspercds.h++"
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "helper.h++"
+#include "tanfncs.h++"
+#include "pidfncs.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "usrinftp.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+
+#include "stpclopt.h++"
+#include "stpcdsif.h++"
+#include "stparobj.h++"
+#include "stpdblcr.h++"
+#include "stpcdcli.h++"
+#include "stpcdhdl.h++"
+#include "stpcrdbs.h++"
+
+
+@q ** (2) Finish.  @>
+
+@ Finish (|finish|).
+\initials{LDF 2013.09.02.}
+
+@<|finish| definition@>=
+
+void
+finish(void)
+{
+
+    if (out_strm.is_open())
+       out_strm.close();
+
+    return;
+
+}
+
+@q ** (2) Main.  @>
+
+@ Main.
+\initials{LDF 2013.09.02.}
+
+@<Main@>=
+int
+main(int argc, char *argv[])
+{
+@q *** (3) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status;
+
+   char *temp_ptr = 0;
+
+   char buffer[1024];
+   memset(buffer, 0, 1024);
+
+   cerr << "Entering `setupdbs' (`main')." << endl;
+
+@q *** (3) @>
+
+   status = atexit(finish);
+
+   if (status != 0) 
+   {
+       cerr << "[setupdbs] ERROR!  In `main':  Cannot set exit function `finish'."
+            << endl 
+            << "Exiting `setupdbs' with exit status 1." 
+            << endl;
+       exit(1);
+   }
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       cerr << "[setupdbs] In `main':  Set exit function `finish' successfully."
+            << endl;
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q *** (3) @>
+@
+@<Main@>=
+
+    status = process_command_line_options(argc, argv);
+
+    if (status != 0)
+    {
+         cerr << "[setupdbs] ERROR!  In `main':  "
+              << "`process_command_line_options' failed, returning " << status
+              << endl
+              << "Exiting `setupdbs' unsuccessfully with exit status 1."
+              << endl;
+
+          exit(1);
+
+    }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+    else if (DEBUG)
+    {
+         cerr << "[setupdbs] In `main':  "
+              << "`process_command_line_options' succeeded, returning 0."
+              << endl;
+
+    }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q *** (3) @>
+@ 
+@<Main@>=
+
+   license_strm.open("./cpyrtc.txt");
+
+   if (!license_strm.is_open())
+   {
+       cerr << "[setupdbs] ERROR!  In `main':  "
+            << "Failed to open file `./cpyrtc.txt' for input."
+            << endl
+            << "Exiting `setupdbs' unsuccessfully with exit status 1."
+            << endl;
+
+       exit(1);
+
+   }  /* |if (!license_strm.is_open())|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       cerr << "[setupdbs] In `main':  "
+            << "Opened file `./cpyrtc.txt' for output successfully."
+            << endl;
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   out_strm.open("./setupdbs_output.sql", ios_base::trunc);
+
+   if (!out_strm.is_open())
+   {
+       cerr << "[setupdbs] ERROR!  In `main':  "
+            << "Failed to open file `./setupdbs_output.sql' for output."
+            << endl
+            << "Exiting `setupdbs' unsuccessfully with exit status 1."
+            << endl;
+
+       exit(1);
+
+   }  /* |if (!out_strm.is_open())|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       cerr << "[setupdbs] In `main':  "
+            << "Opened file `./setupdbs_output.sql' for output successfully."
+            << endl;
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   memset(buffer, 0, 1024);
+
+   temp_ptr = getenv("PWD");
+
+   if (strlen(temp_ptr) < 1024)
+   {
+      strcpy(buffer, temp_ptr);
+      strcat(buffer, "/");
+   }
+
+   temp_ptr = 0;
+
+   out_strm << "/* " << buffer << "setupdbs_output.sql " << endl 
+            << "   Generated " << get_datestamp() << " from `setupdbs' */"
+            << endl << endl;
+   
+
+   while (license_strm.is_open() && license_strm.good() && !license_strm.eof())
+   {
+
+       memset(buffer, 0, 1024);
+       license_strm.read(buffer, 1023);
+       out_strm << buffer;
+
+   }
+
+   license_strm.close();
+   
+   out_strm << static_cast<char>(12) 
+            << endl << endl
+            << "/* * (1)     */"
+            << endl << endl;
+
+@q *** (3) @>
+@ 
+@<Main@>=
+
+    if (prefix_vector.size() == 0)
+    {
+        cerr << "[setupdbs] NOTICE:  No prefixes specified with the `--prefix' option."
+             << endl
+             << "Will set up default prefix `12345'."
+             << endl;
+
+        prefix_vector.push_back(string("12345"));
+    }
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       cerr << "prefix_vector.size() == " << prefix_vector.size() << endl;
+
+       for (vector<string>::iterator iter = prefix_vector.begin();
+            iter != prefix_vector.end();
+            ++iter)
+       {
+           cerr << *iter << endl;
+       }
+
+       cerr << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */     
+
+@q *** (3) @>
+@
+@<Main@>=
+
+   Scan_Parse_Parameter_Type param;  /* This takes care of setting up the connection   
+                                        to the MySQL client.
+                                        \initials{LDF 2013.09.04.}                    */
+
+   status = create_databases(param);
+
+   if (status != 0)
+   {
+         cerr << "[setupdbs] ERROR!  In `main':  "
+              << "`create_databases' failed, returning " << status
+              << endl
+              << "Exiting `setupdbs' unsuccessfully with exit status " << status << "."
+              << endl;
+
+          exit(status);
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+    else if (DEBUG)
+    {
+         cerr << "[setupdbs] In `main':  "
+              << "`create_databases' succeeded, returning 0."
+              << endl;
+
+    }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q *** (3) handles database (gwirdsif).  @>
+
+@ Handles database (default: handlesystem or \.{handlesystem\_standalone}).  
+\initials{LDF 2013.09.04.}
+
+@<Main@>=
+
+   if (handles_database_created == true)
+   {
+@q **** (4) @>
+
+        cerr << "[setupdbs]  In `main':  `handles_database_created' == `true'.  "
+             << "Will create tables in "
+             << "`" << handles_database_name << "' database."
+             << endl;
+
+
+@q **** (4) @>
+
+        status = create_tables_handles(param);
+
+        if (status != 0)
+        {
+            cerr << "[setupdbs]  ERROR!  In `main':  `create_tables_handles' failed, "
+                 << "returning " << status << "."
+                 << endl 
+                 << "Failed to create tables in "
+                 << "`" << handles_database_name << "' database."
+                 << endl
+                 << "Exiting `setupdbs' unsuccessfully with exit status 1."
+                 << endl;
+
+            exit(1);
+
+        }  /* |if (status != 0)|  */
+
+@q **** (4) @>
+
+        else
+        {
+            cerr << "[setupdbs]  In `main':  `create_tables_handles' succeeded, "
+                 << "returning 0."
+                 << endl 
+                 << "Created tables in "
+                 << "`" << handles_database_name << "' database successfully."
+                 << endl;
+
+        }
+
+
+@q **** (4) @>
+
+
+   }  /* |if (handles_database_created == true)|  */
+
+@q *** (3) @>
+
+   else
+   {
+        cerr << "[setupdbs]  In `main':  `handles_database_created' == `false'.  "
+             << "Not creating tables in "
+             << "`" << handles_database_name << "' database."
+             << endl;
+
+   }  /* |else|  */
+
+
+@q *** (3) Server-side database (gwirdsif).  @>
+
+@ Server-side database (gwirdsif).  
+\initials{LDF 2013.09.04.}
+
+@<Main@>=
+
+   if (gwirdsif_database_created == true)
+   {
+@q **** (4) @>
+
+        cerr << "[setupdbs]  In `main':  `gwirdsif_database_created' == `true'.  "
+             << "Will create tables in "
+             << "`" << gwirdsif_database_name << "' database."
+             << endl;
+
+
+@q **** (4) @>
+
+        status = create_tables_gwirdsif(param);
+
+        if (status != 0)
+        {
+            cerr << "[setupdbs]  ERROR!  In `main':  `create_tables_gwirdsif' failed, "
+                 << "returning " << status << "."
+                 << endl 
+                 << "Failed to create tables in "
+                 << "`" << gwirdsif_database_name << "' database."
+                 << endl
+                 << "Exiting `setupdbs' unsuccessfully with exit status 1."
+                 << endl;
+
+            exit(1);
+
+        }  /* |if (status != 0)|  */
+
+@q **** (4) @>
+
+        else
+        {
+            cerr << "[setupdbs]  In `main':  `create_tables_gwirdsif' succeeded, "
+                 << "returning 0."
+                 << endl 
+                 << "Created tables in "
+                 << "`" << gwirdsif_database_name << "' database successfully."
+                 << endl;
+
+        }
+
+@q **** (4) @>
+@
+@<Main@>=
+
+        status = create_tables_archive(param);
+
+        if (status != 0)
+        {
+            cerr << "[setupdbs]  ERROR!  In `main':  `create_tables_archive' failed, "
+                 << "returning " << status << "."
+                 << endl 
+                 << "Failed to create tables for archive objects in "
+                 << "`" << gwirdsif_database_name << "' database."
+                 << endl
+                 << "Exiting `setupdbs' unsuccessfully with exit status 1."
+                 << endl;
+
+            exit(1);
+
+        }  /* |if (status != 0)|  */
+
+@q **** (4) @>
+
+        else
+        {
+            cerr << "[setupdbs]  In `main':  `create_tables_archive' succeeded, "
+                 << "returning 0."
+                 << endl 
+                 << "Created tables for archive objects in "
+                 << "`" << gwirdsif_database_name << "' database successfully."
+                 << endl;
+
+        }
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2013.09.06.}
+Added this section.
+\ENDLOG
+
+@<Main@>=
+
+        status = create_tables_dublin_core(param);
+
+        if (status != 0)
+        {
+            cerr << "[setupdbs]  ERROR!  In `main':  `create_tables_dublin_core' failed, "
+                 << "returning " << status << "."
+                 << endl 
+                 << "Failed to create tables for archive objects in "
+                 << "`" << gwirdsif_database_name << "' database."
+                 << endl
+                 << "Exiting `setupdbs' unsuccessfully with exit status 1."
+                 << endl;
+
+            exit(1);
+
+        }  /* |if (status != 0)|  */
+
+@q **** (4) @>
+
+        else
+        {
+            cerr << "[setupdbs]  In `main':  `create_tables_dublin_core' succeeded, "
+                 << "returning 0."
+                 << endl 
+                 << "Created tables for archive objects in "
+                 << "`" << gwirdsif_database_name << "' database successfully."
+                 << endl;
+
+        }
+
+@q **** (4) @>
+
+   }  /* |if (gwirdsif_database_created == true)|  */
+
+@q *** (3) @>
+
+   else
+   {
+        cerr << "[setupdbs]  In `main':  `gwirdsif_database_created' == `false'.  "
+             << "Not creating tables in "
+             << "`" << gwirdsif_database_name << "' database."
+             << endl;
+
+   }  /* |else|  */
+
+@q *** (3) Client-side database (gwirdcli).  @>
+
+@ Client-side database (gwirdcli).  
+\initials{LDF 2013.09.04.}
+
+@<Main@>=
+
+   if (gwirdcli_database_created == true)
+   {
+@q **** (4) @>
+
+        cerr << "[setupdbs]  In `main':  `gwirdcli_database_created' == `true'.  "
+             << "Will create tables in "
+             << "`" << gwirdcli_database_name << "' database."
+             << endl;
+
+
+@q **** (4) @>
+
+        status = create_tables_gwirdcli(param);
+
+        if (status != 0)
+        {
+            cerr << "[setupdbs]  ERROR!  In `main':  `create_tables_gwirdcli' failed, "
+                 << "returning " << status << "."
+                 << endl 
+                 << "Failed to create tables in "
+                 << "`" << gwirdcli_database_name << "' database."
+                 << endl
+                 << "Exiting `setupdbs' unsuccessfully with exit status 1."
+                 << endl;
+
+            exit(1);
+
+        }  /* |if (status != 0)|  */
+
+@q **** (4) @>
+
+        else
+        {
+            cerr << "[setupdbs]  In `main':  `create_tables_gwirdcli' succeeded, "
+                 << "returning 0."
+                 << endl 
+                 << "Created tables in "
+                 << "`" << gwirdcli_database_name << "' database successfully."
+                 << endl;
+
+        }
+
+
+@q **** (4) @>
+
+
+   }  /* |if (gwirdcli_database_created == true)|  */
+
+@q *** (3) @>
+
+   else
+   {
+        cerr << "[setupdbs]  In `main':  `gwirdcli_database_created' == `false'.  "
+             << "Not creating tables in "
+             << "`" << gwirdcli_database_name << "' database."
+             << endl;
+
+   }  /* |else|  */
+
+
+
+
+
+@q *** (3) @>
+@
+@<Main@>=
+
+
+@q *** (3) Exit successfully.  @>
+
+@ Exit successfully.  
+\initials{LDF 2013.09.02.}
+
+@<Main@>=
+
+   cerr << "Exiting `setupdbs' successfully with exit status 0." 
+        << endl;
+
+   exit(0);
+
+}  /* End of |main| definition  */
+
+
+@q ** (2) @>
+
+
+@q * (1) This is what's compiled.  @>
+
+@ This is what's compiled.  
+\initials{LDF 2013.09.03.}
+
+@c
+using namespace std;
+@<Include files@>@;@/
+using namespace gwrdifpk;
+@<|finish| definition@>@;@/
+@<Main@>@;@/
+
+
+
+@q  * (1) Local variables for Emacs   @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

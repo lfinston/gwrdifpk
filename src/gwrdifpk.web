@@ -1,0 +1,377 @@
+@q gwrdifpk.web  @>
+@q [...]/gwrdifpk/src/gwrdifpk.web @>
+
+@q Created by Laurence D. Finston (LDF) Mon Jul  9 15:12:08 CEST 2012  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+@q * (0)   @>
+
+@q This is the driver file for generating the TeX output for gwrdifpk.         @>
+@q It is only for use with CWEAVE and TeX and contains no code to be compiled. @>
+@q It includes the other `.web' files.                                         @>
+@q LDF 2012.07.09.                                                             @>
+
+\def\docname{GWDG Archive Interface II:}
+
+\newtoks\parttoks
+\parttoks={}
+
+\font\ninerm=cmr9
+\let\mc=\ninerm % medium caps
+
+\def\filename#1{\.{#1}}
+
+\def\9#1{#1}
+
+\newif\ifdoinitials
+\doinitialstrue
+
+\def\initials#1{\ifdoinitials\leavevmode
+\hbox{{\ninerm $\lbrack$#1$\rbrack$\hskip .375em plus .5pt minus .5pt}}\fi}
+
+\def\<#1>{$\langle${\rm #1\/}$\rangle$}
+
+%\tracingmacros=1
+
+\def\PERIOD{.}
+
+%% LDF 2002.10.27.  (Copied from GNU 3DLDF)  
+%% These macros are for my log comments.  Log
+%% comments describe changes I've made and 
+%% contain other information.  It may not always be desirable to print
+%% them, so they can be suppressed by setting \dologfalse.
+
+\newif\ifdolog
+
+\dologtrue
+%\dologfalse
+
+\ifdolog
+\message{^^JPrinting log entries.}
+\def\SUBLOG#1{\setbox1=\hbox{{\bf\kern1em #1\kern1em}}%
+\dimen0=1ex
+\dimen1=1ex\advance\dimen1 by -.375pt
+\dimen2=\hsize
+\advance\dimen2 by -\wd1
+\skip0=3pt}
+
+\def\LOG{\begingroup\doinitialstrue
+   \SUBLOG{Log}%
+   \medskip\par\noindent
+   \vbox{\line{\vrule height \dimen0 width .5\dimen2 depth -\dimen1
+   \copy1\vrule height \dimen0 width .5\dimen2 depth -\dimen1}%
+   \vskip\skip0}\nobreak\par\nobreak}
+
+\def\ENDLOG{\nobreak\par
+   \nobreak
+   \vskip\skip0
+   \vbox{\line{\vrule height \dimen0 width \hsize depth -\dimen1}}%
+   \endgroup}
+
+\else
+
+\message{^^JNot printing log entries.}
+\long\def\LOG#1{\ifx#1\ENDLOG\let\SUBLOG=\relax\else\def\SUBLOG{\LOG}\fi
+\SUBLOG}
+\fi
+
+%% ** (2) Datestamp
+
+\newcount\ampmhours
+\newtoks\AMPM
+\newcount\hours
+\newcount\minutes
+
+\newtoks\datestamp
+
+\hours=\time
+\divide\hours by 60
+\minutes=\time
+\multiply\hours by 60
+\advance\minutes by -\hours
+\divide\hours by 60
+\ifnum\minutes<10\def\minutestring{0\the\minutes}\else\def\minutestring{\the%
+\minutes}\fi
+
+\def\monthstring{\ifcase\the\month\or January\or February\or March\or April\or May%
+\or June\or July\or August\or September\or October\or November\or
+December\else\errmessage{This can't happen!}\fi}
+
+\ampmhours=\hours
+
+\ifnum\ampmhours>12
+\advance\ampmhours by -12
+\AMPM={PM}\else
+\AMPM={AM}\fi
+
+\def\datestamp{\the\ampmhours :\minutestring\space\the\AMPM\space%
+on \monthstring\space \the\day, \the\year}
+
+@q ** (2) Function declarations.  @>
+
+@q ** (2) @>
+
+@** GWDG iRODS/Handle Interface Client-Server Application.
+
+\newlinechar=`^^J
+                  
+@s bitset int
+
+@s bool   int
+@s bools   bool
+
+@s ifstream int
+@s ifstreams ifstream
+
+@s iterator int
+@s iterators iterator 
+
+@s key_type int 
+@s key_types key_type 
+
+@s mapped_type int 
+@s mapped_types mapped_type 
+
+@s map int
+@s maps map
+
+@s multimap map
+@s multimaps multimap
+
+@s ofstream int
+@s ofstreams ofstream
+
+@s stat int
+
+@s pair int
+@s pairs pair
+
+@s stringstream int
+@s stringstreams stringstream
+
+@s numeric_limits int
+
+@s pair   int
+@s pairs pair
+
+@s string char
+@s strings string
+
+@s tm int
+
+@s typedefs typedef
+
+@s valarray int
+@s valarrays valarray
+
+@s vector int 
+@s vectors vector
+
+@s GeneralFile int
+@s GeneralFiles GeneralFile  
+@s Scan_Parse_Parameter_Type int
+
+@s Handle_Value_Type int
+
+@s Dublin_Core_Metadata_Type int 
+@s Dublin_Core_Metadata_Sub_Type int
+
+@s pthread_t int
+@s pthread_mutex_t pthread_t 
+@s pthread_attr_t pthread_t 
+
+@q See `gwrdcw01.web' for the "include" commands for other files.  LDF 2013.09.22.  @>
+
+@i irdsobtp.web   @q Irods_Object_Type                                            @>
+@i dcmtdttp.web   @q Dublin_Core_Metadata_Type                                    @>
+@i dcmdsbtp.web   @q Dublin_Core_Metadata_Sub_Type                                @>
+@i grouptp.web    @q                                                              @>
+
+@i dstngnmt.web   @q Distinguished_Name_Type                                      @>
+@i gpgkprtp.web   @q GPG_Key_Pair__Type                                           @>
+
+@q Functions for GnuTLS @>
+
+@i gntlsfnc.web    @q @>
+@i helper.web      @q @>
+@i ex_rfc2818.web  @q @>  
+
+@q Functions for connections between client and server  @>
+
+@i connect.web     @q @>
+@i listnlcl.web    @q @>
+@i lstnrmta.web    @q @>
+@i lstnrmtx.web    @q @>
+
+@q Functions for exchanging data between client and server  @>
+
+@i exchncli.web   @q @>
+@i exchnsrv.web   @q @>
+
+@q Functions for PIDs (Handles)  @> 
+
+@i pidfncs.web    @q @>
+
+@q Functions called in the parsers.@>
+
+@i   prsrfncs.web  @q @>
+
+@q TAN functions    @>
+@i   tanfncs.web    @q @>
+
+@q Functions for purging log and temporary files @>
+
+@i purgfncs.web   @q @>
+@i purgarch.web  @q @>
+@i purgdcmd.web  @q @>
+@i purgdtbs.web  @q @>
+
+
+@q Utility functions @>
+@i   utilfncs.web  @q @>
+
+@q Generate TANs (program gentans)    @>
+
+@i gentans.web  @q @>
+
+@q Generate PIDs (program genpids)    @>
+
+@i genpids.web      @q @> 
+@i gpcmlopt.web     @q @>
+
+
+@q !! LDF 2014.01.28.  If `cweave' fails, it will probably be because its capacity      @>
+@q has been exceeded.  !!  PLEASE NOTE:  The error message will not be helpful;         @>
+@q it will state that a file (change file, index file or perhaps some other file)       @>
+@q cannot be opened.  In this case, it will be necessary to add another "driver" file.  @>
+
+
+@q Alphabetical list of CWEB files as of 2014.01.28.  @>
+
+@q ckietype.web   @>        
+@q clntactn.web   @>
+@q clntfncs.web   @>        
+@q cmdlnopt.web   @>        
+@q connect.web    @>        
+@q dcmdsbtp.web   @>
+@q dcmtdttp.web   @>          
+@q dstngnmt.web   @>
+@q ex_rfc2818.web @>
+@q exchncli.web   @>          
+@q exchnsrv.web   @>          
+@q excptntp.web   @>          
+@q genpids.web    @>        
+@q gentans.web    @>    
+@q glblcnst.web   @>
+@q glblvrbl.web   @>    
+@q gntlsfnc.web   @>    
+@q gpcmlopt.web   @>
+@q gpgkprtp.web   @>
+@q grouptp.web    @>
+@q gwirdcli.web   @>    
+@q gwirdpcl.web   @>
+@q gwirdsif.web   @>    
+@q gwrdifpk.web   @>    
+@q gwrdwbap.web   @>    
+@q gwrdwbcw.web   @>
+@q helper.web	  @>    
+@q hndltype.web   @>    
+@q hndlvltp.web   @>    
+@q irdsavtp.web   @>    
+@q irdsobtp.web   @>    
+@q listnlcl.web   @>    
+@q lstnrmta.web   @>    
+@q lstnrmtx.web   @>    
+@q optpsgen.web   @>    
+@q optpsgsb.web   @>    
+@q optpsgwv.web   @>    
+@q parser.web     @>    
+@q pidfncs.web    @>    
+@q prsrclnt.web   @>    
+@q prsrfncs.web   @>    
+@q pullpttp.web   @>
+@q pullrqst.web   @>
+@q pullrqtp.web   @>
+@q pullrspn.web   @>
+@q pullrstp.web   @>
+@q purgarch.web   @>
+@q purgdcmd.web   @>
+@q purgdtbs.web   @>
+@q purgfncs.web   @>    
+@q rspercds.web   @>
+@q rspnstp.web    @>    
+@q scanner.web    @>    
+@q scnprswv.web   @>
+@q scnrclnt.web   @>    
+@q scprpmtp.web   @>    
+@q setupdbs.web   @> @q Included in `stpdbcwv.web'.  LDF 2013.09.05.    @>
+@q sgnlhndl.web   @>    
+@q spptfnc1.web   @>    
+@q spptfnc2.web   @>    
+@q srvractn.web   @>
+@q srvractn.web   @>
+@q stparobj.web   @> @q Included in `stpdbcwv.web'.  LDF 2013.09.05.    @>
+@q stpcdcli.web   @> @q Included in `stpdbcwv.web'.  LDF 2013.09.05.    @>
+@q stpcdhdl.web   @> @q Included in `stpdbcwv.web'.  LDF 2013.09.05.    @>
+@q stpcdsif.web   @> @q Included in `stpdbcwv.web'.  LDF 2013.09.05.    @>
+@q stpclopt.web   @> @q Included in `stpdbcwv.web'.  LDF 2013.09.05.    @>
+@q stpcrdbs.web   @> @q Included in `stpdbcwv.web'.  LDF 2013.09.05.    @>
+@q stpdbcwv.web   @> @q Included in `stpdbcwv.web'.  LDF 2013.09.05.    @>
+@q stpdblcr.web   @> @q Included in `stpdbcwv.web'.  LDF 2013.09.05.    @>
+@q tanfncs.web    @>    
+@q usrinftp.web   @>
+@q utilfncs.web   @>    
+@q utlwbfcs.web   @>    
+@q x509cert.web   @>
+
+
+@q * (1) Index.  @>
+@* Index.
+
+@q  * (1) Local variables for Emacs   @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+
+
+

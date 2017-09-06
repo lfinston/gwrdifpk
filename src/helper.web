@@ -1,0 +1,318 @@
+@q helper.web @>
+@q [...]/Finston/gwrdifpk/src/helper.web  @>
+
+@q Created by Laurence D. Finston (LDF) Tue Nov 24 13:41:30 CET 2009 @>
+@q Copied from GNUTLS distribution                                   @>
+
+@q Copied from OptiNum-Grid Installer package `dbsrvcli' by @>
+@q Laurence D. Finston (LDF) Thu Sep 20 11:41:10 CEST 2012  @>
+
+@ Helper functions for GNUTLS examples.
+
+7.3.10 Helper Function for TCP Connections
+
+This helper function abstracts away TCP connection handling from the
+other examples.  It is required to build some examples.
+
+Copyright 2007, 2008, 2009 Free Software Foundation
+
+Copying and distribution of this file, with or without modification,
+are permitted in any medium without royalty provided the copyright
+notice and this notice are preserved.
+
+@
+@<Include files@>=
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <unistd.h>
+
+#include <string>
+#include <fstream>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <deque>
+#include <vector>
+
+
+#include <mysql.h>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "utilfncs.h++"
+
+@
+@<Preprocessor definitions@>=
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif 
+
+#define SA struct sockaddr
+
+@q ** (2) |tcp_connect|  @>
+
+@ |tcp_connect|.  Connects to the peer and returns a socket descriptor.
+@
+\LOG
+\initials{LDF 2009.12.15.}
+Removed |const char *PORT = "5556"| and |const char *SERVER = "127.0.0.1"| and 
+replaced them with optional |string| arguments.  The defaults are the previous 
+fixed values of |*PORT| and |*SERVER|.
+
+\initials{LDF 2009.12.18.}
+Now using |getaddrinfo|.  This makes it possible to pass the IP address 
+of the server to the client using a name such as as ``localhost'' or ``pcfinston''.
+Previously, an explicit address with digits and periods only was required.
+
+\initials{LDF 2010.01.27.}
+@:BUG FIX@> BUG FIX:  Now using |string ip_address| argument.  Previously, 
+|NULL| was used, which caused the client to connect only to a server on the same 
+computer.
+
+\initials{LDF 2013.08.29.}
+Removed default values for arguments.
+\ENDLOG 
+
+@<Declare functions@>=
+int
+tcp_connect (string ip_address, string port_str);
+
+@
+@<Define functions@>=
+int
+tcp_connect (string ip_address, string port_str)
+{
+
+  bool DEBUG = false;  /* |true|  */
+  set_debug_level(DEBUG, 0, 0);
+
+  int err;
+  int sd;
+  struct sockaddr_in sa;
+
+  int rv;
+
+  struct addrinfo hints;
+  struct addrinfo *servinfo;
+  struct addrinfo *p;
+
+  memset(&hints, 0, sizeof hints);
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_flags = AI_PASSIVE; /* use my IP  */
+
+  if ((rv = getaddrinfo(ip_address.c_str(), port_str.c_str(), &hints, &servinfo)) != 0) 
+  {
+       cerr <<  "ERROR!  In `tcp_connect':  `getaddrinfo' failed, returning " 
+            << rv << ":"
+            << endl 
+            << gai_strerror(rv);
+       return 1;
+  }
+  else if (DEBUG) 
+  {
+      cerr <<  "In `tcp_connect':  `getaddrinfo' succeeded, returning " 
+           << rv << "."
+           << endl;
+
+  }  /* |else if (DEBUG)|  */
+
+  // loop through all the results and connect to the first we can
+
+  int i = 0;
+
+#if 1 
+  if (DEBUG)
+  {
+     for(p = servinfo; p != NULL; p = p->ai_next) 
+       i++;
+
+     cerr << i << " elements in `servinfo'" << endl;
+
+  }  /* |if (DEBUG)|  */ 
+#endif 
+
+  i = 0;
+
+  /* Now only outputting error message with |perror| if debugging,
+     or it's the last address.
+     LDF 2012.03.14.  */
+
+  for(p = servinfo; p != NULL; p = p->ai_next) 
+  {
+
+#if 0
+      cerr << "i == " << i << endl; 
+#endif 
+
+      if ((sd = socket(p->ai_family, p->ai_socktype,
+                      p->ai_protocol)) == -1) 
+      {
+
+              if (DEBUG || p->ai_next == 0)
+                 perror("client: socket");
+
+              continue;
+      }
+
+      if (connect(sd, p->ai_addr, p->ai_addrlen) == -1) 
+      {
+              close(sd);
+      
+              if (DEBUG || p->ai_next == 0)
+                 perror("client: connect");
+
+              continue;
+      }
+
+      break;
+
+  }  /* |for|  */
+
+
+@
+\LOG
+\initials{LDF 2010.03.25.}
+@:BUG FIX@> BUG FIX:  Now returning $-1$ instead of 2.
+\ENDLOG 
+@<Define functions@>=
+
+  if (p == NULL) 
+  {
+      cerr <<  "In `tcp_connect':  Client: failed to connect" << endl;
+
+      return -1;
+  }
+
+@
+@<Define functions@>=
+
+  else if (DEBUG) 
+  {
+      cerr << "In `tcp_connect':  Client:  connection succeeded."
+           << endl;
+
+  }  /* |else if (DEBUG)|  */
+
+  int status = 0;
+
+  /* connects to server   */
+
+  char s[INET6_ADDRSTRLEN];
+
+  void* v;
+
+  inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr),
+            s, sizeof(s));
+
+  if (s && DEBUG)
+     cerr << "In `tcp_connect':  Client: connecting to " << s << endl;
+
+  freeaddrinfo(servinfo); // all done with this structure
+
+  return sd;
+
+}  /* End of |tcp_connect| definition.  */
+
+@q ** (2) @>
+
+@ Closes the given socket descriptor.
+
+@<Declare functions@>=
+void
+tcp_close (int sd);
+
+@
+@<Define functions@>=
+void
+tcp_close (int sd)
+{
+  shutdown (sd, SHUT_RDWR);	/* no more receptions */
+  close (sd);
+  sd = 0;
+}
+
+@q ** (2) Get in-address.  @>
+@ Get in-address.
+\initials{LDF 2009.09.29.}
+
+This function comes from {\it Beej's Guide to Network Programming}.
+\initials{LDF 2009.09.29.}
+
+Get |sockaddr|, IPv4 or IPv6.
+
+\LOG
+\initials{LDF 2009.09.29.}
+Added this function.
+\ENDLOG
+
+@<|get_in_addr| declaration@>=
+void*
+get_in_addr(struct sockaddr *sa);
+
+
+@
+@<|get_in_addr| definition@>=
+void*
+get_in_addr(struct sockaddr *sa)
+{
+	if (sa->sa_family == AF_INET) {
+		return &(((struct sockaddr_in*)sa)->sin_addr);
+	}
+
+	return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}
+
+
+
+@q ** (2) @>
+
+@q *** (3) @>
+
+@
+@c
+@<Include files@>@;@/
+using namespace std;
+@<Preprocessor definitions@>@;@/
+@<Declare functions@>@;@/
+@<|get_in_addr| declaration@>@;@/
+@<Define functions@>@;@/
+@<|get_in_addr| definition@>@;@/
+
+@q *** (3) @>
+
+@
+@(helper.h@>=
+@<Declare functions@>@;@/
+@<|get_in_addr| declaration@>@;@/
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))     @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

@@ -1,0 +1,1556 @@
+@q gwirdcli.web  @>
+@q /home/lfinsto/gwrdifpk/src/gwirdcli.web  @>
+
+@q Created by Laurence D. Finston (LDF) Fri Jul 20 09:54:21 CEST 2012  @>
+
+@q * (1) Top  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+@* Client program gwirdcli.
+\initials{LDF 2012.11.21.}
+
+@q * (1) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#include <sys/types.h>
+#include <pwd.h>
+#include <errno.h>
+#include <grp.h>
+#include <sys/wait.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+#include <time.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+
+#include <string>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <stdarg.h>
+#include <limits.h>
+#include <algorithm>
+#include <fstream>
+#include <iterator>
+#include <math.h>
+#include <sstream>   
+
+#include <map>
+#include <vector>
+#include <deque>
+#include <stack>
+#include <set>
+
+#include <pthread.h>
+
+#if HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+#include <mysql.h>
+
+#include <expat.h>
+
+#undef NAME_LEN
+#undef LOCAL_HOST
+
+#include "rspercds.h++"
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "purgfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "cmdlnopt.h++"
+#include "rspnstp.h++" 
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "prsrclnt.h++"
+#include "scnrclnt.h++"
+#include "prsrcln2.h++"
+#include "scnrcln2.h++"
+#include "pullrqtp.h++"
+#include "pullpttp.h++"
+#include "pullrstp.h++"
+#include "scprpmtp.h++"
+#include "clntfncs.h++"
+#include "usrinftp.h++"
+
+@q * (1) Finish gwirdcli (exit handler).  @>
+@ Finish gwirdcli (exit handler).
+\initials{LDF 2012.07.20.}
+
+\LOG
+\initials{LDF 2012.07.20.}
+Added this function.
+
+\initials{LDF 2013.04.25.}
+Changed name of this function from |finish| to |finish_gwirdcli| in order to prevent 
+confusion with the exit handler for the server program \.{gwirdsif}.
+
+\initials{LDF 2013.09.19.}
+Added code for unlocking the memory for |gpg_key_id| and |gpg_passphrase| 
+and deleting them.
+\ENDLOG
+
+@q ** (2) Definition  @>
+
+@<|finish_gwirdcli| definition@>=
+void
+finish_gwirdcli(void)
+{
+
+    bool DEBUG = false;  /* |true|  */
+    set_debug_level(DEBUG, 0, 0);
+
+    int status;
+
+#if DEBUG_COMPILE
+    if (DEBUG) 
+    {
+        lock_cerr_mutex(); 
+        cerr << "Entering `finish_gwirdcli'." << endl;
+        unlock_cerr_mutex(); 
+    }
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q ** (2) @>
+
+   if (gpg_key_id != 0)
+   {
+       memset(gpg_key_id, 0, 10);
+       munlock(gpg_key_id, 10);
+       delete[] gpg_key_id;
+       gpg_key_id = 0;
+        
+   }
+
+   if (gpg_passphrase != 0)
+   {
+       memset(gpg_passphrase, 0, gpg_passphrase_length);
+       munlock(gpg_passphrase, gpg_passphrase_length);
+       delete[] gpg_passphrase;
+       gpg_passphrase = 0;
+        
+   }
+
+   if (mysql_password != 0)
+   {
+       memset(mysql_password, 0, MYSQL_PASSWORD_LENGTH);
+       munlock(mysql_password, MYSQL_PASSWORD_LENGTH);
+       delete[] mysql_password;
+       mysql_password = 0;
+       
+   }
+
+   pthread_mutex_destroy(&cerr_mutex);
+   pthread_mutex_destroy(&cout_mutex);
+   pthread_mutex_destroy(&thread_ctr_mutex);
+   pthread_mutex_destroy(&session_data_mutex);
+   pthread_mutex_destroy(&gpg_passphrase_fifo_mutex);
+   pthread_mutex_destroy(&sql_mutex);
+   pthread_mutex_destroy(&sql_lock_tables_mutex);
+
+   if (gpg_passphrase_fifo_fd > 0)
+   {
+      close(gpg_passphrase_fifo_fd);
+      unlink(gpg_passphrase_fifo_name.c_str());
+   }
+
+#if DEBUG_COMPILE
+   if (DEBUG) 
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `finish_gwirdcli'." << endl;
+       unlock_cerr_mutex(); 
+   }
+#endif  /* |DEBUG_COMPILE|  */  
+
+   return;
+
+}   /* End of |finish_gwirdcli| definition  */
+
+
+@q * (1) Main  @>
+
+@ Main.
+\initials{LDF 2012.07.20.}
+
+@<|main| for gwirdcli@>=
+
+@q ** (2) Definition.  @>
+
+int
+main (int argc, char *argv[])
+{
+@q *** (3) @>
+
+   is_gwirdcli = true;
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdcli] Entering `main'." << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   char buffer[BUFFER_SIZE];
+   memset(buffer, 0, BUFFER_SIZE);
+
+   stringstream temp_strm;
+
+   FILE *fp = 0;
+
+   string distinguished_name_str;
+
+   int status = atexit(finish_gwirdcli);
+
+   if (status != 0) 
+   {
+       cerr << "[gwirdcli] ERROR!  In `main':  Cannot set exit function.  "
+            << "Exiting program `gwirdcli' with exit status 1." 
+            << endl;
+       exit(1);
+   }
+
+   pthread_mutex_init(&cerr_mutex, 0);
+   pthread_mutex_init(&cout_mutex, 0);
+   pthread_mutex_init(&thread_ctr_mutex, 0);
+   pthread_mutex_init(&session_data_mutex, 0);
+   pthread_mutex_init(&sql_mutex, 0);
+   pthread_mutex_init(&sql_lock_tables_mutex, 0);
+   pthread_mutex_init(&gpg_passphrase_fifo_mutex, 0);
+
+/* The global variables |admin_data| and |admin_data_length| 
+   aren't used by \.{gwirdcli}.
+   \initials{LDF 2013.01.11.}  */
+
+   memset(admin_data, 0, 64);  
+   admin_data_length = 0;
+
+@q *** (3) Get hostname and IP address.  @>
+@ Get hostname and IP address.  
+\initials{LDF 2014.02.18.}
+
+\LOG
+\initials{LDF 2014.02.18.}
+Added this section.
+\ENDLOG
+
+@<|main| for gwirdcli@>=
+
+@q **** (4) @>
+
+    memset(buffer, 0, BUFFER_SIZE);
+
+    fp = popen("hostname --long && hostname --ip-address", "r");
+
+    if (fp == 0)
+    {
+         cerr << "[gwirdcli] [Thread 0] ERROR!  In `main':  `popen' failed, "
+              << "returning 0."
+              << endl
+              << "Calls to `hostname' failed.  Can't set `gwirdcli_hostname' "
+              << "and `gwirdcli_ip_address'."
+              << endl 
+              << "Exiting `gwirdcli' unsuccessfully with exit status 1."
+              << endl;
+
+         exit(1);
+           
+    }   
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+    if (DEBUG)
+    {
+         cerr << "[gwirdcli] [Thread 0] In `main':  `popen' succeeded."
+              << endl;
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+
+    status = fread(buffer, 1, 128, fp);
+
+    if (status == 0)
+    {
+         cerr << "[gwirdcli] [Thread 0] ERROR!  In `main':  `fread' failed, returning 0."
+              << endl 
+              << "Calls to `hostname' failed."
+              << endl 
+              << "Can't set `gwirdcli_hostname' and `gwirdcli_ip_address'."
+              << endl 
+              << "Exiting `gwirdcli' unsuccessfully with exit status 1."
+              << endl;
+
+         pclose(fp);
+
+         exit(1);
+
+    }
+
+@q **** (4) @>
+
+    else if (status == 128)
+    {
+         cerr << "[gwirdcli] [Thread 0] ERROR!  In `main':  `fread' returned 128:  "
+              << "Output of `hostname --long' exceeds maximum length."
+              << endl 
+              << "Can't set `gwirdcli_hostname' and `gwirdcli_ip_address'."
+              << endl 
+              << "Exiting `gwirdcli' unsuccessfully with exit status 1."
+              << endl;
+
+         pclose(fp);
+
+         exit(1);
+
+    }    
+
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+    else if (DEBUG)
+    {
+         cerr << "[gwirdcli] [Thread 0] In `main':  `fread' succeeded, returning "
+              << status << "."
+              << endl 
+              << "`buffer' ==" 
+              << endl 
+              << buffer
+              << endl;
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+
+    pclose(fp);
+    fp = 0;
+
+    temp_strm.str("");
+
+    temp_strm << buffer;
+
+    temp_strm.clear();
+
+    temp_strm >> gwirdcli_hostname >> gwirdcli_ip_address;
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "gwirdcli_hostname   == " << gwirdcli_hostname << endl
+            << "gwirdcli_ip_address == " << gwirdcli_ip_address << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+    
+   temp_strm.str("");
+   temp_strm.clear();
+
+   memset(buffer, 0, BUFFER_SIZE);
+
+
+@q *** (3) Set |current_dir|.  @>
+
+@ Set |current_dir|.  
+\initials{LDF Date unknown.}
+
+@<|main| for gwirdcli@>=
+
+   char *temp_ptr = getenv("PWD");
+
+   string current_dir;
+
+   if (temp_ptr != 0)
+       current_dir = temp_ptr;
+   else
+   {
+       cerr << "[gwirdcli] ERROR!  In `main':  Failed to set `current_dir'."
+            << endl 
+            << "Exiting program `gwirdcli' with exit status 1." 
+            << endl;
+
+       exit(1);
+
+   }
+
+   temp_ptr = 0;
+
+   temp_ptr = getenv("HOME");
+
+   if (temp_ptr != 0)
+   {
+       gpg_homedir = temp_ptr;
+       gpg_homedir += "/.gnupg";
+   }
+   else
+   {
+       cerr << "[gwirdcli] ERROR!  In `main':  Failed to set `gpg_homedir'."
+            << endl 
+            << "Exiting program `gwirdcli' with exit status 1." 
+            << endl;
+
+       exit(1);
+
+   }
+
+@q **** (4) @>
+
+@q *** (3) Process command-line options.  @>
+@ Process command-line options.
+\initials{LDF 2012.07.20.}
+
+\LOG
+\initials{LDF 2012.07.20.}
+Added this section.
+
+\initials{LDF 2013.08.29.}
+Added code for setting the variables for the port numbers.
+\ENDLOG
+
+@<|main| for gwirdcli@>=
+
+    port_num_anon = DEFAULT_PORT_NUM_ANON;
+    port_str_anon = DEFAULT_PORT_STR_ANON;
+
+    port_num_x_509 = DEFAULT_PORT_NUM_X_509;
+    port_str_x_509 = DEFAULT_PORT_STR_X_509;
+
+    status = process_command_line_options(argc, argv);
+
+    if (status != 0)
+    {
+
+         cerr << "[gwirdcli] ERROR!  In `main':  `process_command_line_options' failed, "
+              << "returning " << status << "."
+              << endl
+              << "Exiting `gwirdcli' unsuccessfully with exit status 1."
+              << endl;
+
+         exit(1);
+
+    }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       cerr << "[gwirdcli] In `main':  `process_command_line_options' succeeded, returning 0."
+            << endl
+            << "`gpg_homedir' == " << gpg_homedir
+            << endl;
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q *** (3) Initializations.  @>
+
+@ Initializations.  
+\initials{LDF 2012.10.02.}
+
+\LOG
+\initials{LDF 2012.10.02.}
+Added this section.
+
+\initials{LDF 2013.02.05.}
+Now calling |Handle_Value_Type::initialize_idx_type_map|.
+
+\initials{LDF 2013.02.22.}
+Changed name of |Handle_Value_Type::initialize_idx_type_map| to 
+|initialize_maps|.
+
+\initials{LDF 2013.05.02.}
+Now calling |initialize_signal_maps|.
+
+\initials{LDF 2013.07.28.}
+Now calling |init_gw_code_map|.
+\ENDLOG
+
+@<|main| for gwirdcli@>=
+
+   initialize_signal_maps();
+   Response_Type::initialize_maps();
+   Dublin_Core_Metadata_Type::initialize_maps();
+   Handle_Value_Type::initialize_maps();
+   Scan_Parse_Parameter_Type::initialize_maps();
+   init_gw_code_map();
+
+@q *** (3) @>
+@
+\LOG
+\initials{LDF 2013.09.24.}
+Added this section.  It contains code formerly in the |Scan_Parse_Parameter_Type| 
+default constructor.
+\ENDLOG
+
+@<|main| for gwirdcli@>=
+
+   struct passwd pwd;
+   struct passwd *result;
+
+   char pwd_buffer[_SC_GETPW_R_SIZE_MAX];
+   memset(pwd_buffer, 0, _SC_GETPW_R_SIZE_MAX);
+
+   status = getpwuid_r(getuid(), &pwd, pwd_buffer, _SC_GETPW_R_SIZE_MAX, &result);
+
+   if (status != 0 && result == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!    In `main':"
+            << endl 
+            << "`getpwuid_r' failed, returning " << status << ":"
+            << endl
+            << strerror(status)
+            << endl
+            << "Failed to retrieve user info.  Exiting `gwirdcli' unsuccessfully with "
+            << "exit status 1."
+            << endl;
+         unlock_cerr_mutex(); 
+
+         exit(1);
+
+   }
+   else if (status == 0 && result == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `main':"
+            << endl 
+            << "`getpwuid_r' failed, returning 0."
+            << endl
+            << "No matching password record found for UID " << getuid() << "."
+            << endl 
+            << "Exiting `gwirdcli' unsuccessfully with exit status 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       exit(1);
+
+   }
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `main':"
+            << endl 
+            << "`getpwuid_r' succeeded."
+            << endl
+            << "pwd.pw_name == " << pwd.pw_name << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q *** (3) @>
+@
+@<|main| for gwirdcli@>=
+
+@q **** (4) @>
+
+   if (mysql_username.empty())
+   {
+      mysql_username = pwd.pw_name;  
+
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          cerr << "In `main':"
+                << endl 
+                << "`mysql_username' was not set using the `--mysql-username' command-line option:"
+                << endl
+                << "Set `mysql_username' to `pwd.pw_name' == " << mysql_username
+                << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   }  /* |if (mysql_username.empty())|  */
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `main':"
+            << endl 
+            << "`mysql_username' was set using the `--mysql-username' command-line option:"
+            << endl 
+            << "`mysql_username' == " << mysql_username 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+
+@q *** (3) Set |gpg_passphrase_fifo_name|, create FIFO |gpg_passphrase_fifo_id| @>
+@q *** (3) and open the latter for writing in non-blocking mode.                @>
+
+@ Set |gpg_passphrase_fifo_name|, create FIFO |gpg_passphrase_fifo_id|
+and open the latter for writing in non-blocking mode.               
+\initials{LDF 2013.10.04.}
+
+\LOG
+\initials{LDF 2013.10.04.}
+Added this section.
+\ENDLOG
+
+@q **** (4) @>
+
+@ Create temporary file so we have a unique name for the FIFO.
+\initials{LDF 2013.10.04.}
+
+@<|main| for gwirdcli@>=
+
+    pthread_mutex_lock(&gpg_passphrase_fifo_mutex);
+
+    char temp_filename[] = "/tmp/gwirdcli.decrypt.fifo.XXXXXX";
+    
+    errno = 0;
+    int fd = mkstemp(temp_filename);
+
+    if (fd == -1)
+    {
+            lock_cerr_mutex(); 
+            cerr << "ERROR!  In `main':"
+                 << endl 
+                 << "`mkstemp' failed, returning 0:"
+                 << endl
+                 << strerror(errno)
+                 << endl 
+                 << "Failed to create temporary file."
+                 << endl 
+                 << "Exiting `gwirdcli' unsuccessfully with exit status 1."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            exit(1);
+
+    }  /* |if (fd == -1)|  */
+
+#if DEBUG_COMPILE
+    else if (DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "In `main':"
+             << endl 
+             << "`mkstemp' succeeded:  `temp_filename' == " << temp_filename 
+             << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@   
+@<|main| for gwirdcli@>=
+
+   gpg_passphrase_fifo_name = temp_filename;
+
+   errno = 0;
+   status = unlink(gpg_passphrase_fifo_name.c_str());  /* We just need the name and 
+                                                          besides, we need to create
+                                                          a FIFO, not a regular file.
+                                                          \initials{LDF 2013.10.04.}  */
+   if (status == -1)
+   {
+      lock_cerr_mutex(); 
+      cerr << "[gwirdcli] ERROR!  In `main':"
+           << endl 
+           << "`unlink' failed, returning -1:"
+           << endl 
+           << strerror(errno)
+           << endl
+           << "Failed to unlink `" << gpg_passphrase_fifo_name << "'."
+           << endl 
+           << "Exiting program `gwirdcli' with exit status 1." 
+           << endl;
+      unlock_cerr_mutex(); 
+
+      pthread_mutex_unlock(&gpg_passphrase_fifo_mutex);
+
+      mysql_library_end();
+
+      exit(1);
+
+   }  /* |(status == -1)|  */
+
+@q *** (3) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "[gwirdcli] In `main':"
+           << "In `main':  `unlink' succeeded, returning 0."
+           << endl 
+           << "Removed `" << gpg_passphrase_fifo_name << "' successfully."
+           << endl
+           << "Will recreate as FIFO."
+           << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|main| for gwirdcli@>=
+
+   errno = 0;
+   status = mkfifo(gpg_passphrase_fifo_name.c_str(),  S_IRUSR | S_IWUSR);
+
+   if (status == -1)
+   {
+      lock_cerr_mutex(); 
+      cerr << "[gwirdcli] ERROR!  In `main':"
+           << endl 
+           << "`mkfifo' failed, returning -1:"
+           << endl 
+           << strerror(errno)
+           << endl
+           << "Failed to created FIFO `" << gpg_passphrase_fifo_name << "'."
+           << endl 
+           << "Exiting program `gwirdcli' with exit status 1." 
+           << endl;
+      unlock_cerr_mutex(); 
+
+      pthread_mutex_unlock(&gpg_passphrase_fifo_mutex);
+
+      mysql_library_end();
+
+      exit(1);
+
+   }  /* |if (status == -1)|  */
+
+@q *** (3) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "[gwirdcli] In `main':"
+           << "`mkfifo' succeeded, returning 0."
+           << endl 
+           << "Created FIFO `" << gpg_passphrase_fifo_name << "' successfully."
+           << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|main| for gwirdcli@>=
+
+   errno = 0;
+
+   gpg_passphrase_fifo_fd = open(gpg_passphrase_fifo_name.c_str(), O_RDWR | O_NONBLOCK);
+
+   if (gpg_passphrase_fifo_fd == -1)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdcli] ERROR!  In `main':  `open' failed, returning -1:"
+            << endl        
+            << strerror(errno)
+            << endl
+            << "Failed to open FIFO `" << gpg_passphrase_fifo_name << "' for reading or writing "
+            << "in non-blocking mode."
+            << endl 
+            << "Exiting program `gwirdcli' with exit status 1." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+       pthread_mutex_unlock(&gpg_passphrase_fifo_mutex);
+
+       mysql_library_end();
+
+       exit(1);
+
+   }  /* |if|  */
+
+@q *** (3) @>
+
+@ @:NOTE@> !! PLEASE NOTE:  |gpg_passphrase_fifo_mutex| must be unlocked before |set_password| 
+is called, because the latter locks it.
+\initials{LDF 2013.10.04.}
+
+@<|main| for gwirdcli@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdcli] In `main': `open' succeeded."
+            << endl
+            << "Opened FIFO `" << gpg_passphrase_fifo_name << "' "
+            << "for reading and writing, in non-blocking mode, successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   pthread_mutex_unlock(&gpg_passphrase_fifo_mutex);
+
+@q **** (4) @>
+
+@q *** (3) Check |mysql_password_filename| and set, if necessary.  @>
+
+@ Check |mysql_password_filename| and set, if necessary. 
+\initials{LDF 2013.10.04.}
+
+\LOG
+\initials{LDF 2013.10.04.}
+Added this section.
+\ENDLOG
+
+@<|main| for gwirdcli@>=
+
+@q **** (4) @>
+
+   if (mysql_password_filename.empty() && (gpg_passphrase == 0 || strlen(gpg_passphrase) == 0))
+   {
+       cout << "[gwirdcli] NOTICE!  In `main':"
+            << endl 
+            << "`mysql_password_filename' is empty and `gpg_passphrase' is NULL or empty."
+            << endl
+            << "Not decrypting MySQL password."
+            << endl 
+            << "Please note:  A secret key without a passphrase will be used for decryption "
+            << "of other items, if any."
+            << endl  
+            << "This is not very secure.  Do not do this unless you know the risks "
+            << "(see documentation)."
+            << endl;
+
+   }  /* |if (gpg_passphrase == 0 || strlen(gpg_passphrase) == 0)|  */
+
+@q **** (4) @>
+
+   else if (!mysql_password_filename.empty())
+   {
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cout << "[gwirdcli] In `main':  `mysql_password_filename' is not empty:"
+                << endl
+                << "Will decrypt MySQL password."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       if (gpg_passphrase == 0 || strlen(gpg_passphrase) == 0)
+       {
+           cout << "[gwirdcli] NOTICE!  In `main':  "
+                << "`gpg_passphrase' is NULL or empty."
+                << endl
+                << "Please note:  A secret key without a passphrase will be used for decryption."
+                << endl  
+                << "This is not very secure.  Do not do this unless you know the risks "
+                << "(see documentation)."
+                << endl;
+
+       }  /* |if|  */
+
+       status = set_password(mysql_password_filename, 
+                             mysql_password,
+                             MYSQL_PASSWORD_LENGTH,
+                             DEFAULT_MYSQL_PASSWORD_FILENAME,
+                             gpg_passphrase, 
+                             current_dir, 
+                             string(""));
+
+       if (status != 0)
+       {
+           cerr << "[gwirdcli] ERROR!  In `main':  `set_password' failed, "
+                << "returning " << status << "."
+                << endl
+                << "Failed to set MySQL password."
+                << endl 
+                << "Exiting program `gwirdcli' with exit status 1." 
+                << endl;
+
+
+
+           mysql_library_end();
+
+           exit(1);
+
+       }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "[gwirdcli] In `main':  `set_password' succeeded, "
+                << "returning 0."
+                << endl 
+                << "`mysql_password' == " << mysql_password
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+   }  /* |else|  */
+
+@q **** (4) @>
+
+@ @:Kludge@> !! Kludge:  @:TODO@> !! TODO: 
+Using call to \.{certtool} via |popen| to extract information 
+from the user's X.509 certificate, if present.  It would probably be better to use the 
+GnuTLS functions for this, but I would have to look up how to do this.  I didn't find 
+what I was looking for immediately in the manual.  In addition, this package is still 
+using GnuTLS 2.4.1!  If it is ever put into production, it should be ported to the most
+recent version.
+\par
+On the other hand, using \.{certtool} may not be a bad way of extracting 
+this information, so changing this is not really urgent.
+\initials{LDF 2014.01.08.}
+
+\LOG
+\initials{LDF 2014.01.08.}
+Added this section.
+
+\initials{LDF 2014.02.21.}
+Moved this section from |client_func| to |main|.
+
+\initials{LDF 2014.02.26.}
+Now calling |get_distinguished_name|.  Removed code from here to the latter function.
+\ENDLOG
+
+@<|main| for gwirdcli@>=
+
+   if (cert_filenames.size() > 0)
+   {
+@q ***** (5) @>
+       
+      status = get_distinguished_name(cert_filenames.front(), 
+                                      distinguished_name_str, 
+                                      string("[Thread 0] "));
+
+      if (status != 0)
+      {
+          lock_cerr_mutex(); 
+          cerr << "[Thread 0] " << "ERROR!  In `main':"
+               << endl
+               << "`get_distinguished_name' failed, returning " << status << "."
+               << endl
+               << "Failed to extract Distinguished Name from certificate `"
+               << cert_filenames.front() << "'."
+               << endl
+               << "Exiting `gwirdcli' unsuccessfully with exit status 1."
+               << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_library_end();
+
+           exit(1);
+          
+      }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "[Thread 0] " << "In `main':"
+                << endl
+                << "`status'   == 0"
+                << endl 
+                << "`get_distinguished_name' succeeded, returning 0."
+                << endl 
+                << "`distinguished_name_str' == " << distinguished_name_str
+                << endl; 
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+   }  /* |if (cert_filenames.size() > 0)|  */
+
+@q **** (4) @>
+@
+@<|main| for gwirdcli@>=
+
+   else
+   {
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "[Thread 0] " << "In `main':"
+                << endl 
+                << "`cert_filenames' is empty.  Not calling `get_distinguished_name'."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   }  /* |else| (|cert_filenames.size() == 0|)  */
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2014.02.21.}
+Added this section.  Now using a single |Scan_Parse_Parameter_Type| object.  
+Previously, one was declared locally in the following conditional while another
+was declared within a |try| block and passed to |client_func|.  
+I've removed the |try| block;  The default constructor for |Scan_Parse_Parameter_Type|
+probably won't fail and if it does, it should just call |pthread_exit|.
+\ENDLOG
+
+@<|main| for gwirdcli@>=
+
+   Scan_Parse_Parameter_Type param;
+
+   User_Info_Type user_info;
+
+   param.username = pwd.pw_name;
+
+   status = user_info.get_user_info_from_database(param.mysql_ptr, 
+                                                  distinguished_name_str,
+                                                  param.username);
+
+@q ***** (5) @>
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdcli] [Thread 0] ERROR!  In `main':"
+            << endl
+            << "`User_Info_Type::get_user_info_from_database' failed, returning " 
+            << status << ":"
+            << endl 
+            << "Failed to set `User_Info_Type user_info' from "
+            << "`param.username' == " << param.username << "."
+            << endl 
+            << "Exiting `gwirdcli' unsuccessfully with exit status 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_library_end();
+
+       exit(1);
+
+   }  /* |if (status != 0)|  */
+
+@q **** (4) @>
+@
+@<|main| for gwirdcli@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdcli] [Thread 0] In `main':"
+            << endl
+            << "`User_Info_Type::get_user_info_from_database' succeeded, returning 0:" 
+            << endl; 
+#if 0 
+       user_info.show("user_info:");
+#endif 
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   param.user_id             = user_info.user_id;
+   param.username            = user_info.username;
+   param.distinguished_name  = user_info.distinguished_name;
+   param.gpg_key_pair_id     = user_info.gpg_key_pair_id;
+   param.gpg_key_fingerprint = user_info.gpg_key_fingerprint;
+
+@q **** (4) @>
+@
+@<|main| for gwirdcli@>=
+
+   status = param.get_privileges_gwirdcli(0);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdcli] [Thread 0] ERROR!  In `main':"
+            << endl
+            << "`Scan_Parse_Parameter_Type::get_privileges_gwirdcli' failed, returning " 
+            << status << ":"
+            << endl 
+            << "Failed to set retrieve privileges for "
+            << "`param.username' == " << param.username << " from the `gwirdcli' database."
+            << endl 
+            << "Exiting `gwirdcli' unsuccessfully with exit status 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_library_end();
+
+       exit(1);
+
+   }  /* |if (status != 0)|  */
+
+@q **** (4) @>
+@
+@<|main| for gwirdcli@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdcli] [Thread 0] In `main':"
+            << endl
+            << "`Scan_Parse_Parameter_Type::get_privileges_gwirdcli' succeeded, returning 0."
+            << endl;
+#if 0 
+       param.show("param:");
+#endif 
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q **** (4) Read client command file (if |client_command_filename| not empty).  @>
+
+@ Read client command file (if |client_command_filename| not empty).  
+\initials{LDF 2014.02.01.}
+
+@<|main| for gwirdcli@>=
+
+#if 1 /* 0 */
+bool save_DEBUG = DEBUG;
+DEBUG = false; /* |true|  */
+#endif 
+
+   if (!client_command_filename.empty())
+   {
+@q ***** (5) @>
+
+       param.PARSER_DEBUG = false;  /* |true|  */
+
+       yyscan_t parameter;
+
+       xxlex_init(&parameter);      
+
+       xxset_extra(&param, parameter);
+
+       YY_BUFFER_STATE xx_buffer_state;
+
+@q ***** (5) @>
+@
+@<|main| for gwirdcli@>=
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "[gwirdpcl] [Thread 0] In `main':  `client_command_filename' is not empty:"
+                << endl       
+                << "`client_command_filename' == `" << client_command_filename << "'."
+                << endl
+                << "Will call `xxparse' to process it."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|main| for gwirdcli@>=
+
+       errno = 0;
+       fp = fopen(client_command_filename.c_str(), "r");
+
+       if (fp == 0)
+       {
+           cerr << "[gwirdpcl] ERROR!  In `main':  `fopen' failed, "
+                << "returning NULL:"
+                << endl
+                << strerror(errno)
+                << endl 
+                << "File `client_command_filename' == "
+                << "`" << client_command_filename << "' doesn't exist or couldn't be opened."
+                << endl 
+                << "Exiting program `gwirdpcl' with exit status 1." 
+                << endl;
+
+           mysql_library_end();
+
+           exit(1);       
+
+       }  /* |if (fp == 0)|  */
+
+@q ***** (5) @>
+@
+@<|main| for gwirdcli@>=
+
+       else 
+       {
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "[gwirdpcl] In `main':  `fopen' succeeded."
+                    << endl 
+                    << "File `client_command_filename' == "
+                    << "`" << client_command_filename << "' exists and could be opened."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           xxrestart(fp, parameter);
+
+       }  /* |else|  */
+
+@q ***** (5) Call |xxparse|.  @>
+
+@ Call |xxparse|.
+\initials{LDF 2012.07.30.}
+
+@<|main| for gwirdcli@>=
+
+       status = xxparse(parameter);
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << "[gwirdpcl] [Thread 0] ERROR!  In `main':  `xxparse' failed, returning "
+                << status << "."
+                << endl
+                << "Exiting `gwirdpcl' unsuccessfully with exit status 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_library_end();
+
+           exit(1);
+
+       }  /* |if (status != 0)|  */
+
+       else 
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "[gwirdpcl] [Thread 0] In `main':  `xxparse' succeeded, returning 0."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           fclose(fp);
+           fp = 0;
+
+       }  /* |else|  */
+       
+
+@q ***** (5) @>
+
+   }  /* |if (!client_command_filename.empty())|  */
+
+@q **** (4) @>
+@
+@<|main| for gwirdcli@>=
+
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdpcl] [Thread 0] In `main':  `client_command_filename' is empty."
+            << endl       
+            << "Not reading client command file."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+#if 1 /* 0 */
+DEBUG = save_DEBUG; 
+#endif 
+
+@q **** (4) Call |client_func|.@>
+
+@ Call |client_func|.
+\initials{LDF 2012.07.20.}
+
+Beyond this point, it makes sense to lock and unlock |cerr_mutex|, because
+|client_func| might start new threads.
+\initials{LDF 2012.07.20.}
+
+\LOG
+\initials{LDF 2013.04.18.}
+Added code for the case that |client_func| returns 2.  This will
+occur when the \.{END\_SERVER} command succeeds.
+\ENDLOG 
+
+@<|main| for gwirdcli@>=
+
+   memset(param.data_buffer, 0, BUFFER_SIZE);
+
+   param.data_filename = input_filename; 
+
+   param.PARSER_DEBUG = false;  /* |true|  */
+
+   status = client_func(param);
+
+   string error_warning_str;
+
+   temp_strm.str("");
+
+   {
+
+       int temp_width = 0;
+
+       int i =   (param.errors_occurred > param.warnings_occurred) 
+               ? param.errors_occurred : param.warnings_occurred;
+
+       do
+       { 
+           ++temp_width;
+
+           i /= 10;
+           
+       } while (i > 0);
+
+
+       temp_strm.str("");
+
+       temp_strm << setw(temp_width) << param.errors_occurred << " error"
+                 << ((param.errors_occurred == 1) ? "" : "s") << "."
+                 << endl
+                 << setw(temp_width) << param.warnings_occurred << " warning" 
+                 << ((param.warnings_occurred == 1) ? "" : "s") << "."
+                 << endl;
+
+       error_warning_str = temp_strm.str();
+
+       temp_strm.str("");        
+   
+   }
+
+   if (status == 2)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdcli] In `main':  `client_func' succeeded, returning 2." 
+            << endl
+            << "`END_SERVER' command succeeded."
+            << endl
+            << error_warning_str;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (status == 2)|  */
+
+   else if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdcli] ERROR!  In `main':  `client_func' failed, returning " 
+            << status << "."
+            << endl
+            << error_warning_str
+            << "Exiting `gwirdcli' unsuccessfully with exit status 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_library_end();
+
+       exit(1);
+
+   }  /* |else if (status != 0)|  */
+
+
+@q **** (4) @>
+@
+@<|main| for gwirdcli@>=
+
+   else 
+   {
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "[gwirdcli] In `main':  `client_func' succeeded, returning 0."
+                << endl;
+
+           param.show("param:");
+
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+       lock_cerr_mutex(); 
+       lock_cout_mutex(); 
+       cout << error_warning_str;
+       unlock_cout_mutex(); 
+       unlock_cerr_mutex(); 
+
+
+   }  /* |else|  */
+
+@q **** (4) @>
+
+@q *** (3) @>
+@
+@<|main| for gwirdcli@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdcli] Exiting `main' successfully with exit status 0." << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   mysql_library_end();
+
+   exit(0);
+
+@q *** (3) @>
+
+}  /* End of |main| definition  */
+
+@q ** (2) External function declarations.  @>
+
+@ External function declarations.  
+
+@<External function declarations@>=
+int 
+xxparse(yyscan_t parameter);
+
+@q ** (2) @>
+
+@ Putting gwirdcli together.
+\initials{LDF 2012.07.20.}
+
+@q *** (3) @>
+
+@ This is what's compiled.
+\initials{LDF 2012.07.20.}
+
+@c
+typedef void* yyscan_t;
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+GCRY_THREAD_OPTION_PTHREAD_IMPL;
+gnutls_anon_server_credentials_t anoncred;
+int yydebug;
+extern int xxdebug;
+@<|finish_gwirdcli| definition@>@;@/
+@<External function declarations@>@;@/
+@<|main| for gwirdcli@>@;@/
+
+@q Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))     @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+@q ** (2) @>
+
+
+

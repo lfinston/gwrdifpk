@@ -1,0 +1,1054 @@
+@q prsrcln2.web@>
+@q Created by Laurence D. Finston (LDF) Sat Feb  1 18:52:45 CET 2014  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q * (1) Client Parser 2 (|xxparse|).  @>
+@* Client Parser 2 (|xxparse|).
+\initials{LDF 2014.02.01.}
+
+@q ** (2) Include files.@>
+@ Include files.
+
+@<Include files@>=
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <limits.h>
+#include <signal.h>
+
+#include <algorithm>
+#include <fstream>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <iterator>
+#include <time.h>
+#include <math.h>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include <sstream>   
+#include <map>
+#include <vector>
+#include <deque>
+#include <stack>
+#include <set>
+#include <bitset>
+
+#include <pthread.h>
+
+#include <expat.h>
+
+#if HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+#include <mysql.h>
+
+#undef NAME_LEN
+#undef LOCAL_HOST
+
+#include "rspercds.h++"
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "prsrcln2.h++"
+#include "scnrcln2.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "pullrqtp.h++"
+#include "pullpttp.h++"
+#include "pullrstp.h++"
+#include "scprpmtp.h++"
+#include "usrinftp.h++"
+
+@q ** (2) Declarations of additional functions.@>
+@ Declarations of additional functions.
+
+@<Declarations of additional functions@>=
+
+int 
+xxlex(YYSTYPE* lvalp, yyscan_t parameter);
+
+int
+xxwrap(void);
+
+int
+xxerror(void* v, char const* s);
+
+@q ** (2) Options.@>
+@ Options.
+
+@<Options@>=
+@=%verbose@>@;@/
+@=%pure-parser@>@;@/
+@=%parse-param {yyscan_t parameter}@>@;@/
+@=%name-prefix="xx"@>@;@/
+@=%lex-param {yyscan_t parameter}@>@;@/
+@=%debug@>
+
+@q ** (2) |union| declaration.@>
+@ {\bf union} declaration.
+
+\LOG
+\initials{LDF 2012.09.28.}
+Added |unsigned int uint_value|.
+
+\initials{LDF 2013.04.28.}
+Added |void *pointer_value|.
+\ENDLOG 
+
+@<|union| declaration@>=
+
+@=%union {@>
+
+  int int_value;
+  unsigned int uint_value;
+  unsigned long int ulint_value;
+  float float_value;
+  char string_value[1024];
+  void *pointer_value;
+
+@=}@>
+
+@q ** (2) Token and type declarations.@>
+@ Token and type declarations.
+\initials{LDF 2014.02.01.}
+
+\LOG
+\initials{LDF 2014.02.19.}
+Added token declarations for 
+|SERVER_IP_ADDRESS_XX|,
+|SERVER_HOSTNAME_XX|,
+|CLIENT_IP_ADDRESS_XX|,
+|CLIENT_HOSTNAME_XX|,
+|FORCE_XX|,
+|USER_ID_XX|,
+|USERNAME_XX| and
+|DISTINGUISHED_NAME_XX|.
+
+\initials{LDF 2014.02.20.}
+Added token declaration for |INTERVAL_XX|.
+
+\initials{LDF 2014.02.26.}
+Added token declaration for |DUMMY_STATEMENT_XX|.
+\ENDLOG 
+
+@q *** (3) Code  @>
+
+@<Token and type declarations@>=
+
+%token<int_value>    DUMMY_STATEMENT_XX@;@/
+
+%token<string_value> STRING_XX@;@/
+%token<int_value>    INTEGER_XX@;@/
+%token<uint_value>   UNSIGNED_INTEGER_XX@;@/
+%token<uint_value>   UNSIGNED_LONG_INTEGER_XX@;@/
+
+%token<int_value>    ADD_XX@;@/
+%token<int_value>    PULL_XX@;@/
+%token<int_value>    PATH_XX@;@/
+%token<int_value>    PATHS_XX@;@/
+%token<int_value>    INTERVAL_XX@;@/
+
+%token<int_value>    USER_ID_XX@;@/
+%token<int_value>    USERNAME_XX@;@/
+%token<int_value>    DISTINGUISHED_NAME_XX@;@/
+
+%token<int_value>    SERVER_IP_ADDRESS_XX@;@/
+%token<int_value>    SERVER_HOSTNAME_XX@;@/
+%token<int_value>    CLIENT_IP_ADDRESS_XX@;@/
+%token<int_value>    CLIENT_HOSTNAME_XX@;@/
+
+%token<int_value>    FORCE_XX@;@/
+
+%token<int_value>    END_XX@;@/
+
+@q ** (2) Rules.  @>
+@ Rules.
+
+@<Rules@>=
+
+@q *** (3) Program.  @>
+@ Program.
+\initials{LDF 2014.02.01.}
+
+@<Rules@>=
+
+@=program: statement_list END_XX@>
+{
+
+    Scan_Parse_Parameter_Type* param 
+         = static_cast<Scan_Parse_Parameter_Type*>(xxget_extra(parameter));
+
+#if DEBUG_COMPILE 
+    if (param->PARSER_DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread " << param->thread_ctr << "] program: statement_list END_XX" 
+             << endl
+             << "Exiting `xxparse' with return value 0."
+             << endl;
+        unlock_cerr_mutex(); 
+    }  /* |if (param->PARSER_DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+  
+    return 0;
+
+};
+
+@q *** (3) statement_list.  @>
+@ \<statement list>.
+\initials{LDF 2014.02.01.}
+
+@q **** (4) statement_list --> EMPTY.  @>
+
+@ \<statement list> $\longrightarrow$ \.{EMPTY}.  
+\initials{LDF 2014.02.01.}
+
+@<Rules@>=
+
+@=statement_list: /* Empty  */  @>
+{
+
+    Scan_Parse_Parameter_Type* param 
+         = static_cast<Scan_Parse_Parameter_Type*>(xxget_extra(parameter));
+
+#if DEBUG_COMPILE 
+    if (param->PARSER_DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread " << param->thread_ctr << "] statement_list: /* Empty */" << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |if (param->PARSER_DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+};
+
+@q **** (4) statement_list --> statement_list statement.  @>
+
+@ \<statement list> $\longrightarrow$ \<statement>.
+\initials{LDF 2012.07.30.}
+
+@<Rules@>=
+
+@=statement_list: statement_list statement @>
+{
+
+    Scan_Parse_Parameter_Type* param 
+         = static_cast<Scan_Parse_Parameter_Type*>(xxget_extra(parameter));
+
+#if DEBUG_COMPILE 
+    if (param->PARSER_DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread " << param->thread_ctr << "] statement_list: statement_list statement" 
+             << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |if (param->PARSER_DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+};
+
+@q **** (4) statement: ADD_XX PULL_XX PATH_XX add_pull_path_options filename_list  @>
+@q **** (4) and                                                                    @>
+@q **** (4) statement: ADD_XX PULL_XX PATHS_XX add_pull_path_options filename_list @>
+
+@ \<statement list> $\longrightarrow$ \.{ADD\_XX} \.{PULL\_XX} \.{PATH\_XX} 
+\<add pull path options> \<filename list> 
+and
+@ \<statement list> $\longrightarrow$ \.{ADD\_XX} \.{PULL\_XX} \.{PATHS\_XX} 
+\<add pull path options> \<filename list>.
+\initials{LDF 2014.02.16.}
+
+\LOG
+\initials{LDF 2014.02.20.}
+Replaced the two \.{STRING\_XX} items with \<filename list>.  
+Added second rule with \.{PATHS\_XX} instead of \.{PATH\_XX}.  
+The two rules share the same action.
+\ENDLOG 
+
+@<Rules@>=
+
+@=statement: ADD_XX PULL_XX PATH_XX add_pull_path_options filename_list @>
+@<Add pull paths action@>@;
+
+
+@=statement: ADD_XX PULL_XX PATHS_XX add_pull_path_options filename_list @>
+@<Add pull paths action@>@;
+
+
+@q ***** (5) Add pull paths action.  @>
+@ Add pull paths action
+\initials{LDF 2014.02.20.}
+
+\LOG
+\initials{LDF 2014.02.20.}
+Added this section.
+\ENDLOG
+
+@<Add pull paths action@>=
+{
+@q ***** (5) @>
+
+    Scan_Parse_Parameter_Type* param 
+         = static_cast<Scan_Parse_Parameter_Type*>(xxget_extra(parameter));
+
+    bool save_PARSER_DEBUG = param->PARSER_DEBUG;
+    param->PARSER_DEBUG = false;  /* |true|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE 
+    if (param->PARSER_DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread " << param->thread_ctr << "] In `xxparse', "
+             << "rule `statement: ADD_XX PULL_XX PATH(S)_XX "
+             << "add_pull_path_options filename_list'."
+             << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |if (param->PARSER_DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+    Pull_Response_Type *pull_path = static_cast<Pull_Response_Type*>(@=$4@>); 
+
+    int pull_paths_added = 0;
+
+    status = param->add_pull_paths(*pull_path, pull_paths_added);
+ 
+    if (status != 0)
+    {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `xxparse', rule"
+            << endl
+            << "`ADD_XX PULL_XX PATH(S)_XX add_pull_path_options filename_list':"
+            << endl
+            << "`Scan_Parse_Parameter_Type::add_pull_paths' failed, returning " 
+            << status << "."
+            << endl
+            << "Will try to continue."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++param->errors_occurred; 
+
+       lock_cerr_mutex(); 
+       lock_cout_mutex(); 
+       cout << "Add pull path(s) -->"
+            << endl
+            << "Error!  Failed to add pull path(s)."
+            << endl;
+       unlock_cout_mutex(); 
+       unlock_cerr_mutex(); 
+
+ 
+    }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<Add pull paths action@>=
+
+    else if (pull_paths_added == 0)
+    {
+        lock_cerr_mutex(); 
+        cerr << "WARNING!  In `xxparse', rule"
+             << endl
+             << "`ADD_XX PULL_XX PATH(S)_XX add_pull_path_options filename_list':"
+             << endl
+             << "`Scan_Parse_Parameter_Type::add_pull_paths' succeeded returning 0, " 
+             << "but `pull_paths_added' == 0."
+             << endl
+             << "Continuing."
+             << endl;
+        unlock_cerr_mutex(); 
+
+        ++param->warnings_occurred; 
+
+        lock_cerr_mutex(); 
+        lock_cout_mutex(); 
+        cout << "Add pull path(s) -->"
+             << endl
+             << "WARNING!  `Scan_Parse_Parameter_Type::add_pull_paths' succeeded, "
+             << "but no pull paths added."
+             << endl;
+        unlock_cout_mutex(); 
+        unlock_cerr_mutex(); 
+
+
+    }  /* |else if (pull_paths_added == 0)|  */
+
+@q ***** (5) @>
+@
+@<Add pull paths action@>=
+
+    else
+    {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       if (param->PARSER_DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `xxparse', rule " 
+                << "`ADD_XX PULL_XX PATH(S)_XX add_pull_path_options filename_list':"
+                << endl
+                << "`Scan_Parse_Parameter_Type::add_pull_path' succeeded, returning 0."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (param->PARSER_DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+       lock_cerr_mutex(); 
+       lock_cout_mutex(); 
+       cout << "Add pull path(s) -->"
+            << endl
+            << "Success.  Added " << pull_paths_added << " pull ";
+
+       if (pull_paths_added != 1)
+          cout << "paths." << endl;
+       else
+          cout << "path." << endl;
+
+       unlock_cout_mutex(); 
+       unlock_cerr_mutex(); 
+
+    }  /* |else|  */
+
+    delete pull_path;
+
+    param->filename_vector.clear();
+
+#if 0 
+
+    Response_Type response;
+    response.type = Response_Type::REGISTER_PULL_TYPE;
+    param->response_deque.push_back(response);
+
+#endif 
+
+
+
+    param->PARSER_DEBUG = save_PARSER_DEBUG; 
+
+};
+
+@q **** (4) add_pull_path_options  @>
+
+@ \<add pull path options>.
+\initials{LDF 2014.02.18.}
+
+@<Token and type declarations@>=
+
+%type<pointer_value> add_pull_path_options@;@/
+
+@q ***** (5) add_pull_path_options: /* Empty */  @>
+
+@ \<add_pull_path_options> $\longrightarrow$ \.{Empty}.
+\initials{LDF 2014.02.19.}
+
+@<Rules@>=
+@=add_pull_path_options: /* Empty */@>
+{
+    Scan_Parse_Parameter_Type* param 
+         = static_cast<Scan_Parse_Parameter_Type*>(xxget_extra(parameter));
+
+    bool save_PARSER_DEBUG = param->PARSER_DEBUG;
+    param->PARSER_DEBUG = false;  /* |true|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+    if (param->PARSER_DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread " << param->thread_ctr << "] In `xxparse', "
+             << "rule `add_pull_path_options: /* Empty */'."
+             << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |if (param->PARSER_DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    @=$$@> = static_cast<void*>(new Pull_Response_Type); 
+    
+
+};
+
+@q ***** (5) add_pull_path_options: add_pull_path_options USER_ID_XX INTEGER_XX @>
+
+@ \<add_pull_path_options> $\longrightarrow$ \<add_pull_path_options> 
+\.{USER\_ID\_XX} \.{INTEGER\_XX}.
+\initials{LDF 2014.02.19.}
+
+@<Rules@>=
+@=add_pull_path_options: add_pull_path_options USER_ID_XX INTEGER_XX @>
+{
+    Scan_Parse_Parameter_Type* param 
+         = static_cast<Scan_Parse_Parameter_Type*>(xxget_extra(parameter));
+
+    bool save_PARSER_DEBUG = param->PARSER_DEBUG;
+    param->PARSER_DEBUG = false;  /* |true|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+    if (param->PARSER_DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread " << param->thread_ctr << "] In `xxparse', "
+             << "rule `add_pull_path_options: add_pull_path_options "
+             << "USER_ID_XX INTEGER_XX'."
+             << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |if (param->PARSER_DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+     static_cast<Pull_Response_Type*>(@=$1@>)->user_id = @=$3@>; 
+};
+
+@q ***** (5) add_pull_path_options: add_pull_path_options USERNAME_XX STRING_XX @>
+
+@ \<add_pull_path_options> $\longrightarrow$ \<add_pull_path_options> 
+\.{USERNAME\_XX} \.{STRING\_XX}.
+\initials{LDF 2014.02.19.}
+
+@<Rules@>=
+@=add_pull_path_options: add_pull_path_options USERNAME_XX STRING_XX @>
+{
+    Scan_Parse_Parameter_Type* param 
+         = static_cast<Scan_Parse_Parameter_Type*>(xxget_extra(parameter));
+
+    bool save_PARSER_DEBUG = param->PARSER_DEBUG;
+    param->PARSER_DEBUG = false;  /* |true|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+    if (param->PARSER_DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread " << param->thread_ctr << "] In `xxparse', "
+             << "rule `add_pull_path_options: add_pull_path_options "
+             << "USERNAME_XX STRING_XX'."
+             << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |if (param->PARSER_DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+     static_cast<Pull_Response_Type*>(@=$1@>)->username = @=$3@>; 
+
+@q ****** (6) @>
+
+};
+
+@q ***** (5) add_pull_path_options: add_pull_path_options DISTINGUISHED_NAME_XX STRING_XX @>
+
+@ \<add_pull_path_options> $\longrightarrow$ \<add_pull_path_options> 
+\.{DISTINGUISHED\_NAME\_XX} \.{STRING\_XX}.
+\initials{LDF 2014.02.19.}
+
+@<Rules@>=
+@=add_pull_path_options: add_pull_path_options DISTINGUISHED_NAME_XX STRING_XX @>
+{
+    Scan_Parse_Parameter_Type* param 
+         = static_cast<Scan_Parse_Parameter_Type*>(xxget_extra(parameter));
+
+    bool save_PARSER_DEBUG = param->PARSER_DEBUG;
+    param->PARSER_DEBUG = false;  /* |true|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+    if (param->PARSER_DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread " << param->thread_ctr << "] In `xxparse', "
+             << "rule `add_pull_path_options: add_pull_path_options "
+             << "DISTINGUISHED_NAME_XX STRING_XX'."
+             << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |if (param->PARSER_DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+     static_cast<Pull_Response_Type*>(@=$1@>)->Distinguished_Name = @=$3@>; 
+
+@q ****** (6) @>
+
+};
+
+
+@q ***** (5) add_pull_path_options: add_pull_path_options SERVER_IP_ADDRESS_XX STRING_XX @>
+
+@ \<add_pull_path_options> $\longrightarrow$ \<add_pull_path_options> 
+\.{SERVER\_IP\_ADDRESS\_XX} \.{STRING\_XX}.
+\initials{LDF 2014.02.19.}
+
+@<Rules@>=
+@=add_pull_path_options: add_pull_path_options SERVER_IP_ADDRESS_XX STRING_XX @>
+{
+    Scan_Parse_Parameter_Type* param 
+         = static_cast<Scan_Parse_Parameter_Type*>(xxget_extra(parameter));
+
+    bool save_PARSER_DEBUG = param->PARSER_DEBUG;
+    param->PARSER_DEBUG = false;  /* |true|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+    if (param->PARSER_DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread " << param->thread_ctr << "] In `xxparse', "
+             << "rule `add_pull_path_options: add_pull_path_options "
+             << "SERVER_IP_ADDRESS_XX STRING_XX'."
+             << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |if (param->PARSER_DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+     static_cast<Pull_Response_Type*>(@=$1@>)->server_ip_address = @=$3@>; 
+
+@q ****** (6) @>
+
+};
+
+@q ***** (5) add_pull_path_options: add_pull_path_options SERVER_HOSTNAME_XX STRING_XX @>
+
+@ \<add_pull_path_options> $\longrightarrow$ \<add_pull_path_options> 
+\.{SERVER\_HOSTNAME\_XX} \.{STRING\_XX}.
+\initials{LDF 2014.02.19.}
+
+@<Rules@>=
+@=add_pull_path_options: add_pull_path_options SERVER_HOSTNAME_XX STRING_XX @>
+{
+@q ****** (6) @>
+
+    Scan_Parse_Parameter_Type* param 
+         = static_cast<Scan_Parse_Parameter_Type*>(xxget_extra(parameter));
+
+    bool save_PARSER_DEBUG = param->PARSER_DEBUG;
+    param->PARSER_DEBUG = false;  /* |true|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+    if (param->PARSER_DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread " << param->thread_ctr << "] In `xxparse', "
+             << "rule `add_pull_path_options: add_pull_path_options "
+             << "SERVER_HOSTNAME_XX STRING_XX'."
+             << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |if (param->PARSER_DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+     static_cast<Pull_Response_Type*>(@=$1@>)->server_hostname = @=$3@>; 
+
+@q ****** (6) @>
+
+};
+
+@q ***** (5) add_pull_path_options: add_pull_path_options CLIENT_IP_ADDRESS_XX STRING_XX @>
+
+@ \<add_pull_path_options> $\longrightarrow$ \<add_pull_path_options> 
+\.{CLIENT\_IP\_ADDRESS\_XX} \.{STRING\_XX}.
+\initials{LDF 2014.02.19.}
+
+@<Rules@>=
+@=add_pull_path_options: add_pull_path_options CLIENT_IP_ADDRESS_XX STRING_XX @>
+{
+    Scan_Parse_Parameter_Type* param 
+         = static_cast<Scan_Parse_Parameter_Type*>(xxget_extra(parameter));
+
+    bool save_PARSER_DEBUG = param->PARSER_DEBUG;
+    param->PARSER_DEBUG = false;  /* |true|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+    if (param->PARSER_DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread " << param->thread_ctr << "] In `xxparse', "
+             << "rule `add_pull_path_options: add_pull_path_options "
+             << "CLIENT_IP_ADDRESS_XX STRING_XX'."
+             << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |if (param->PARSER_DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+     static_cast<Pull_Response_Type*>(@=$1@>)->client_ip_address = @=$3@>; 
+};
+
+@q ***** (5) add_pull_path_options: add_pull_path_options CLIENT_HOSTNAME_XX STRING_XX @>
+
+@ \<add_pull_path_options> $\longrightarrow$ \<add_pull_path_options> 
+\.{CLIENT\_HOSTNAME\_XX} \.{STRING\_XX}.
+\initials{LDF 2014.02.19.}
+
+@<Rules@>=
+@=add_pull_path_options: add_pull_path_options CLIENT_HOSTNAME_XX STRING_XX @>
+{
+    Scan_Parse_Parameter_Type* param 
+         = static_cast<Scan_Parse_Parameter_Type*>(xxget_extra(parameter));
+
+    bool save_PARSER_DEBUG = param->PARSER_DEBUG;
+    param->PARSER_DEBUG = false;  /* |true|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+    if (param->PARSER_DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread " << param->thread_ctr << "] In `xxparse', "
+             << "rule `add_pull_path_options: add_pull_path_options "
+             << "CLIENT_HOSTNAME_XX STRING_XX'."
+             << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |if (param->PARSER_DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+     static_cast<Pull_Response_Type*>(@=$1@>)->client_hostname = @=$3@>; 
+};
+
+@q ***** (5) add_pull_path_options: add_pull_path_options FORCE_XX @>
+
+@ \<add_pull_path_options> $\longrightarrow$ \<add_pull_path_options> 
+\.{FORCE\_XX}.
+\initials{LDF 2014.02.19.}
+
+@<Rules@>=
+@=add_pull_path_options: add_pull_path_options FORCE_XX @>
+{
+    Scan_Parse_Parameter_Type* param 
+         = static_cast<Scan_Parse_Parameter_Type*>(xxget_extra(parameter));
+
+    bool save_PARSER_DEBUG = param->PARSER_DEBUG;
+    param->PARSER_DEBUG = false;  /* |true|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+    if (param->PARSER_DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread " << param->thread_ctr << "] In `xxparse', "
+             << "rule `add_pull_path_options: add_pull_path_options "
+             << "FORCE_XX'."
+             << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |if (param->PARSER_DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+     static_cast<Pull_Response_Type*>(@=$1@>)->force_flag = true;
+};
+
+@q ***** (5) add_pull_path_options: add_pull_path_options INTERVAL_XX INTEGER_XX @>
+
+@ \<add_pull_path_options> $\longrightarrow$ \<add_pull_path_options> 
+\.{INTERVAL\_XX} \.{INTEGER\_XX}.
+\initials{LDF 2014.02.20.}
+
+\LOG
+\initials{LDF 2014.02.20.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=add_pull_path_options: add_pull_path_options INTERVAL_XX INTEGER_XX @>
+{
+    Scan_Parse_Parameter_Type* param 
+         = static_cast<Scan_Parse_Parameter_Type*>(xxget_extra(parameter));
+
+    bool save_PARSER_DEBUG = param->PARSER_DEBUG;
+    param->PARSER_DEBUG = false;  /* |true|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+    if (param->PARSER_DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread " << param->thread_ctr << "] In `xxparse', "
+             << "rule `add_pull_path_options: add_pull_path_options "
+             << "INTERVAL_XX INTEGER_XX':"
+             << endl
+             << "`INTEGER_XX' (3) (pull interval) == " << @=$3@>
+             << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |if (param->PARSER_DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    if (@=$3@> <= 0)
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread " << param->thread_ctr << "] WARNING!  In `xxparse', "
+             << "rule `add_pull_path_options: add_pull_path_options "
+             << "INTERVAL_XX INTEGER_XX':"
+             << endl
+             << "`INTEGER_XX' (3) (pull interval) == " << @=$3@> << " (<= 0)."
+             << endl
+             << "Invalid value for pull interval.   Not setting pull interval."
+             << endl
+             << "Continuing."
+             << endl;
+        unlock_cerr_mutex(); 
+
+        ++param->warnings_occurred;        
+    }
+    else
+      static_cast<Pull_Response_Type*>(@=$1@>)->pull_interval = @=$3@>;
+};
+
+
+@q *** (3) filename_list.  @>
+
+@ \<filename list>.  
+\initials{LDF 2014.02.20.}
+
+\LOG
+\initials{LDF 2014.02.20.}
+Added this type declaration.
+\ENDLOG
+
+@<Token and type declarations@>=
+
+@=%type <int_value> filename_list@>
+
+@q **** (4) filename_list: STRING_XX@>
+@ \<filename list> $\longrightarrow$ \.{STRING\_XX}.
+\initials{LDF 2014.02.20.}
+
+
+\LOG
+\initials{LDF 2014.02.20.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=filename_list: STRING_XX @>
+{
+
+    Scan_Parse_Parameter_Type* param 
+        = static_cast<Scan_Parse_Parameter_Type*>(xxget_extra(parameter));
+
+#if DEBUG_COMPILE 
+    if (param->PARSER_DEBUG)
+    {
+
+        lock_cerr_mutex(); 
+        cerr << "[Thread " << param->thread_ctr << "] "
+             << "In `xxparse', rule `filename_list: STRING_XX." 
+             << endl;
+        unlock_cerr_mutex(); 
+    }  /* |if (param->PARSER_DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    @=$$@> = 0;
+
+    param->filename_vector.clear();
+    param->filename_vector.push_back(@=$1@>);
+
+};
+
+
+@q **** (4) filename_list: filename_list STRING_XX@>
+@ \<filename list> $\longrightarrow$ \<filename list> \.{STRING\_XX}.
+\initials{LDF 2014.02.20.}
+
+\LOG
+\initials{LDF 2014.02.20.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+@=filename_list: filename_list STRING_XX@>
+{
+
+    Scan_Parse_Parameter_Type* param 
+       = static_cast<Scan_Parse_Parameter_Type*>(xxget_extra(parameter));
+
+#if DEBUG_COMPILE 
+    if (param->PARSER_DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread " << param->thread_ctr << "] "
+             << "In `xxparse', rule `filename_list: filename_list STRING_XX'." 
+             << endl
+             << "`STRING_XX' == " << @=$2@>
+             << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |if (param->PARSER_DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    param->filename_vector.push_back(@=$2@>);
+
+};
+
+@q **** (4) statement: DUMMY_STATEMENT_XX  @>
+@ \<statement list> $\longrightarrow$ \.{DUMMY\_STATEMENT\_XX}.
+\initials{LDF 2014.02.26.}
+
+\LOG
+\initials{LDF 2014.02.26.}
+Added this rule.
+\ENDLOG
+
+@<Rules@>=
+
+@=statement: DUMMY_STATEMENT_XX @>@;
+{
+    Scan_Parse_Parameter_Type* param 
+         = static_cast<Scan_Parse_Parameter_Type*>(xxget_extra(parameter));
+
+    bool save_PARSER_DEBUG = param->PARSER_DEBUG;
+    param->PARSER_DEBUG = true;  /* |false|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE 
+    if (param->PARSER_DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread " << param->thread_ctr << "] In `xxparse', "
+             << "rule `statement: DUMMY_STATEMENT_XX'."
+             << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |if (param->PARSER_DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    Response_Type response;
+
+    response.type = Response_Type::COMMAND_ONLY_TYPE;
+
+    response.command = "WHOAMI";
+
+    param->response_deque.push_back(response);
+
+    param->PARSER_DEBUG = save_PARSER_DEBUG; 
+};
+
+@q **** (4) @>
+
+@q *** (3) @>
+
+@q ** (2) @>
+@
+@<Garbage@>=
+/* Empty  */
+
+@q ** (2) @>
+
+@ Putting parser together.
+@c
+@=%{@>
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+static stringstream temp_strm;
+static int status;
+static char buffer[BUFFER_SIZE];
+@<Declarations of additional functions@>@;@/
+#if 0 
+@<Garbage@>@;@/
+#endif 
+@=%}@>
+@<Options@>@;@/
+@<|union| declaration@>@;@/
+@<Token and type declarations@>@;@/
+@=%%@>
+@q Rules @>
+@<Rules@>@;@/
+
+@q ** (2) @>
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode) (setq abbrev-mode t)        @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+

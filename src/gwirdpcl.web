@@ -1,0 +1,2139 @@
+@q gwirdpcl.web  @>
+@q [...]/gwrdifpk/src/gwirdpcl.web  @>
+
+@q Created by Laurence D. Finston (LDF) Tue Jan 28 17:18:36 CET 2014 @>
+
+@q * (1) Top  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+@* Pull client program gwirdpcl.
+\initials{LDF 2014.01.30.}
+
+@q * (1) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#include <sys/types.h>
+#include <pwd.h>
+#include <errno.h>
+#include <grp.h>
+#include <sys/wait.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+#include <time.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <netinet/in.h>
+
+#include <string>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <stdarg.h>
+#include <limits.h>
+#include <algorithm>
+#include <fstream>
+#include <iterator>
+#include <math.h>
+#include <sstream>   
+
+#include <map>
+#include <vector>
+#include <deque>
+#include <stack>
+#include <set>
+
+#include <pthread.h>
+
+#if HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+#include <mysql.h>
+
+#include <expat.h>
+
+#undef NAME_LEN
+#undef LOCAL_HOST
+
+#include "rspercds.h++"
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "purgfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "cmdlnopt.h++"
+#include "rspnstp.h++" 
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "prsrclnt.h++"
+#include "scnrclnt.h++"
+#include "prsrcln2.h++"
+#include "scnrcln2.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+#include "plclfunc.h++"
+#include "gntlsfnc.h++"
+#include "helper.h++"
+#include "ex_rfc2818.h++"
+#include "usrinftp.h++"
+#include "pullrspn.h++"
+#include "pullpttp.h++"
+#include "pullrstp.h++"
+
+@q * (1) Finish gwirdpcl (exit handler).  @>
+@ Finish gwirdpcl (exit handler).
+\initials{LDF 2014.01.30.}
+
+@q ** (2) Definition  @>
+
+@<|finish_gwirdpcl| definition@>=
+void
+finish_gwirdpcl(void)
+{
+
+    bool DEBUG = false;  /* |true|  */
+    set_debug_level(DEBUG, 0, 0);
+
+    int status;
+
+#if DEBUG_COMPILE
+    if (DEBUG) 
+    {
+        lock_cerr_mutex(); 
+        cerr << "Entering `finish_gwirdpcl'." << endl;
+        unlock_cerr_mutex(); 
+    }
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q ** (2) @>
+
+   mysql_library_end();
+
+   if (gpg_key_id != 0)
+   {
+       memset(gpg_key_id, 0, 10);
+       munlock(gpg_key_id, 10);
+       delete[] gpg_key_id;
+       gpg_key_id = 0;
+        
+   }
+
+   if (gpg_passphrase != 0)
+   {
+       memset(gpg_passphrase, 0, gpg_passphrase_length);
+       munlock(gpg_passphrase, gpg_passphrase_length);
+       delete[] gpg_passphrase;
+       gpg_passphrase = 0;
+        
+   }
+
+   if (mysql_password != 0)
+   {
+       memset(mysql_password, 0, MYSQL_PASSWORD_LENGTH);
+       munlock(mysql_password, MYSQL_PASSWORD_LENGTH);
+       delete[] mysql_password;
+       mysql_password = 0;
+       
+   }
+
+   pthread_mutex_destroy(&cerr_mutex);
+   pthread_mutex_destroy(&cout_mutex);
+   pthread_mutex_destroy(&thread_ctr_mutex);
+   pthread_mutex_destroy(&session_data_mutex);
+   pthread_mutex_destroy(&gpg_passphrase_fifo_mutex);
+   pthread_mutex_destroy(&sql_mutex);
+   pthread_mutex_destroy(&sql_lock_tables_mutex);
+
+   if (gpg_passphrase_fifo_fd > 0)
+   {
+      close(gpg_passphrase_fifo_fd);
+      unlink(gpg_passphrase_fifo_name.c_str());
+   }
+
+#if DEBUG_COMPILE
+   if (DEBUG) 
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `finish_gwirdpcl'." << endl;
+       unlock_cerr_mutex(); 
+   }
+#endif  /* |DEBUG_COMPILE|  */  
+
+   return;
+
+}   /* End of |finish_gwirdpcl| definition  */
+
+
+@q * (1) Main  @>
+
+@ Main.
+\initials{LDF 2012.07.20.}
+
+@<|main| for gwirdpcl@>=
+
+@q ** (2) Definition.  @>
+
+int
+main (int argc, char *argv[])
+{
+@q *** (3) @>
+
+   is_gwirdpcl = true;
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   char buffer[BUFFER_SIZE];
+   memset(buffer, 0, BUFFER_SIZE);
+
+   string server_ip_address;
+
+   MYSQL_RES *result = 0;
+   MYSQL_ROW curr_row;
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+   long int affected_rows;
+
+   stringstream sql_strm;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdpcl] Entering `main'." << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   int status = atexit(finish_gwirdpcl);
+
+   if (status != 0) 
+   {
+       cerr << "[gwirdpcl] ERROR!  In `main':  Cannot set exit function.  "
+            << "Exiting program `gwirdpcl' with exit status 1." 
+            << endl;
+       exit(1);
+   }
+
+   pthread_mutex_init(&cerr_mutex, 0);
+   pthread_mutex_init(&cout_mutex, 0);
+   pthread_mutex_init(&thread_ctr_mutex, 0);
+   pthread_mutex_init(&session_data_mutex, 0);
+   pthread_mutex_init(&sql_mutex, 0);
+   pthread_mutex_init(&sql_lock_tables_mutex, 0);
+   pthread_mutex_init(&gpg_passphrase_fifo_mutex, 0);
+
+@q *** (3) @>
+@
+@<|main| for gwirdpcl@>=
+
+   char *temp_ptr = getenv("PWD");
+
+   string current_dir;
+
+   if (temp_ptr != 0)
+       current_dir = temp_ptr;
+   else
+   {
+       cerr << "[gwirdpcl] ERROR!  In `main':  Failed to set `current_dir'."
+            << endl 
+            << "Exiting program `gwirdpcl' with exit status 1." 
+            << endl;
+
+       exit(1);
+
+   }
+
+   temp_ptr = 0;
+
+   temp_ptr = getenv("HOME");
+
+   if (temp_ptr != 0)
+   {
+       gpg_homedir = temp_ptr;
+       gpg_homedir += "/.gnupg";
+   }
+   else
+   {
+       cerr << "[gwirdpcl] ERROR!  In `main':  Failed to set `gpg_homedir'."
+            << endl 
+            << "Exiting program `gwirdpcl' with exit status 1." 
+            << endl;
+
+       exit(1);
+
+   }
+
+@q *** (3) Process command-line options.  @>
+@ Process command-line options.
+\initials{LDF 2012.07.20.}
+
+\LOG
+\initials{LDF 2012.07.20.}
+Added this section.
+
+\initials{LDF 2013.08.29.}
+Added code for setting the variables for the port numbers.
+\ENDLOG
+
+@<|main| for gwirdpcl@>=
+
+    port_num_anon = DEFAULT_PORT_NUM_ANON;
+    port_str_anon = DEFAULT_PORT_STR_ANON;
+
+    port_num_x_509 = DEFAULT_PORT_NUM_X_509;
+    port_str_x_509 = DEFAULT_PORT_STR_X_509;
+
+    listen_client_port     = DEFAULT_LISTEN_CLIENT_PORT;
+    listen_client_port_str = DEFAULT_LISTEN_CLIENT_PORT_STR;
+
+    status = process_command_line_options(argc, argv);
+
+    if (status != 0)
+    {
+
+         cerr << "[gwirdpcl] ERROR!  In `main':  `process_command_line_options' failed, "
+              << "returning " << status << "."
+              << endl
+              << "Exiting `gwirdpcl' unsuccessfully with exit status 1."
+              << endl;
+
+         exit(1);
+
+    }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       cerr << "[gwirdpcl] In `main':  `process_command_line_options' succeeded, returning 0."
+            << endl
+            << "`gpg_homedir' == " << gpg_homedir
+            << endl;
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q *** (3) Initializations.  @>
+
+@ Initializations.  
+\initials{LDF 2012.10.02.}
+
+\LOG
+\initials{LDF 2012.10.02.}
+Added this section.
+
+\initials{LDF 2013.02.05.}
+Now calling |Handle_Value_Type::initialize_idx_type_map|.
+
+\initials{LDF 2013.02.22.}
+Changed name of |Handle_Value_Type::initialize_idx_type_map| to 
+|initialize_maps|.
+
+\initials{LDF 2013.05.02.}
+Now calling |initialize_signal_maps|.
+
+\initials{LDF 2013.07.28.}
+Now calling |init_gw_code_map|.
+\ENDLOG
+
+@<|main| for gwirdpcl@>=
+
+   initialize_signal_maps();
+   Response_Type::initialize_maps();
+   Dublin_Core_Metadata_Type::initialize_maps();
+   Handle_Value_Type::initialize_maps();
+   Scan_Parse_Parameter_Type::initialize_maps();
+   init_gw_code_map();
+
+@q *** (3) @>
+@
+\LOG
+\initials{LDF 2013.09.24.}
+Added this section.  It contains code formerly in the |Scan_Parse_Parameter_Type| 
+default constructor.
+\ENDLOG
+
+@<|main| for gwirdpcl@>=
+
+   struct passwd pwd;
+   struct passwd *pwd_result;
+
+   char pwd_buffer[_SC_GETPW_R_SIZE_MAX];
+   memset(pwd_buffer, 0, _SC_GETPW_R_SIZE_MAX);
+
+   status = getpwuid_r(getuid(), &pwd, pwd_buffer, _SC_GETPW_R_SIZE_MAX, &pwd_result);
+
+   if (status != 0 && pwd_result == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!    In `main':"
+            << endl 
+            << "`getpwuid_r' failed, returning " << status << ":"
+            << endl
+            << strerror(status)
+            << endl
+            << "Failed to retrieve user info.  Exiting `gwirdpcl' unsuccessfully with "
+            << "exit status 1."
+            << endl;
+         unlock_cerr_mutex(); 
+
+         exit(1);
+
+   }
+   else if (status == 0 && pwd_result == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `main':"
+            << endl 
+            << "`getpwuid_r' failed, returning 0."
+            << endl
+            << "No matching password record found for UID " << getuid() << "."
+            << endl 
+            << "Exiting `gwirdpcl' unsuccessfully with exit status 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       exit(1);
+
+   }
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `main':"
+            << endl 
+            << "`getpwuid_r' succeeded."
+            << endl
+            << "pwd.pw_name == " << pwd.pw_name << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q *** (3) @>
+@
+@<|main| for gwirdpcl@>=
+
+@q **** (4) @>
+
+   if (mysql_username.empty())
+   {
+      mysql_username = pwd.pw_name;  
+
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          cerr << "In `main':"
+                << endl 
+                << "`mysql_username' was not set using the `--mysql-username' command-line option:"
+                << endl
+                << "Set `mysql_username' to `pwd.pw_name' == " << mysql_username
+                << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   }  /* |if (mysql_username.empty())|  */
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `main':"
+            << endl 
+            << "`mysql_username' was set using the `--mysql-username' command-line option:"
+            << endl 
+            << "`mysql_username' == " << mysql_username 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+
+
+@q *** (3) Set |gpg_passphrase_fifo_name|, create FIFO |gpg_passphrase_fifo_id| @>
+@q *** (3) and open the latter for writing in non-blocking mode.                @>
+
+@ Set |gpg_passphrase_fifo_name|, create FIFO |gpg_passphrase_fifo_id|
+and open the latter for writing in non-blocking mode.               
+\initials{LDF 2013.10.04.}
+
+\LOG
+\initials{LDF 2013.10.04.}
+Added this section.
+\ENDLOG
+
+@q **** (4) @>
+
+@ Create temporary file so we have a unique name for the FIFO.
+\initials{LDF 2013.10.04.}
+
+@<|main| for gwirdpcl@>=
+
+    pthread_mutex_lock(&gpg_passphrase_fifo_mutex);
+
+    char temp_filename[] = "/tmp/gwirdpcl.decrypt.fifo.XXXXXX";
+    
+    errno = 0;
+    int fd = mkstemp(temp_filename);
+
+    if (fd == -1)
+    {
+            lock_cerr_mutex(); 
+            cerr << "ERROR!  In `main':"
+                 << endl 
+                 << "`mkstemp' failed, returning 0:"
+                 << endl
+                 << strerror(errno)
+                 << endl 
+                 << "Failed to create temporary file."
+                 << endl 
+                 << "Exiting `gwirdpcl' unsuccessfully with exit status 1."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            exit(1);
+
+    }  /* |if (fd == -1)|  */
+
+#if DEBUG_COMPILE
+    else if (DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "In `main':"
+             << endl 
+             << "`mkstemp' succeeded:  `temp_filename' == " << temp_filename 
+             << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@   
+@<|main| for gwirdpcl@>=
+
+   gpg_passphrase_fifo_name = temp_filename;
+
+   errno = 0;
+   status = unlink(gpg_passphrase_fifo_name.c_str());  /* We just need the name and 
+                                                          besides, we need to create
+                                                          a FIFO, not a regular file.
+                                                          \initials{LDF 2013.10.04.}  */
+   if (status == -1)
+   {
+      lock_cerr_mutex(); 
+      cerr << "[gwirdpcl] ERROR!  In `main':"
+           << endl 
+           << "`unlink' failed, returning -1:"
+           << endl 
+           << strerror(errno)
+           << endl
+           << "Failed to unlink `" << gpg_passphrase_fifo_name << "'."
+           << endl 
+           << "Exiting program `gwirdpcl' with exit status 1." 
+           << endl;
+      unlock_cerr_mutex(); 
+
+      pthread_mutex_unlock(&gpg_passphrase_fifo_mutex);
+
+      mysql_library_end();
+
+      exit(1);
+
+   }  /* |(status == -1)|  */
+
+@q *** (3) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "[gwirdpcl] In `main':"
+           << "In `main':  `unlink' succeeded, returning 0."
+           << endl 
+           << "Removed `" << gpg_passphrase_fifo_name << "' successfully."
+           << endl
+           << "Will recreate as FIFO."
+           << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|main| for gwirdpcl@>=
+
+   errno = 0;
+   status = mkfifo(gpg_passphrase_fifo_name.c_str(),  S_IRUSR | S_IWUSR);
+
+   if (status == -1)
+   {
+      lock_cerr_mutex(); 
+      cerr << "[gwirdpcl] ERROR!  In `main':"
+           << endl 
+           << "`mkfifo' failed, returning -1:"
+           << endl 
+           << strerror(errno)
+           << endl
+           << "Failed to created FIFO `" << gpg_passphrase_fifo_name << "'."
+           << endl 
+           << "Exiting program `gwirdpcl' with exit status 1." 
+           << endl;
+      unlock_cerr_mutex(); 
+
+      pthread_mutex_unlock(&gpg_passphrase_fifo_mutex);
+
+      mysql_library_end();
+
+      exit(1);
+
+   }  /* |if (status == -1)|  */
+
+@q *** (3) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "[gwirdpcl] In `main':"
+           << "`mkfifo' succeeded, returning 0."
+           << endl 
+           << "Created FIFO `" << gpg_passphrase_fifo_name << "' successfully."
+           << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|main| for gwirdpcl@>=
+
+   errno = 0;
+
+   gpg_passphrase_fifo_fd = open(gpg_passphrase_fifo_name.c_str(), O_RDWR | O_NONBLOCK);
+
+   if (gpg_passphrase_fifo_fd == -1)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdpcl] ERROR!  In `main':  `open' failed, returning -1:"
+            << endl        
+            << strerror(errno)
+            << endl
+            << "Failed to open FIFO `" << gpg_passphrase_fifo_name << "' for reading or writing "
+            << "in non-blocking mode."
+            << endl 
+            << "Exiting program `gwirdpcl' with exit status 1." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+       pthread_mutex_unlock(&gpg_passphrase_fifo_mutex);
+
+       mysql_library_end();
+
+       exit(1);
+
+   }  /* |if|  */
+
+@q *** (3) @>
+
+@ @:NOTE@> !! PLEASE NOTE:  |gpg_passphrase_fifo_mutex| must be unlocked before |set_password| 
+is called, because the latter locks it.
+\initials{LDF 2013.10.04.}
+
+@<|main| for gwirdpcl@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdpcl] In `main': `open' succeeded."
+            << endl
+            << "Opened FIFO `" << gpg_passphrase_fifo_name << "' "
+            << "for reading and writing, in non-blocking mode, successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   pthread_mutex_unlock(&gpg_passphrase_fifo_mutex);
+
+@q **** (4) @>
+
+@q *** (3) Check |mysql_password_filename| and set, if necessary.  @>
+
+@ Check |mysql_password_filename| and set, if necessary. 
+\initials{LDF 2014.02.11.}
+
+\LOG
+\initials{LDF 2014.02.11.}
+Added this section.
+\ENDLOG
+
+@<|main| for gwirdpcl@>=
+
+@q **** (4) @>
+
+   if (mysql_password_filename.empty() && (gpg_passphrase == 0 || strlen(gpg_passphrase) == 0))
+   {
+       cout << "[gwirdpcl] NOTICE!  In `main':"
+            << endl 
+            << "`mysql_password_filename' is empty and `gpg_passphrase' is NULL or empty."
+            << endl
+            << "Not decrypting MySQL password."
+            << endl 
+            << "Please note:  A secret key without a passphrase will be used for decryption "
+            << "of other items, if any."
+            << endl  
+            << "This is not very secure.  Do not do this unless you know the risks "
+            << "(see documentation)."
+            << endl;
+
+   }  /* |if (gpg_passphrase == 0 || strlen(gpg_passphrase) == 0)|  */
+
+@q **** (4) @>
+
+   else if (!mysql_password_filename.empty())
+   {
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cout << "[gwirdpcl] In `main':  `mysql_password_filename' is not empty:"
+                << endl
+                << "Will decrypt MySQL password."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       if (gpg_passphrase == 0 || strlen(gpg_passphrase) == 0)
+       {
+           cout << "[gwirdpcl] NOTICE!  In `main':  "
+                << "`gpg_passphrase' is NULL or empty."
+                << endl
+                << "Please note:  A secret key without a passphrase will be used for decryption."
+                << endl  
+                << "This is not very secure.  Do not do this unless you know the risks "
+                << "(see documentation)."
+                << endl;
+
+       }  /* |if|  */
+
+       status = set_password(mysql_password_filename, 
+                             mysql_password,
+                             MYSQL_PASSWORD_LENGTH,
+                             DEFAULT_MYSQL_PASSWORD_FILENAME,
+                             gpg_passphrase, 
+                             current_dir, 
+                             string(""));
+
+       if (status != 0)
+       {
+           cerr << "[gwirdpcl] ERROR!  In `main':  `set_password' failed, "
+                << "returning " << status << "."
+                << endl
+                << "Failed to set MySQL password."
+                << endl 
+                << "Exiting program `gwirdpcl' with exit status 1." 
+                << endl;
+
+
+
+           mysql_library_end();
+
+           exit(1);
+
+       }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "[gwirdpcl] In `main':  `set_password' succeeded, "
+                << "returning 0."
+                << endl 
+                << "`mysql_password' == " << mysql_password
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+   }  /* |else|  */
+
+@q **** (4) @>
+
+
+@q *** (3) @>
+@
+@<|main| for gwirdpcl@>=
+
+   MYSQL *mysql_ptr = mysql_init(0);
+
+   if (mysql_ptr)
+   {
+      if (DEBUG)
+      {
+         lock_cerr_mutex(); 
+         cerr << "[gwirdpcl] In `main':  " 
+              << "`mysql_init' succeeded."
+              << endl;
+         unlock_cerr_mutex();
+
+      }  /* |if (DEBUG)|  */ 
+
+   }  /* |if (mysql_ptr)| */
+
+   else
+   {
+      lock_cerr_mutex(); 
+      cerr << "[gwirdpcl] ERROR!  In `main':" 
+           << endl
+           << "`mysql_init' failed.  Exiting `gwirdpcl' unsuccessfully with "
+           << "exit status 1."
+           << endl;
+      unlock_cerr_mutex();
+ 
+      return 1;
+
+   }   
+
+@q *** (3) Set |mysql_socket_filename|.  @>
+@ Set |mysql_socket_filename|.  
+\initials{LDF 2014.02.11.}
+
+@<|main| for gwirdpcl@>=
+
+   string mysql_socket_filename;
+
+   errno = 0;
+
+   status = access("/var/run/mysql/mysql.sock", F_OK);
+
+
+   if (status == -1)
+   {  
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+         if (DEBUG)
+         {
+             lock_cerr_mutex(); 
+             cerr << "[gwirdpcl] In `main':" 
+                  << endl
+                  << "MySQL server socket file `/var/run/mysql/mysql.sock' doesn't exist:"
+                  << endl 
+                  << "`access' error: " << strerror(errno)
+                  << endl 
+                  << "Trying `/var/run/mysqld/mysqld.sock'."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+         }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+
+         errno = 0;
+
+         status = access("/var/run/mysqld/mysqld.sock", F_OK);
+
+         if (status == -1)
+         {
+              lock_cerr_mutex(); 
+              cerr << "[gwirdpcl] ERROR!  In `main':" 
+                   << endl
+                   << "MySQL server socket file `/var/run/mysqld/mysqld.sock' doesn't exist:"
+                   << endl 
+                   << "`access' error: " << strerror(errno)
+                   << endl
+                   << "Tested for `/var/run/mysql/mysql.sock' previously."
+                   << endl
+                   << "Exiting `gwirdpcl' unsuccessfully with "
+                   << "exit status 1."
+                   << endl;
+              unlock_cerr_mutex();
+
+              mysql_close(mysql_ptr); 
+              mysql_ptr = 0;
+ 
+              return 1;
+
+         }  /* |if (status == -1)|  */
+
+@q **** (4) @>
+ 
+         else
+         {
+#if DEBUG_COMPILE
+              if (DEBUG)
+              {
+                  lock_cerr_mutex(); 
+                  cerr << "[gwirdpcl] In `main':" 
+                       << endl
+                       << "MySQL server socket file `/var/run/mysqld/mysqld.sock' exists."
+                       << endl;
+                  unlock_cerr_mutex(); 
+
+              }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+              mysql_socket_filename = "/var/run/mysqld/mysqld.sock";
+
+         }  /* |else|  */
+
+@q **** (4) @>
+
+     }  /* |if (status == -1)|  */
+     
+@q *** (3) @>
+@
+@<|main| for gwirdpcl@>=
+
+     else
+     {
+#if DEBUG_COMPILE
+          if (DEBUG)
+          {
+              lock_cerr_mutex(); 
+              cerr << "[gwirdpcl] In `main':" 
+                   << endl
+                   << "MySQL server socket file `/var/run/mysql/mysql.sock' exists."
+                   << endl;
+              unlock_cerr_mutex(); 
+
+          }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+          mysql_socket_filename = "/var/run/mysql/mysql.sock";         
+
+     }  /* |else|  */
+
+@q *** (3) @>
+@
+@<|main| for gwirdpcl@>=
+
+     string temp_str;
+
+     stringstream temp_strm;
+
+@q ******* (7) @>
+@
+@<|main| for gwirdpcl@>=
+
+     my_bool reconnect    = 1;
+     unsigned int timeout = 120;
+
+     mysql_options(mysql_ptr, MYSQL_OPT_RECONNECT, &reconnect); 
+     mysql_options(mysql_ptr, MYSQL_OPT_CONNECT_TIMEOUT, &timeout); 
+
+#if 0 
+     mysql_options(mysql_ptr, MYSQL_INIT_COMMAND,"set time_zone = '+0:00'");
+#endif 
+
+     bool failed = false;
+
+@q *** (3) @>
+@
+@<|main| for gwirdpcl@>=
+
+#if DEBUG_COMPILE
+     if (DEBUG)
+     {
+         lock_cerr_mutex(); 
+         cerr << "[gwirdpcl] In `main' default constructor:"
+              << endl 
+              << "mysql_username == " << mysql_username << endl;
+
+         if (mysql_password != 0)
+            cerr << "[gwirdpcl] mysql_password == " << mysql_password << endl;
+         else
+            cerr << "[gwirdpcl] mysql_password == NULL" << endl;
+
+         unlock_cerr_mutex(); 
+
+     }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q *** (3) @>
+@
+@<|main| for gwirdpcl@>=
+
+     for (int i = 0; i < 6; ++i)
+     {
+
+
+          if (!mysql_real_connect(mysql_ptr, 
+                                  0, 
+                                  mysql_username.c_str(),
+                                  mysql_password, 
+                                  0,
+                                  0, 
+                                  mysql_socket_filename.c_str(), 0))
+          {
+             failed = true;
+
+             lock_cerr_mutex(); 
+             cerr << "[gwirdpcl] ERROR!  In `main':" 
+                  << endl
+                  << "`mysql_real_connect' failed.  "
+                  << "Error:  " << mysql_error(mysql_ptr)
+                  << endl 
+                  << "Error number:  " << mysql_errno(mysql_ptr)
+                  << endl;
+              unlock_cerr_mutex();
+
+              if (i == 5)
+              {
+                  lock_cerr_mutex(); 
+                  cerr << "[gwirdpcl] Exiting `gwirdpcl' unsuccessfully with "
+                       << "exit status 1."
+                       << endl;
+                  unlock_cerr_mutex(); 
+
+                  mysql_close(mysql_ptr); 
+                  mysql_ptr = 0;
+
+                  return 1;
+
+              }  /* |if|  */
+
+              else
+              {
+                  lock_cerr_mutex(); 
+                  cerr << "[gwirdpcl] Trying again, i.e., calling `mysql_real_connect' again."
+                       << endl;
+                  unlock_cerr_mutex(); 
+
+                  sleep(1);
+
+                  continue;
+
+              }
+
+          }  /* |if|  */
+
+          else
+          {
+              if (failed || DEBUG)
+              {
+                 lock_cerr_mutex(); 
+                 cerr << "[gwirdpcl] In `main':"
+                      << endl
+                      << "`mysql_real_connect' succeeded.  Database user name == " 
+                      << mysql_username << "."
+                      << endl; 
+                 unlock_cerr_mutex();
+              }   
+
+              failed = false;
+
+              break;
+
+          }  /* |else|  */
+
+     }  /* |for|  */
+
+@q *** (3) Check |mysql_password_filename| and set, if necessary.  @>
+
+@ Check |mysql_password_filename| and set, if necessary. 
+\initials{LDF 2013.10.04.}
+
+\LOG
+\initials{LDF 2013.10.04.}
+Added this section.
+\ENDLOG
+
+@<|main| for gwirdpcl@>=
+
+@q **** (4) @>
+
+   if (mysql_password_filename.empty() && (gpg_passphrase == 0 || strlen(gpg_passphrase) == 0))
+   {
+       cout << "[gwirdpcl] NOTICE!  In `main':"
+            << endl 
+            << "`mysql_password_filename' is empty and `gpg_passphrase' is NULL or empty."
+            << endl
+            << "Not decrypting MySQL password."
+            << endl 
+            << "Please note:  A secret key without a passphrase will be used for decryption "
+            << "of other items, if any."
+            << endl  
+            << "This is not very secure.  Do not do this unless you know the risks "
+            << "(see documentation)."
+            << endl;
+
+   }  /* |if (gpg_passphrase == 0 || strlen(gpg_passphrase) == 0)|  */
+
+@q **** (4) @>
+
+   else if (!mysql_password_filename.empty())
+   {
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cout << "[gwirdpcl] In `main':  `mysql_password_filename' is not empty:"
+                << endl
+                << "Will decrypt MySQL password."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       if (gpg_passphrase == 0 || strlen(gpg_passphrase) == 0)
+       {
+           cout << "[gwirdpcl] NOTICE!  In `main':  "
+                << "`gpg_passphrase' is NULL or empty."
+                << endl
+                << "Please note:  A secret key without a passphrase will be used for decryption."
+                << endl  
+                << "This is not very secure.  Do not do this unless you know the risks "
+                << "(see documentation)."
+                << endl;
+
+       }  /* |if|  */
+
+       status = set_password(mysql_password_filename, 
+                             mysql_password,
+                             MYSQL_PASSWORD_LENGTH,
+                             DEFAULT_MYSQL_PASSWORD_FILENAME,
+                             gpg_passphrase, 
+                             current_dir, 
+                             string(""));
+
+       if (status != 0)
+       {
+           
+           cerr << "[gwirdpcl] ERROR!  In `main':  `set_password' failed, "
+                << "returning " << status << "."
+                << endl
+                << "Failed to set MySQL password."
+                << endl 
+                << "Exiting program `gwirdpcl' with exit status 1." 
+                << endl;
+
+           exit(1);
+
+       }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "[gwirdpcl] In `main':  `set_password' succeeded, "
+                << "returning 0."
+                << endl 
+                << "`mysql_password' == " << mysql_password
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+   }  /* |else|  */
+
+@q **** (4) @>
+@
+@<|main| for gwirdpcl@>=
+
+   gnutls_global_init();
+
+   memset(buffer, 0, BUFFER_SIZE);
+
+   pthread_attr_t attr;
+
+   gnutls_certificate_credentials_t cert_cred;
+
+   gnutls_x509_crt_t *ca_list;  
+   unsigned int ca_list_size;
+
+   int err, listen_sd, i;
+   int ret;
+   struct sockaddr_in sa_serv;
+   struct sockaddr_in sa_cli;
+   int client_len;
+   char topbuf[512];
+   int optval = 1;
+
+   if (!config_dir.empty())
+   {
+       DEFAULT_CERT_FILENAME = DEFAULT_KEY_FILENAME = DEFAULT_CA_FILENAME
+         = config_dir;
+
+       DEFAULT_CERT_FILENAME += "/"; 
+       DEFAULT_KEY_FILENAME  += "/"; 
+       DEFAULT_CA_FILENAME   += "/"; 
+   }
+
+   DEFAULT_CERT_FILENAME += "user_cert.pem";  
+   DEFAULT_KEY_FILENAME  += "user_key.pem";
+   DEFAULT_CA_FILENAME   += "ca_cert.pem";
+   DEFAULT_CRL_FILENAME   = "";
+  
+   string curr_key_filename;
+   string curr_cert_filename;
+   string curr_ca_filename; 
+   string curr_crl_filename;  
+
+   size_t pos;
+
+@q **** (4) @>
+
+   if (key_filenames.size() == 0)
+       curr_key_filename = DEFAULT_KEY_FILENAME;
+   else
+   {
+       curr_key_filename = key_filenames[0];
+
+       if (!config_dir.empty())
+       {
+           pos = curr_key_filename.find("/");
+
+           if (pos == string::npos)
+           {
+               curr_key_filename.insert(0, "/");
+               curr_key_filename.insert(0, config_dir);
+           }
+       }
+   }
+
+@q **** (4) @>
+
+   if (cert_filenames.size() == 0)
+       curr_cert_filename = DEFAULT_CERT_FILENAME;
+   else
+   {
+       curr_cert_filename = cert_filenames[0];
+
+       if (!config_dir.empty())
+       {
+           pos = curr_cert_filename.find("/");
+
+           if (pos == string::npos)
+           {
+               curr_cert_filename.insert(0, "/");
+               curr_cert_filename.insert(0, config_dir);
+           }   
+       }
+
+   }
+
+@q ****** (6) @>
+
+   if (ca_filenames.size() == 0)
+       curr_ca_filename = DEFAULT_CA_FILENAME;
+   else
+   {
+       curr_ca_filename = ca_filenames[0];
+
+       if (!config_dir.empty())
+       {
+           pos = curr_ca_filename.find("/");
+
+           if (pos == string::npos)
+           {
+               curr_ca_filename.insert(0, "/");
+               curr_ca_filename.insert(0, config_dir);
+           }   
+       }
+   }
+
+@q ****** (6) @>
+
+   if (crl_filenames.size() == 0)
+       curr_crl_filename = DEFAULT_CRL_FILENAME;
+   else
+   {
+       curr_crl_filename = crl_filenames[0];
+
+       if (!config_dir.empty())
+       {
+           pos = curr_crl_filename.find("/");
+
+           if (pos == string::npos)
+           {
+               curr_crl_filename.insert(0, "/");
+               curr_crl_filename.insert(0, config_dir);
+           }   
+       }
+
+   }
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "cert_filenames.size() == " << cert_filenames.size() << endl 
+            << "key_filenames.size() ==  " << key_filenames.size() << endl 
+            << "ca_filenames.size() ==   " << ca_filenames.size() << endl 
+            << "curr_key_filename ==     " << curr_key_filename << endl
+            << "curr_cert_filename ==    " << curr_cert_filename << endl
+            << "curr_ca_filename ==      " << curr_ca_filename << endl
+            << "curr_crl_filename ==     " << curr_crl_filename << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   gnutls_certificate_allocate_credentials (&cert_cred);
+
+   status = gnutls_certificate_set_x509_trust_file (cert_cred,
+                                                    curr_ca_filename.c_str(),
+                                                    GNUTLS_X509_FMT_PEM);
+#if DEBUG_COMPILE 
+  if (DEBUG)
+  {
+      lock_cerr_mutex();
+      cerr << "In `main':"
+           << endl 
+           << "`gnutls_certificate_set_x509_trust_file' returned " << status
+           << " (the number of certificates processed)." 
+           << endl;
+      unlock_cerr_mutex(); 
+
+  }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+  if (curr_crl_filename != "")
+  {
+     status = gnutls_certificate_set_x509_crl_file (cert_cred, curr_crl_filename.c_str(),
+                                                    GNUTLS_X509_FMT_PEM);
+#if DEBUG_COMPILE 
+     if (DEBUG)
+     {
+         lock_cerr_mutex();
+         cerr << "In `main':"
+              << endl 
+              << "`gnutls_certificate_set_x509_crl_file' returned " << status
+              << " (the number of CRLs (certificate revocation lists) processed)." 
+              << endl;
+         unlock_cerr_mutex(); 
+
+     }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+  }  /* |if (curr_crl_filename != "")|  */
+
+  status = gnutls_certificate_set_x509_key_file (cert_cred, 
+                                                 curr_cert_filename.c_str(), 
+                                                 curr_key_filename.c_str(), 
+                                                 GNUTLS_X509_FMT_PEM);
+
+#if DEBUG_COMPILE
+  if (DEBUG)
+  {
+      lock_cerr_mutex();
+      cerr << "In `main':"
+           << endl
+           << "`gnutls_certificate_set_x509_key_file' returned " << status
+           << endl;
+      unlock_cerr_mutex(); 
+
+  }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+  if (status != GNUTLS_E_SUCCESS)
+  {
+      lock_cerr_mutex(); 
+      cerr << "ERROR!  In `main':"
+           << endl 
+           << "`gnutls_certificate_set_x509_key_file' returned "
+           << status << ":"
+           << endl
+           << gnutls_strerror(status)
+           << endl;
+      unlock_cerr_mutex(); 
+
+  }  /* |if (status != GNUTLS_E_SUCCESS)|  */
+
+#if DEBUG_COMPILE 
+  else if (DEBUG)
+  {
+      lock_cerr_mutex(); 
+      cerr << "In `main':"
+           << endl 
+           << "`gnutls_certificate_set_x509_key_file' returned GNUTLS_E_SUCCESS ("
+           << status << ")."
+           << endl;
+      unlock_cerr_mutex(); 
+
+  }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+  gnutls_certificate_get_x509_cas(cert_cred, &ca_list, &ca_list_size);
+
+#if DEBUG_COMPILE 
+  if (DEBUG)
+  {
+      lock_cerr_mutex(); 
+      cerr << "In `main':  "
+           << "ca_list_size == " << ca_list_size
+           << endl;
+      unlock_cerr_mutex(); 
+
+  }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+
+  gnutls_dh_params_t dh_params;
+  gnutls_rsa_params_t rsa_params;
+
+  generate_dh_params (dh_params);
+  generate_rsa_params (rsa_params);
+
+  if (TLS_SESSION_CACHE != 0)
+  {
+     wrap_db_init ();
+  }
+
+@q **** (4) @>
+
+  gnutls_certificate_set_dh_params (cert_cred, dh_params);
+  gnutls_certificate_set_rsa_export_params (cert_cred, rsa_params);
+
+  errno = 0;
+  listen_sd = socket (AF_INET, SOCK_STREAM, 0);
+
+  if (listen_sd == -1)
+  {
+      lock_cerr_mutex(); 
+      cerr << "[gwirdpcl] [Thread 0]  "
+           << endl 
+           << "ERROR!  In `main':  `socket' failed, returning -1:"
+           << endl 
+           << strerror(errno) << endl
+           << "Exiting thread function unsuccessfully with return value 0."
+           << endl;
+      unlock_cerr_mutex(); 
+      pthread_exit(0);
+  }
+  
+  memset (&sa_serv, '\0', sizeof (sa_serv));
+  sa_serv.sin_family = AF_INET;
+  sa_serv.sin_addr.s_addr = INADDR_ANY;
+  sa_serv.sin_port = htons (listen_client_port);
+
+  setsockopt (listen_sd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof (int));
+
+  errno = 0;
+  status = bind (listen_sd, (SA *) & sa_serv, sizeof (sa_serv));
+
+  if (status == -1)
+  {
+      lock_cerr_mutex(); 
+      cerr << "[gwirdpcl] [Thread 0]  " 
+           << "ERROR!  In `main':  `bind' failed, returning -1:"
+           << endl 
+           << strerror(errno) << endl
+           << "Exiting thread function unsuccessfully with return value 0."
+           << endl;
+      unlock_cerr_mutex(); 
+
+      close(listen_sd);
+
+      pthread_exit(0);
+  }
+
+  errno = 0;
+  status = listen (listen_sd, 1024);
+
+  if (status == -1)
+  {
+      lock_cerr_mutex(); 
+      cerr << "[gwirdpcl] [Thread 0]  " 
+           << "ERROR!  In `main':  `listen' failed, returning -1:"
+           << endl 
+           << strerror(errno) << endl
+           << "Exiting thread function unsuccessfully with return value 0."
+           << endl;
+      unlock_cerr_mutex(); 
+
+      close(listen_sd);
+
+      pthread_exit(0);
+  }
+
+  temp_strm.str("");
+
+  lock_cout_mutex(); 
+  lock_cerr_mutex(); 
+  cout << "[Thread 0]  In `main':  Pull client ready.  Listening to port " 
+       << listen_client_port << "."
+       << endl;
+  unlock_cerr_mutex(); 
+  unlock_cout_mutex(); 
+
+  client_len = sizeof(sa_cli);
+
+  pthread_attr_init(&attr); 
+  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+
+@q **** (4) Main accept loop.  @>
+
+@ Main accept loop.  \initials{LDF 2012.09.21.}
+
+@<|main| for gwirdpcl@>=
+
+   Distinguished_Name_Type distinguished_name;
+ 
+   X509_Cert_Type user_cert;
+
+   int loop_ctr = 0;
+
+   pthread_t id = 0UL;
+
+   int sock = 0;
+
+   Pull_Response_Type *curr_pull_response = 0;
+
+   gnutls_session_t session;
+
+   for(;;) 
+   { 
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `main':  At beginning of main accept loop ..." 
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|main| for gwirdpcl@>=
+
+      user_cert.clear();
+
+      curr_pull_response = new Pull_Response_Type;
+
+      sock = 0;
+
+      session = initialize_tls_session (cert_cred);
+
+      sock = accept (listen_sd, (SA *) &sa_cli, (socklen_t*) &client_len);
+
+      server_ip_address = inet_ntop (AF_INET, &sa_cli.sin_addr, topbuf, sizeof (topbuf));
+
+      lock_cout_mutex(); 
+      lock_cerr_mutex(); 
+      cout << "[gwirdpcl] [Thread 0]  " 
+           << "In `main':  Connection from " 
+           << server_ip_address
+           << ", port " << ntohs (sa_cli.sin_port) 
+           << endl; 
+      unlock_cerr_mutex();
+      unlock_cout_mutex(); 
+
+@q ***** (5) @>
+
+   gnutls_transport_set_ptr (session,
+                             reinterpret_cast<gnutls_transport_ptr_t>(sock));
+
+   status = gnutls_handshake (session);
+
+   if (status < 0) 
+   {
+
+      lock_cerr_mutex(); 
+      cerr << "ERROR!  In `main': *** Handshake has failed:" 
+           << endl; 
+      gnutls_strerror (status); 
+      cerr << endl 
+           << "Deinitializing `session'.  Continuing main accept loop." 
+           << endl;
+      unlock_cerr_mutex();
+
+      gnutls_deinit (session);
+
+      continue;
+
+   }  /* |if (status < 0)| */
+
+
+@q ***** (5) @>
+@
+@<|main| for gwirdpcl@>=
+
+   status = verify_certificate(session, &user_cert);
+
+   if (status != 0)
+   {
+
+      lock_cerr_mutex(); 
+      cerr << "ERROR!  In `main':  `verify_certificate' failed, "
+           << "returning " << status << "."
+           << endl
+           << "Deinitializing `session'.  Continuing main accept loop." 
+           << endl;
+      unlock_cerr_mutex();
+   
+      tcp_close(sock);
+      sock = 0;
+
+      gnutls_deinit (session);
+
+      continue;
+
+   }  /* |if (status != 0)|  */
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `main':  `verify_certificate' succeeded, returning 0."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       distinguished_name = user_cert;
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "[gwirdpcl] In `main':" << endl;
+
+           distinguished_name.show("distinguished_name:");
+
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2014.02.13.}
+Added this section.
+\ENDLOG
+
+@<|main| for gwirdpcl@>=
+
+@q ****** (6) @>
+
+       sql_strm.str("");
+
+       sql_strm << "select pull_server_id, server_hostname from gwirdcli.Pull_Servers "
+                << "where server_ip_address = '" << server_ip_address << "' "
+                << "and server_distinguished_name = '" << distinguished_name.output() << "' "
+                << "and pull_server_id > 0";
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `main':  `sql_strm.str()' == " << sql_strm.str()
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+       status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, &row_ctr, &field_ctr, 0);
+
+       if (status != 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << "ERROR!  In `main':  `submit_mysql_query' failed, "
+               << "returning " << status << "."
+               << endl
+               << "Failed to retrieve server information for "
+               << "`server_ip_address' == " << server_ip_address << ","
+               << endl 
+               << "`server_distinguished_name' == " << distinguished_name.output()
+               << endl 
+               << "from the `gwirdcli.Pull_Servers' database table."
+               << endl
+               << "Deinitializing `session'.  Continuing main accept loop." 
+               << endl;
+          unlock_cerr_mutex();
+
+          sql_strm.str("");
+   
+          if (result)
+          {
+             mysql_free_result(result); 
+             result = 0;
+          }
+
+          tcp_close(sock);
+          sock = 0;
+
+          gnutls_deinit (session);
+
+          continue;
+
+       }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+
+       else if (row_ctr == 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << "ERROR!  In `main':  `row_ctr' == 0:"
+               << endl
+               << "Failed to retrieve server information for "
+               << "`server_ip_address' == " << server_ip_address << ","
+               << endl 
+               << "`server_distinguished_name' == " << distinguished_name.output()
+               << endl 
+               << "from the `gwirdcli.Pull_Servers' database table."
+               << endl
+               << "Deinitializing `session'.  Continuing main accept loop." 
+               << endl;
+          unlock_cerr_mutex();
+
+          sql_strm.str("");
+
+          mysql_free_result(result); 
+          result = 0;
+   
+          tcp_close(sock);
+          sock = 0;
+
+          gnutls_deinit (session);
+
+          continue;
+
+       }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+
+@ It is sufficient if |row_ctr > 0|.  We don't need to examine the results.
+\initials{LDF 2014.02.13.}
+
+@<|main| for gwirdpcl@>=
+
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `main':  `row_ctr' == " << row_ctr << ":"
+               << endl
+               << "Retrieved server information for "
+               << "`server_ip_address' == " << server_ip_address << "," 
+               << endl 
+               << "`server_distinguished_name' == " << distinguished_name.output()
+               << endl 
+               << "from the `gwirdcli.Pull_Servers' database table successfully."
+               << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       sql_strm.str("");
+       mysql_free_result(result); 
+       result = 0;
+
+@q ****** (6) @>
+
+@q ***** (5) @>
+@
+@<|main| for gwirdpcl@>=
+
+       memset(buffer, 0, BUFFER_SIZE);
+       status = gnutls_record_recv (session, buffer, BUFFER_SIZE);
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "[gwirdpcl] [Thread 0]  In `main':"
+                << endl 
+                << "`status' == " << status
+                << endl
+                << "`buffer' =="
+                << endl
+                << buffer
+                << endl; 
+           unlock_cerr_mutex();       
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2014.02.11.}
+Added this section.
+\ENDLOG
+
+@<|main| for gwirdpcl@>=
+
+       status = curr_pull_response->set(string(buffer), server_ip_address);
+
+       if (status != 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << "ERROR!  In `main':  `Pull_Response_Type::set' failed, "
+               << "returning " << status << "."
+               << endl
+               << "Failed to set `*curr_pull_response'."
+               << endl 
+               << "Deinitializing `session'.  Continuing main accept loop." 
+               << endl;
+          unlock_cerr_mutex();
+   
+          delete curr_pull_response;
+          curr_pull_response = 0;
+
+          tcp_close(sock);
+          sock = 0;
+
+          gnutls_deinit (session);
+
+          continue;
+
+       }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|main| for gwirdpcl@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `main':  `Pull_Response_Type::set' succeeded, "
+                << "returning " << status << ":"
+                << endl;
+
+           curr_pull_response->show("*curr_pull_response:");
+
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|main| for gwirdpcl@>=
+
+       status = curr_pull_response->get_pull_response_from_database(mysql_ptr, true);
+
+       if (status == 2)
+       {
+          lock_cerr_mutex(); 
+          cerr << "WARNING!  In `main':  "
+               << "`Pull_Response_Type::get_pull_response_from_database' "
+               << "returned 2:"
+               << endl
+               << "No corresponding pull response in database."
+               << endl 
+               << "Will send message to server."
+               << endl;
+          unlock_cerr_mutex();
+           
+       }  /* |if (status == 2)|  */
+
+@q ***** (5) @>
+@
+@<|main| for gwirdpcl@>=
+
+       else if (status == 4)
+       {
+          lock_cerr_mutex(); 
+          cerr << "WARNING!  In `main':  "
+               << "`Pull_Response_Type::get_pull_response_from_database' "
+               << "returned 4:"
+               << endl
+               << "Pull response found in database, but it doesn't have any \"pull paths\"."
+               << endl 
+               << "Will send message to server."
+               << endl;
+          unlock_cerr_mutex();
+           
+       }  /* |if (status == 2)|  */
+
+
+@q ***** (5) @>
+@
+@<|main| for gwirdpcl@>=
+
+       else if (status != 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << "ERROR!  In `main':  "
+               << "`Pull_Response_Type::get_pull_response_from_database' failed, "
+               << "returning " << status << "."
+               << endl
+               << "Failed to retrieve pull response from database."
+               << endl 
+               << "Deinitializing `session'.  Continuing main accept loop." 
+               << endl;
+          unlock_cerr_mutex();
+           
+          delete curr_pull_response;
+          curr_pull_response = 0;
+
+          tcp_close(sock);
+          sock = 0;
+
+          gnutls_deinit (session);
+
+          continue;
+
+       }  /* |else if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|main| for gwirdpcl@>=
+
+@q ***** (5) @>
+@
+@<|main| for gwirdpcl@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `main':  `Pull_Response_Type::get_pull_response_from_database' "
+                << "succeeded, returning 0."
+                << endl;
+
+           curr_pull_response->show("*curr_pull_response:");
+
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|main| for gwirdpcl@>=
+
+       status = pthread_create(&id, 
+                               &attr,
+                               pull_response,
+                               static_cast<void*>(curr_pull_response));
+
+       if (status != 0)
+       {
+
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `main':  `pthread_create' failed, returning "
+                << status << ":"
+                << endl
+                << strerror(status)
+                << endl
+                << "Exiting `gwirdpcl' unsuccessfully with exit status 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           close(sock);
+           sock = 0;
+
+           gnutls_deinit (session);
+
+           exit(1);
+
+       }
+       else
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "In `main':  `pthread_create' succeeded, returning 0."
+                    << endl
+                    << "Continuing main \"accept\" loop."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           ++loop_ctr;
+
+           gnutls_deinit (session);
+
+           continue;
+
+       }  /* |else|  */
+ 
+@q ***** (5) @>
+
+   }  /* |for| (main accept loop)  */
+
+@q **** (4) Exit.  This code will never be reached in normal operation.  @>
+
+@ Exit.  This code will never be reached in normal operation.
+\initials{LDF 2012.09.21.}
+
+@<|main| for gwirdpcl@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdpcl] Exiting `main' successfully with exit status 0." << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   gnutls_global_deinit();
+
+   exit(0);
+
+@q *** (3) @>
+
+}  /* End of |main| definition  */
+
+@q ** (2) External function declarations.  @>
+
+@ External function declarations.  
+
+@<External function declarations@>=
+#if 0 
+int 
+xxparse(yyscan_t parameter);
+#endif 
+
+@q ** (2) @>
+
+@ Putting gwirdpcl together.
+\initials{LDF 2012.07.20.}
+
+@q *** (3) @>
+
+@ This is what's compiled.
+\initials{LDF 2012.07.20.}
+
+@c
+typedef void* yyscan_t;
+@<Include files@>@;@/
+
+#define SA struct sockaddr
+
+#define DH_BITS 1024
+
+#define SOCKET_ERR(err,s) if(err==-1) {perror(s);return(1);}
+
+using namespace std;
+using namespace gwrdifpk;
+GCRY_THREAD_OPTION_PTHREAD_IMPL;
+gnutls_anon_server_credentials_t anoncred;
+int yydebug;
+extern int xxdebug;
+@<|finish_gwirdpcl| definition@>@;@/
+@<External function declarations@>@;@/
+@<|main| for gwirdpcl@>@;@/
+
+@q Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))                           @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+@q ** (2) @>
+
+
+

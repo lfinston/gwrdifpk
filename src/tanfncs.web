@@ -1,0 +1,776 @@
+@q tanfncs.web @>
+
+@q Created by Laurence D. Finston (LDF) Thu Jul 19 10:53:25 CEST 2012  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+@q * (1) TAN functions (tanfncs.web).  @>
+
+@*  TAN functions (tanfncs\PERIOD web).
+
+\LOG
+\initials{LDF 2012.07.19.}
+Added this file.
+\ENDLOG
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif 
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stddef.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+
+#include <sys/types.h>
+#include <dirent.h>
+#include <string.h>
+#include <pwd.h>
+#include <errno.h>
+
+#include <pthread.h>
+
+#include <fstream>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <string>
+#include <sstream>  
+#include <deque>    
+#include <map>   
+#include <vector>   
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#include <mysql.h>
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+
+@q ** (2) Generate TANs.  @>
+@ Generate TANs.
+\initials{LDF 2012.07.16.}
+
+\LOG
+\initials{LDF 2012.07.16.}
+Added this function.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|generate_tans| declaration@>=
+int
+generate_tans(MYSQL *mysql_ptr, 
+              unsigned int target = 1000, 
+              unsigned int tans_per_iteration = 100,
+              string thread_ctr_str = "");
+
+@q *** (3) Definition  @>
+@
+@<|generate_tans| definition@>=
+int
+generate_tans(MYSQL *mysql_ptr, unsigned int target, 
+              unsigned int tans_per_iteration, string thread_ctr_str)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+#if DEBUG_COMPILE
+
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "Entering `generate_tans'." << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+
+#endif  /* |DEBUG_COMPILE|  */
+
+   int status;
+
+   FILE *fp = 0;
+
+   stringstream sql_strm;
+
+   string optpsgen_path = "/home/lfinsto/irods_proj/irods/Finston/gwrdifpk/src/optpsgen";
+
+   stringstream  cmd_strm;
+
+   cmd_strm << optpsgen_path << " --extra-random --length 29 --min-block-size=4 "
+            << "--max-block-size=4 --alnum --iter " 
+            << tans_per_iteration << " --delimiters \"'\" 2>/dev/null";
+
+   unsigned int local_buffer_size = 32 * tans_per_iteration + 1;
+
+   char buffer[local_buffer_size];
+
+   string insert_str;
+   size_t insert_str_len;
+
+#if DEBUG_COMPILE
+
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "In `generate_tans':  " << "local_buffer_size == " 
+            << local_buffer_size << endl;
+       unlock_cerr_mutex();        
+
+   }  /* |if (DEBUG)|  */
+
+#endif  /* |DEBUG_COMPILE|  */
+
+   string comma_str;
+
+   MYSQL_RES* result      = 0;
+   MYSQL_ROW curr_row;
+
+   unsigned int row_ctr   = 0;
+   unsigned int field_ctr = 0;
+   long affected_rows     = 0;
+
+   unsigned int TAN_ctr = 0;
+
+@q **** (4) Lock TANs table.  @>
+
+@ Lock TANs table.  
+\initials{LDF 2012.07.16.}
+
+@<|generate_tans| definition@>=
+
+   pthread_mutex_lock(&sql_lock_tables_mutex);
+
+   sql_strm << "lock tables TANs write";
+
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, 0, thread_ctr_str);   
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "ERROR!  In `generate_tans':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << ":"
+            << endl
+            << mysql_error(mysql_ptr)
+            << endl 
+            << "Failed to lock `TANs' database table."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+        unlock_cerr_mutex(); 
+
+        if (result)
+           mysql_free_result(result);
+
+        pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+        return 1;
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "In `generate_tans':  Locked `TANs' table successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   mysql_free_result(result);
+
+@q **** (4) Check how many unassigned TANs are already in the `TANs' database table.  @>
+
+@ Check how many unassigned TANs are already in the `TANs' database table.  
+\initials{LDF 2012.07.13.}
+
+@<|generate_tans| definition@>=
+
+   sql_strm.str("");
+
+   sql_strm << "select count(TAN) from TANs where user_id = 0";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "In `generate_tans':  " << "sql_strm.str() == " 
+            << sql_strm.str() << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */
+
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, &row_ctr, &field_ctr, 
+                               0, thread_ctr_str);
+
+   if (status != 0)
+   {
+        lock_cerr_mutex(); 
+        cerr << thread_ctr_str << "ERROR!  In `generate_tans':  "
+             << "`submit_mysql_query' failed, returning "
+             << status << "."
+             << endl 
+             << "Failed to retrieve number of TANs from database table `gwirdsif.TANs'."
+             << endl 
+             << "Exiting `generate_tans' unsuccessfully with return value 1."
+             << endl;
+         unlock_cerr_mutex(); 
+
+        if (result)
+        {
+           mysql_free_result(result);
+           result = 0;
+        }
+
+        submit_mysql_query("unlock tables", result, 
+                          mysql_ptr, 0, 0, 0, thread_ctr_str);   /* Try to unlock \.{TANs}
+                                                                    table.
+                                                                    \initials{LDF 2012.07.18.}  */
+
+        if (result)
+           mysql_free_result(result);
+
+        pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+        return 1;
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+        lock_cerr_mutex(); 
+        cerr << thread_ctr_str << "In `generate_tans':  `submit_mysql_query' succeeded."
+             << endl 
+             << "`row_ctr' == " << row_ctr << "."
+             << endl;
+        unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */
+
+@q **** (4) @>
+@
+@<|generate_tans| definition@>=
+
+   if ((curr_row = mysql_fetch_row(result)) == 0)
+   {
+       lock_cerr_mutex();
+       cerr << thread_ctr_str << "ERROR!  In `generate_tans':  `mysql_fetch_row' failed:"
+            << endl
+            << mysql_error(mysql_ptr)
+            << endl 
+            << "Exiting `generate_tans' unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+
+       mysql_free_result(result);
+
+
+       submit_mysql_query("unlock tables", result, 
+                          mysql_ptr, 0, 0, 0, thread_ctr_str);   /* Try to unlock \.{TANs}
+                                                                    table.
+                                                                    \initials{LDF 2012.07.18.}  */
+
+       if (result)
+          mysql_free_result(result);
+
+       pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+       return 1;
+
+   }  /* |if (curr_row = mysql_fetch_row(result) == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "In `generate_tans':  `mysql_fetch_row' succeeded."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */
+
+@q **** (4) @>
+@
+@<|generate_tans| definition@>=
+
+   if (curr_row[0] == 0 || strlen(curr_row[0]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "ERROR!  In `generate_tans':"
+            << endl 
+            << "`curr_row[0]' is NULL or empty.  Can't set `TAN_ctr'."
+            << endl 
+            << "Exiting `generate_tans' unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result);
+
+       submit_mysql_query("unlock tables", result, 
+                          mysql_ptr, 0, 0, 0, thread_ctr_str);   /* Try to unlock \.{TANs}
+                                                                    table.
+                                                                    \initials{LDF 2012.07.18.}  */
+
+       if (result)
+           mysql_free_result(result);
+
+
+       pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+       return 1;
+
+   }  /* |if (curr_row[0] == 0 || strlen(curr_row[0]) == 0)|  */
+
+   TAN_ctr = atoi(curr_row[0]);
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "In `generate_tans':  "
+            << "`TAN_ctr' == " << TAN_ctr << endl;
+       cerr << "cmd_strm.str() == " << cmd_strm.str() << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   mysql_free_result(result);
+   result = 0;
+
+@q **** (4) @>
+@
+@<|generate_tans| definition@>=
+
+   if (TAN_ctr >= target)
+   {
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `generate_tans':  "
+                << "`TAN_ctr' >= `target'" << endl
+                << "`TAN_ctr' == " << TAN_ctr
+                << endl
+                << "`target' == " << target
+                << endl 
+                << "Will unlock `TANs' table and exit function successfully."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+       goto UNLOCK_TANS_TABLE;
+
+   }  /* |if (TAN_ctr >= target)|  */
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2012.07.19.}
+No longer setting expiration date for new TANs.  It should be set when the
+TANs are assigned to a user.  There is no reason why an unassigned TAN should
+expire.  If an administrator suspects that the \.{TANs} table has been compromised,
+then all of the rows should be deleted.
+\ENDLOG 
+
+@<|generate_tans| definition@>=
+
+   insert_str = "insert ignore into TANs (TAN) values ";
+   insert_str_len = insert_str.length();
+   
+   while (TAN_ctr < target)
+   {
+@q ***** (5) @>
+
+       memset(buffer, 0, local_buffer_size);
+       errno = 0;
+       fp = popen(cmd_strm.str().c_str(), "r");
+
+       comma_str = "";
+
+       if (fp == 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "ERROR!  In `generate_tans':  "
+                << "`popen' failed.  Failed to execute `optpsgen'."
+                << endl
+                << "popen error:  " << strerror(errno)
+                << endl 
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           if (result)
+           {
+              mysql_free_result(result);
+              result = 0;
+           }
+
+           submit_mysql_query("unlock tables", result, 
+                               mysql_ptr, 0, 0, 0, thread_ctr_str);  /* Try to unlock \.{TANs}
+                                                                        table.
+                                                                     \initials{LDF 2012.07.18.}  */
+
+           if (result)
+              mysql_free_result(result);
+
+           pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+           return 1;
+       }
+#if DEBUG_COMPILE
+
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `generate_tans':  " << "`popen' succeeded." << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */
+
+       sql_strm.str("");
+
+       sql_strm << insert_str;
+     
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "feof(fp) == " << feof(fp) << endl;
+       cerr << "ferror(fp) == " << ferror(fp) << endl;
+       cerr << "strlen(buffer) == " << strlen(buffer) << endl;
+       cerr << "buffer == " << buffer << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+       while (!(feof(fp) || ferror(fp) || !fgets(buffer, local_buffer_size - 1, fp)))
+       {
+
+#if DEBUG_COMPILE
+
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_ctr_str << "In `generate_tans':  `buffer' == " 
+                     << endl << buffer << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+
+#endif  /* |DEBUG_COMPILE|  */
+
+          if (buffer[strlen(buffer) - 1] == '\n')
+             buffer[strlen(buffer) - 1] = '\0';
+
+          sql_strm << comma_str 
+                   << "(" << buffer << ")";
+
+          if (comma_str.empty())
+             comma_str = ", ";
+
+       }
+
+       pclose(fp);
+       fp = 0;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "In `generate_tans':  " << "sql_strm.str() == " 
+            << sql_strm.str() << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|generate_tans| definition@>=
+  
+       if (sql_strm.str().length() == insert_str_len)
+       {
+            lock_cerr_mutex(); 
+            cerr << thread_ctr_str << "ERROR!  In `generate_tans':"
+                 << endl 
+                 << "`sql_strm.str().length()' == `insert_str_len' == " 
+                 << insert_str_len << "."
+                 << endl 
+                 << "Failed to set values for MySQL insert command."
+                 << endl 
+                 << "Exiting `generate_tans' unsuccessfully with return value 1."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+
+            if (result)
+            {
+               mysql_free_result(result);
+               result = 0;
+            }
+
+            submit_mysql_query("unlock tables", result, 
+                               mysql_ptr, 0, 0, 0, thread_ctr_str);   /* Try to unlock \.{TANs}
+                                                                         table.
+                                                                    \initials{LDF 2012.07.18.}  */
+
+            if (result)
+               mysql_free_result(result);
+
+            pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+            return 1;
+
+
+       }  /* |if (sql_strm.str().length() == test_len)|  */
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `generate_tans':"
+                << endl 
+                << "`sql_strm.str().length()' != `insert_str_len'."
+                << endl 
+                << "Set values for MySQL insert command successfully."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q ***** (5) @>
+@
+@<|generate_tans| definition@>=
+
+       status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 
+                                    0, 0, &affected_rows, thread_ctr_str);
+
+       if (status != 0)
+       {
+            lock_cerr_mutex(); 
+            cerr << thread_ctr_str << "ERROR!  In `generate_tans':  "
+                 << "`submit_mysql_query' failed, returning "
+                 << status << "."
+                 << endl 
+                 << "Failed to write TANs to database table `gwirdsif.TANs'."
+                 << endl 
+                 << "Exiting `generate_tans' unsuccessfully with return value 1."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            if (result)
+            {
+               mysql_free_result(result);
+               result = 0;
+            }
+        
+
+            submit_mysql_query("unlock tables", result, 
+                               mysql_ptr, 0, 0, 0, thread_ctr_str);   /* Try to unlock \.{TANs}
+                                                                    table.
+                                                                    \initials{LDF 2012.07.18.}  */
+            if (result)
+               mysql_free_result(result);
+
+            pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+            return 1;
+
+       }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+            lock_cerr_mutex(); 
+            cerr << thread_ctr_str << "In `generate_tans':  `submit_mysql_query' succeeded."
+                 << endl 
+                 << "`affected_rows' == " << affected_rows << "."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */ 
+
+#endif  /* |DEBUG_COMPILE|  */
+
+       TAN_ctr += affected_rows;
+
+       mysql_free_result(result);
+       result = 0;
+  
+@q ***** (5) @>
+
+   }  /* |while|  */
+
+@q **** (4) Unlock TANs table.  @>
+
+@ Unlock TANs table.  
+\initials{LDF 2012.07.16.}
+
+@<|generate_tans| definition@>=
+
+UNLOCK_TANS_TABLE:
+
+   if (result)
+      mysql_free_result(result);
+   
+   status = submit_mysql_query("unlock tables", result, mysql_ptr, 0, 0, 0, thread_ctr_str); 
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "ERROR!  In `generate_tans':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << ":"
+            << endl
+            << mysql_error(mysql_ptr)
+            << endl 
+            << "Failed to unlock `TANs' database table."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+        unlock_cerr_mutex(); 
+
+        if (result)
+           mysql_free_result(result);
+
+        pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+        return 1;
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "In `generate_tans':  Unlocked `TANs' table successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   pthread_mutex_unlock(&sql_lock_tables_mutex);
+   mysql_free_result(result);
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "Exiting `generate_tans' successfully with return value 0." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+
+#endif  /* |DEBUG_COMPILE|  */
+
+   return 0;
+
+@q **** (4) @>
+
+}  /* End of |generate_tans| definition  */
+
+@q *** (3) @>
+
+@q ** (2) Putting utility functions together.@>
+
+@ Putting utility functions  together.
+\initials{LDF 2008.12.05.}
+
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+@<|generate_tans| declaration@>@;@/
+@<|generate_tans| definition@>@;@/
+
+@q *** (3) This is what's written to the header file `tanfncs.h'.  @>
+
+@ This is what's written to the header file \filename{tanfncs.h}.  
+\initials{LDF 2008.12.05.}
+
+@(tanfncs.h@>=
+#ifndef TANFNCS_H
+#define TANFNCS_H 1
+using namespace std;
+using namespace gwrdifpk;
+@<|generate_tans| declaration@>@;@/
+#endif 
+
+@q (progn (cweb-mode) (outline-minor-mode))                           @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

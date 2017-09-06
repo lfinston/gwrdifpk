@@ -1,0 +1,828 @@
+@q stpcrdbs.web @>
+@q [...]/gwrdifpk/src/stpcrdbs.web  @>
+
+@q Created by Laurence D. Finston (LDF) Wed Sep  4 14:36:15 CEST 2013 @>
+
+@q * (1) Top @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+@q ** (2) Include files@>
+
+@ Include files.
+\initials{LDF 2013.09.04.}
+
+@<Include files@>=
+
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <pthread.h>  /* POSIX threads  */
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
+
+#include <mysql.h>
+
+#include <expat.h>
+
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <fstream>
+#include <sstream>   
+#include <string>
+#include <getopt.h>
+
+#include <map>
+#include <vector>
+#include <deque>
+#include <set>
+#include <stack>
+#include <utility>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif 
+
+
+#include "rspercds.h++"
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "helper.h++"
+#include "tanfncs.h++"
+#include "pidfncs.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "usrinftp.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+
+#include "stpclopt.h++"
+
+
+@q ** (2) Create databases (|create_databases|).  @>
+
+@ Create databases (|create_databases|).
+\initials{LDF 2013.09.04.}
+
+\LOG
+\initials{LDF 2013.09.04.}
+Added this function.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|create_databases| declaration@>=
+
+int
+create_databases(Scan_Parse_Parameter_Type &param);
+
+@q *** (3) Definition  @>
+@ 
+@<|create_databases| definition@>=
+
+int
+create_databases(Scan_Parse_Parameter_Type &param)
+{
+@q *** (3) @>
+
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status;
+   stringstream sql_strm;
+
+   stringstream temp_strm;
+   string temp_str;
+   
+   size_t pos = 0;
+
+   MYSQL_RES* result = 0;
+   MYSQL_ROW curr_row;
+
+   size_t result_array_size = 16;
+
+   MYSQL_RES *result_array[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+   unsigned int row_ctr   = 0;
+   unsigned int field_ctr = 0;
+   long int affected_rows = 0;
+
+   vector<string> query_vector;
+
+   vector<unsigned int *> row_ctr_vector;
+   vector<unsigned int *> field_ctr_vector;
+   vector<long int *>     affected_rows_vector;
+
+   string comma_str;
+
+
+@q *** (3) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       cerr << "Entering `create_databases'." << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q *** (3) @>
+
+   sql_strm << "select schema_name from information_schema.schemata "
+            << "where schema_name = '" << handles_database_name << "' "
+            << "or schema_name = '" << gwirdsif_database_name << "' "
+            << "or schema_name = '" << gwirdcli_database_name << "'";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       cerr << "In `create_databases':  `sql_strm.str()' == " << sql_strm.str() 
+            << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   status = param.submit_mysql_query(sql_strm.str(), result, &row_ctr, &field_ctr); 
+
+   if (status != 0)
+   {
+
+       cerr << "ERROR!  In `create_databases':  `Scan_Parse_Parameter_Type::submit_mysql_query' "
+            << "failed, returning " << status << "."
+            << endl
+            << "Failed to query for database names."
+            << endl
+            << "Exiting `create_databases' unsuccessfully with return value 1."
+            << endl;
+
+       if (result)
+       {
+          mysql_free_result(result); 
+          result = 0;
+       }
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+@q *** (3) @>
+@
+@<|create_databases| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       cerr << "In `create_databases':  `Scan_Parse_Parameter_Type::submit_mysql_query' "
+            << "succeeded, returning 0."
+            << endl
+            << "Queried for database names successfully."
+            << endl
+            << "`row_ctr' == " << row_ctr
+            << endl;
+        
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+
+@q *** (3) @>
+@
+@<|create_databases| definition@>=
+
+   temp_strm.str("");
+
+   if (row_ctr == 0)
+   {
+        cerr << "Databases don't already exist.  Will create."
+             << endl;
+
+        handles_database_created  = gwirdsif_database_created = gwirdcli_database_created = true;
+
+   }  /* |if (row_ctr == 0)|  */
+
+@q *** (3) @>
+@
+@<|create_databases| definition@>=
+
+   else
+   {
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           cerr << "At least one database already exists.  Will check."
+                << endl;
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+
+       for (int i = 0; i < row_ctr; ++i)
+       {
+           if ((curr_row = mysql_fetch_row(result)) == 0)
+           {   
+               cerr << "ERROR!  In `create_databases':  "
+                    << "`mysql_fetch_row' failed:"
+                    << endl
+                    << mysql_error(param.mysql_ptr)
+                    << endl 
+                    << "Exiting `create_databases' unsuccessfully with return value 1."
+                    << endl;
+   
+               mysql_free_result(result);
+
+               return 1;
+
+           }  /* |if (curr_row = mysql_fetch_row(result) == 0)|  */
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+           else if (DEBUG)
+           {
+               cerr << "In `create_databases':  `mysql_fetch_row' succeeded."
+                    << endl;
+
+           }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */
+
+           if (curr_row[0] && strlen(curr_row[0]))
+              temp_strm << curr_row[0] << " ";
+
+       }  /* |for|  */
+
+
+@q **** (4) @>
+
+       if (temp_strm.str().empty())  /* This should never happen.  \initials{LDF 2013.09.03.}  */
+       {
+           cerr << "Databases don't already exist.  Will create."
+                << endl;
+
+           handles_database_created  = gwirdsif_database_created = gwirdcli_database_created 
+              = true;
+
+
+       }
+       else
+       {
+           temp_str = temp_strm.str();
+
+           pos = temp_str.find(handles_database_name);
+
+           if (pos != string::npos)
+              handles_database_exists  = true;
+           
+           pos = temp_str.find(gwirdsif_database_name);
+
+           if (pos != string::npos)
+              gwirdsif_database_exists  = true;
+
+           pos = temp_str.find(gwirdcli_database_name);
+
+           if (pos != string::npos)
+              gwirdcli_database_exists  = true;
+
+       }  /* |else|  */
+
+
+@q **** (4) @>
+
+
+   }  /* |else|  */
+
+@q *** (3) @>
+
+   temp_strm.str("");
+   sql_strm.str("");
+   mysql_free_result(result); 
+   result = 0;
+
+
+@q *** (3) @>
+@
+@<|create_databases| definition@>=
+
+   if (handles_database_exists)
+   {
+       cerr << "Handles database \"" << handles_database_name << "\" already exists."
+            << endl;
+   }
+   else
+   {
+       cerr << "Handles database \"" << handles_database_name << "\" doesn't already exist."
+            << endl;
+
+       temp_strm << "create database " << handles_database_name;
+
+       query_vector.push_back(temp_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       temp_strm.str("");  
+
+       handles_database_created  = true;
+
+   }
+
+@q **** (4) @>
+
+   if (gwirdsif_database_exists)
+   {
+       cerr << "Server-side database \"" << gwirdsif_database_name << "\" already exists."
+            << endl;
+   }
+   else
+   {
+       cerr << "Server-side database \"" << gwirdsif_database_name << "\" doesn't already exist."
+            << endl;
+
+       temp_strm << "create database " << gwirdsif_database_name;
+
+       query_vector.push_back(temp_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       temp_strm.str("");  
+
+       gwirdsif_database_created = true;
+
+   }
+
+@q **** (4) @>
+
+   if (gwirdcli_database_exists)
+   {
+       cerr << "Client-side database \"" << gwirdcli_database_name << "\" already exists."
+            << endl;
+   }
+   else
+   {
+       cerr << "Client-side database \"" << gwirdcli_database_name << "\" doesn't already exist."
+            << endl;
+
+       temp_strm << "create database " << gwirdcli_database_name;
+
+       query_vector.push_back(temp_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       temp_strm.str("");  
+
+       gwirdcli_database_created = true;
+
+   }
+
+@q *** (3) @>
+@
+@<|create_databases| definition@>=
+
+   if (drop && (handles_database_exists || gwirdsif_database_exists || gwirdcli_database_exists))
+   {
+@q **** (4) @>
+
+       temp_strm.str("");  
+
+       if (handles_database_exists)
+       {
+           cerr << "Handles database \"" << handles_database_name << "\" exists.  "
+                << "Will drop."
+                << endl;
+
+           temp_strm << "drop database " << handles_database_name;
+
+           query_vector.push_back(temp_strm.str());
+
+           row_ctr_vector.push_back(0);
+           field_ctr_vector.push_back(0);
+           affected_rows_vector.push_back(0);
+
+           temp_strm.str("");  
+
+           temp_strm << "create database " << handles_database_name;
+
+           query_vector.push_back(temp_strm.str());
+
+           row_ctr_vector.push_back(0);
+           field_ctr_vector.push_back(0);
+           affected_rows_vector.push_back(0);
+
+           temp_strm.str("");  
+
+           handles_database_created = true;
+
+
+       }
+
+       if (gwirdsif_database_exists)
+       {
+           cerr << "Server-side database \"" << gwirdsif_database_name << "\" exists.  "
+                << "Will drop."
+                << endl;
+
+           temp_strm << "drop database " << gwirdsif_database_name;
+
+           query_vector.push_back(temp_strm.str());
+
+           row_ctr_vector.push_back(0);
+           field_ctr_vector.push_back(0);
+           affected_rows_vector.push_back(0);
+
+           temp_strm.str("");  
+
+           temp_strm << "create database " << gwirdsif_database_name;
+
+           query_vector.push_back(temp_strm.str());
+
+           row_ctr_vector.push_back(0);
+           field_ctr_vector.push_back(0);
+           affected_rows_vector.push_back(0);
+
+           temp_strm.str("");  
+ 
+           gwirdsif_database_created = true;
+           
+
+
+       }
+
+       if (gwirdcli_database_exists)
+       {
+           cerr << "Client-side database \"" << gwirdcli_database_name << "\" exists.  "
+                << "Will drop."
+                << endl;
+
+           temp_strm << "drop database " << gwirdcli_database_name;
+
+           query_vector.push_back(temp_strm.str());
+
+           row_ctr_vector.push_back(0);
+           field_ctr_vector.push_back(0);
+           affected_rows_vector.push_back(0);
+
+           temp_strm.str("");  
+
+           temp_strm << "create database " << gwirdcli_database_name;
+
+           query_vector.push_back(temp_strm.str());
+
+           row_ctr_vector.push_back(0);
+           field_ctr_vector.push_back(0);
+           affected_rows_vector.push_back(0);
+
+           temp_strm.str("");  
+
+           gwirdcli_database_created = true;
+
+       }
+
+@q **** (4) @>
+@
+@<|create_databases| definition@>=
+
+@q **** (4) @>
+
+   }  /* |if (drop)|  */
+
+@q *** (3) @>
+@
+@<|create_databases| definition@>=
+
+   else  /* |drop == false|  */
+   {
+@q **** (4) @>
+
+       temp_strm.str("");  
+
+       if (handles_database_exists)
+       {
+           cerr << "Handles database \"" << handles_database_name << "\" already exists.  "
+                << "Not dropping and recreating."
+                << endl;
+
+       }
+       else
+       {
+           cerr << "Handles database \"" << handles_database_name << "\" doesn't already exist.  "
+                << "Creating."
+                << endl;
+
+       }
+
+@q **** (4) @>
+
+       if (gwirdsif_database_exists)
+       {
+
+           cerr << "Server-side database \"" << gwirdsif_database_name << "\" already exists.  "
+                << "Not dropping and recreating."
+                << endl;
+
+       }
+       else
+       {
+           cerr << "Server-side database \"" << gwirdsif_database_name << "\" "
+                << "doesn't already exist.  Creating."
+                << endl;
+
+       }
+
+
+@q **** (4) @>
+
+       if (gwirdcli_database_exists)
+       {
+           cerr << "Client-side database \"" << gwirdcli_database_name << "\" already exists.  "
+                << "Not dropping and recreating."
+                << endl;
+
+
+       }
+       else
+       {
+           cerr << "Client-side database \"" << gwirdcli_database_name << "\" "
+                << "doesn't already exist.  Creating."
+                << endl;
+
+       }
+
+@q **** (4) @>
+
+   }  /* |else| (|drop == false|) */
+
+
+@q *** (3) @>
+@
+@<|create_databases| definition@>=
+
+   if (query_vector.size() == 0)  /* Nothing to do.  Exit.  \initials{LDF 2013.09.03.}  */
+   {
+       cerr << "In `create_databases':  `query_vector.size()' == 0.  No SQL commands to execute."
+            << endl;
+
+       if (drop == true)
+       {
+           cerr << "`drop' == `true'.  This should never happen."
+                << endl
+                << "Exiting `create_databases' unsuccessfully with return value  1."
+                << endl;
+
+           delete_and_clear(result_array, 
+                            result_array_size, 
+                            row_ctr_vector, 
+                            field_ctr_vector,
+                            affected_rows_vector,
+                            query_vector);
+
+           return 1;
+
+       }
+       else
+       {
+
+            cerr << "Exiting `create_databases' with return value 2."
+                 << endl;
+
+            delete_and_clear(result_array, 
+                             result_array_size, 
+                             row_ctr_vector, 
+                             field_ctr_vector,
+                             affected_rows_vector,
+                             query_vector);
+
+            return 2;
+ 
+       }
+
+   }  /* |if (query_vector.size() == 0)|  */
+
+@q *** (3) @>
+@
+@<|create_databases| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+
+        cerr << "query_vector.size() == " << query_vector.size() 
+             << endl
+             << "`query_vector':"
+             << endl;
+
+        for (vector<string>::iterator iter = query_vector.begin();
+             iter != query_vector.end();
+             ++iter)
+        {
+
+            cerr << *iter << endl;
+
+        }
+
+        cerr << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q *** (3) @>
+@
+\LOG
+\initials{LDF 2013.09.04.}
+Added this section.
+\ENDLOG
+
+@<|create_databases| definition@>=
+
+
+   for (vector<string>::iterator iter = query_vector.begin();
+        iter != query_vector.end();
+        ++iter)
+   {
+
+       out_strm << *iter << ";" << endl << endl;
+
+   }
+
+   out_strm << endl;
+
+@q *** (3) @>
+@
+@<|create_databases| definition@>=
+
+   status = param.submit_mysql_queries(query_vector, 
+                                       result_array, 
+                                       row_ctr_vector, 
+                                       field_ctr_vector, 
+                                       affected_rows_vector, 
+                                       false);
+
+
+   if (status != 0)
+   {
+        cerr << "ERROR!  In `create_databases':  `submit_mysql_queries' failed, returning "
+             << status << "."
+             << endl
+             << "Exiting `create_databases' unsuccessfully with return value 1."
+             << endl;
+
+        delete_and_clear(result_array, 
+                         result_array_size, 
+                         row_ctr_vector, 
+                         field_ctr_vector,
+                         affected_rows_vector,
+                         query_vector);
+
+        out_strm << "/* Failed  */" << endl;
+
+        return 1;
+
+   }  /* |if (status != 0)|  */
+
+@q *** (3) @>
+@
+@<|create_databases| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       cerr << "In `create_databases':  `submit_mysql_queries' succeeded, returning 0."
+            << endl
+            << "Dropped (possibly) and created databases successfully."
+            << endl;
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   out_strm << "/* Succeeded  */" 
+            << endl << endl
+            << "/* ********************************************************************* */"
+            << endl << endl;
+            
+   delete_and_clear(result_array, 
+                    result_array_size, 
+                    row_ctr_vector, 
+                    field_ctr_vector,
+                    affected_rows_vector,
+                    query_vector);
+
+   if (result)
+   {   
+        mysql_free_result(result);
+        result = 0;
+   }
+
+   sql_strm.str("");
+
+@q *** (3) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       cerr << "Exiting `create_databases' successfully with return value 1." << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |create_databases| definition  */
+
+@q ** (2) This is what's compiled.  @>
+
+@ This is what's compiled.  
+\initials{LDF 2013.09.04.}
+
+@c
+using namespace std;
+@<Include files@>@;@/
+using namespace gwrdifpk;
+@<|create_databases| definition@>@;@/
+
+
+@q ** (2) This is what's written to the header file `stpcrdbs.h'.  @>
+
+@ This is what's written to the header file \filename{stpcrdbs.h}.
+\initials{LDF 2013.09.04.}
+
+@(stpcrdbs.h@>=
+#ifndef STPCRDBS_H
+#define STPCRDBS_H 1
+@<|create_databases| declaration@>@;@/
+#endif
+
+@q (progn (cweb-mode) (outline-minor-mode))                                @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+

@@ -1,0 +1,993 @@
+@q pullrspn.web  @>
+@q [...]/gwrdifpk/src/pullrspn.web  @>
+
+@q Created by Laurence D. Finston (LDF) Fri Jan 31 10:30:27 CET 2014  @>
+
+@q * (1) Top @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.                       @>
+@q Copyright (C) 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify     @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or    @>
+@q (at your option) any later version.                                  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git               @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@* Pull request function.
+\initials{LDF 2014.01.30.}
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE         
+#endif 
+
+#include <stdlib.h>  /* Standard Library for C  */
+#include <stdio.h>
+#include <errno.h>
+#include <limits.h>
+
+#include <unistd.h>
+
+#if 0 
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <limits.h>
+#endif 
+
+#include <string.h>
+
+#include <algorithm> /* Standard Template Library (STL) for C++  */
+#include <fstream> 
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <string>
+#include <time.h>
+#include <math.h>
+#include <sstream>  
+#include <deque>
+#include <stack>
+#include <vector>
+#include <set>
+
+#include <pthread.h>  /* POSIX threads  */
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+#include <expat.h>
+
+#include <mysql.h>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif 
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "rspercds.h++"
+#include "excptntp.h++"
+#include "helper.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "usrinftp.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "pullpttp.h++"
+#include "pullrstp.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+#include "gntlsfnc.h++"
+#include "ex_rfc2818.h++"
+#include "clntfncs.h++" 
+#include "plclfunc.h++"
+
+@q ** (2) Pull response thread function.@>
+
+@ Pull response thread function.
+\initials{LDF 2014.01.30.}
+
+@q *** (3) Declaration  @>
+
+@<|pull_response| declaration@>=
+
+void* 
+pull_response(void *v);
+
+@q *** (3) Definition  @>
+@
+@<|pull_response| definition@>=
+
+void* 
+pull_response(void *v)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status = 0;
+
+   stringstream temp_strm;
+   stringstream command_strm;
+
+   string temp_str;
+
+   string thread_str;
+
+   size_t pos = 0;
+
+   Pull_Response_Type *curr_pull_response = static_cast<Pull_Response_Type *>(v);
+
+   FILE *fp = 0;
+
+   char buffer[BUFFER_SIZE];
+   memset(buffer, 0, BUFFER_SIZE);
+
+   bool failed = false;
+
+   unsigned int update_database_flags = 0U;
+
+   int fd = 0;
+
+@q **** (4) @>
+@
+@<|pull_response| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `pull_response' (detached thread)."
+            << endl;
+  
+       curr_pull_response->show("*curr_pull_response:");
+
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|pull_response| definition@>=
+
+   Scan_Parse_Parameter_Type param;
+
+   param.PARSER_DEBUG = false;  /* |true|  */
+
+   param.data_filename = "";  /* |input_filename|  */
+   param.username = curr_pull_response->username;
+
+   if (curr_pull_response->pull_response_id == 0)
+   {
+        temp_strm.str("");
+        temp_strm << "PULL RESPONSE " << GW_NOTICE << " ";
+                  
+        if (curr_pull_response->pull_path_vector.size() == 0)
+           temp_strm << "\"\" \"\" ";
+        else if (curr_pull_response->pull_path_vector.size() == 1)
+           temp_strm << "\"" << curr_pull_response->pull_path_vector.back().local_path << "\" "
+                     << "\"" << curr_pull_response->pull_path_vector.back().remote_path << "\" ";
+        else
+           temp_strm << "\"(Multiple client-side paths)\" \"(Multiple server-side paths)\" ";
+
+        temp_strm << "\"No expired pull responses found\" ";
+
+        command_strm << temp_strm.str();
+
+        temp_strm.str("");
+   }
+
+@q **** (4) @>
+@
+@<|pull_response| definition@>=
+
+   else if (curr_pull_response->pull_path_vector.size() == 0)
+   {
+        temp_strm.str("");
+        temp_strm << "PULL RESPONSE " << GW_ERROR << " ";
+   
+        if (curr_pull_response->pull_path_vector.size() == 1)
+            temp_strm << "\"" << curr_pull_response->pull_path_vector.back().local_path << "\" "
+                      << "\"" << curr_pull_response->pull_path_vector.back().remote_path << "\" ";
+        else
+            temp_strm << "\"(Multiple client-side paths)\" \"(Multiple server-side paths)\" ";
+
+        temp_strm << "\"No pull paths in pull response\" ";
+
+        command_strm << temp_strm.str();
+
+        temp_strm.str("");
+
+   }  /* |else if (curr_pull_response->pull_path_vector.size() == 0)|  */
+
+@q **** (4) @>
+@
+@<|pull_response| definition@>=
+
+   else  /* |curr_pull_response->pull_path_vector.size() > 0|  */
+   {    
+@q ***** (5) @>
+@
+@<|pull_response| definition@>=
+
+        for (vector<Pull_Path_Type>::iterator iter 
+                = curr_pull_response->pull_path_vector.begin();
+             iter != curr_pull_response->pull_path_vector.end();
+             ++iter)
+        {    
+
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2014.02.13.}
+Added this section.
+\ENDLOG
+
+@<|pull_response| definition@>=
+
+@q ******* (7) @>
+
+             errno = 0;
+             status = access(iter->local_path.c_str(), F_OK);
+
+             if (status == -1)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "ERROR!  In `pull_response':"
+                      << endl
+                      << "`access' failed, returning -1."
+                      << endl 
+                      << "Failed to access file `iter->local_path' == " 
+                      << iter->local_path << ":"
+                      << endl
+                      << strerror(errno)
+                      << endl 
+                      << "Will send failure notice to server.  Continuing."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+                 temp_strm.str("");
+
+                 temp_strm << "PULL RESPONSE " << GW_ERROR << " "
+                           << "\"" << iter->local_path << "\" "
+                           << "\"" << iter->remote_path << "\" "
+                           << "\"Failed to access client-side file `" 
+                           << iter->local_path << "'.\" ";
+
+                 command_strm << temp_strm.str();
+  
+                 temp_strm.str("");
+
+                 continue;
+
+             }  /* |if (status == -1)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+             else if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "In `pull_response':"
+                      << endl
+                      << "`access' succeeded, returning 0."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|pull_response| definition@>=
+
+             if (curr_pull_response->latest_pull == 0)
+             {
+
+                temp_strm.str("");
+
+                temp_strm << "PUT -f PULL REQUEST " 
+                          << curr_pull_response->pull_request_id << " "
+                          << "\"" << iter->local_path << "\" " 
+                          << "remote_filename "
+                          << "\"" << iter->remote_path << "\" ";
+
+                command_strm << temp_strm.str();
+
+                temp_strm.str("");
+
+                update_database_flags |= Pull_Response_Type::LATEST_PULL;
+ 
+                continue;
+
+             }  /* |if (curr_pull_response->latest_pull == 0)|  */
+
+@q ****** (6) @>
+@
+@<|pull_response| definition@>=
+
+             else  /* |curr_pull_response->latest_pull != 0|  */
+             {
+@q ******* (7) @>
+
+                 temp_strm.str("");
+                 
+                 temp_strm << "a=`sha224sum " << iter->local_path << " 2>&1`; "
+                           << "echo $?; echo $a";
+
+                 fp = popen(temp_strm.str().c_str(), "r");
+
+                 if (fp == 0)
+                 {
+                    lock_cerr_mutex(); 
+                    cerr << "ERROR!  In `pull_response':"
+                         << endl
+                         << "`popen' failed, returning NULL."
+                         << endl
+                         << "Will send failure notice to server.  Continuing."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                    temp_strm.str("");
+
+                    temp_strm << "PULL RESPONSE " << GW_ERROR << " "
+                              << "\"" << iter->local_path << "\" "
+                              << "\"" << iter->remote_path << "\" "
+                              << "\"Failed to generate checksum\" ";
+
+                    command_strm << temp_strm.str();
+  
+                    temp_strm.str("");
+
+                    pclose(fp);
+                    fp = 0;  
+
+                    continue;
+                
+
+                 }  /* |if (fp == 0)|  */
+
+@q ******* (7) @>
+@
+@<|pull_response| definition@>=
+
+                 else  /* |fp != 0|  */
+                 {
+@q ******** (8) @>
+
+                     fread(buffer, 1, BUFFER_SIZE - 1, fp);
+
+#if DEBUG_COMPILE
+                     if (DEBUG)        
+                     {
+                         lock_cerr_mutex(); 
+                         cerr << "In `pull_response':"
+                              << endl
+                              << "`buffer' ==" 
+                              << endl 
+                              << buffer
+                              << endl;
+                         unlock_cerr_mutex(); 
+
+                     }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******** (8) @>
+
+                     temp_strm.str("");
+                     temp_strm << buffer;
+                     temp_strm.clear();
+                     temp_strm >> status;
+
+                     if (status != 0)
+                     {
+
+                         lock_cerr_mutex(); 
+                         cerr << "ERROR!  In `pull_response':"
+                              << endl
+                              << "`sha224sum' command, executed via `popen', failed, "
+                              << "returning " << status << ":"
+                              << endl
+                              << "`buffer' =="
+                              << endl
+                              << buffer
+                              << endl 
+                              << "Will send failure notice to server.  Continuing."
+                              << endl;
+                         unlock_cerr_mutex(); 
+
+                         temp_strm.str("");
+
+                         temp_strm << "PULL RESPONSE " << GW_ERROR << " "
+                                   << "\"" << iter->local_path << "\" "
+                                   << "\"" << iter->remote_path << "\" "
+                                   << "\"Failed to generate checksum\" ";
+
+                         command_strm << temp_strm.str();
+  
+                         temp_strm.str("");
+
+                         pclose(fp);
+                         fp = 0;  
+
+                         continue;
+
+                     }  /* |if (status != 0)|  */
+
+@q ******** (8) @>
+@
+@<|pull_response| definition@>=
+
+#if DEBUG_COMPILE
+                     else if (DEBUG)   
+                     {
+                         lock_cerr_mutex(); 
+                         cerr << "In `pull_response':"
+                              << endl
+                              << "`sha224sum' command, executed via `popen', succeeded, "
+                              << "returning 0." 
+                              << endl;
+                         unlock_cerr_mutex(); 
+
+                     }  /* |else if (DEBUG)|  */
+
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ******** (8) @>
+@
+@<|pull_response| definition@>=
+
+                     temp_str = "";
+
+                     temp_str = temp_strm.str();
+
+                     temp_strm.clear();
+                     temp_strm.str("");
+
+                     pos = temp_str.find('\n');
+
+                     if (pos == string::npos)
+                     {
+                         lock_cerr_mutex(); 
+                         cerr << "ERROR!  In `pull_response':"
+                              << endl
+                              << "Failed to read output of `sha224sum' command, "
+                              << "executed via `popen'."
+                              << endl
+                              << "`buffer' =="
+                              << endl
+                              << buffer
+                              << endl 
+                              << "Will send failure notice to server.  Continuing."
+                              << endl;
+                         unlock_cerr_mutex(); 
+
+                         temp_strm.str("");
+
+                         temp_strm << "PULL RESPONSE " << GW_ERROR << " "
+                                   << "\"" << iter->local_path << "\" "
+                                   << "\"" << iter->remote_path << "\" "
+                                   << "\"Failed to generate checksum\" ";
+
+                         command_strm << temp_strm.str();
+  
+                         temp_strm.str("");
+
+                         pclose(fp);
+                         fp = 0;  
+
+                         continue;
+
+                     }  /* |if (pos == string::npos)|  */
+
+@q ******** (8) @>
+@
+@<|pull_response| definition@>=
+
+
+                     temp_str.erase(0, pos + 1);
+
+                     pos = temp_str.find_first_of(" \t\n");
+
+                     if (pos != string::npos)
+                         temp_str.erase(pos);
+ 
+
+#if DEBUG_COMPILE
+                     if (DEBUG)        
+                     {
+                         lock_cerr_mutex(); 
+                         cerr << "temp_str == " << temp_str << endl;
+                         unlock_cerr_mutex(); 
+
+                     }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******** (8) @>
+@
+@<|pull_response| definition@>=
+
+                     if (temp_str == iter->checksum_sha224)
+                     {
+                         lock_cerr_mutex(); 
+                         cerr << "NOTICE!  In `pull_response':"
+                              << endl
+                              << "`sha224sum' of `iter->local_path' == "
+                              << "`" << iter->local_path << "' hasn't changed:"
+                              << endl
+                              << "`temp_str'              == " << temp_str
+                              << endl
+                              << "`iter->checksum_sha224' == " << iter->checksum_sha224
+                              << endl 
+                              << "Will send notice to server.  Continuing."
+                              << endl;
+                         unlock_cerr_mutex(); 
+
+                         temp_strm.str("");
+
+                         temp_strm << "PULL RESPONSE " << GW_IRODS_OBJECT_UNCHANGED << " "
+                                   << "\"" << iter->local_path << "\" "
+                                   << "\"" << iter->remote_path << "\" "
+                                   << "\"SHA224 checksum unchanged.  Not sending.\" ";
+
+                         command_strm << temp_strm.str();
+  
+                         temp_strm.str("");
+
+                         pclose(fp);
+                         fp = 0;  
+
+                         continue;
+
+                     }  /* |if|  */
+
+@q ******** (8) @>
+
+                     else
+                     {
+
+                         temp_strm.str("");
+
+                         temp_strm << "PUT -f PULL REQUEST " 
+                                   << curr_pull_response->pull_request_id << " "
+                                   << "\"" << iter->local_path << "\" " 
+                                   << "remote_filename "
+                                   << "\"" << iter->remote_path << "\" ";
+
+                         command_strm << temp_strm.str();
+   
+                         temp_strm.str("");
+
+                         iter->new_checksum_sha224 = temp_str;
+                         
+                         update_database_flags |= Pull_Response_Type::CHECKSUMS;
+
+                         update_database_flags |= Pull_Response_Type::LATEST_PULL;
+
+                     }
+
+@q ******** (8) @>
+@
+@<|pull_response| definition@>=
+
+                     memset(buffer, 0, BUFFER_SIZE);
+                     pclose(fp);
+                     fp = 0;  
+
+@q ******** (8) @>
+
+                  }  /* |else| (|fp != 0|)  */
+
+@q ******* (7) @>
+
+              }  /* |else| (|curr_pull_response->latest_pull != 0|)  */
+
+@q ****** (6) @>
+
+        }  /* |for|  */
+
+@q ***** (5) @>
+
+    }  /* |else| (|curr_pull_response->pull_path_vector.size() > 0|)  */
+
+@q ***** (5) @>
+
+    temp_strm.str("");
+
+    command_strm << "END";
+
+@q **** (4) @>
+@
+@<|pull_response| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `pull_response':"
+            << endl
+            << "`command_strm.str()' ==" 
+            << endl
+            << command_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|pull_response| definition@>=
+
+   if (command_strm.str().size() > BUFFER_SIZE - 1)
+   {
+@q ***** (5) @>
+      
+      char temp_filename[] = "/tmp/gwirdpcl.XXXXXX";
+
+      errno = 0;
+      fd = mkstemp(temp_filename);
+
+      if (fd == -1)
+      {
+          lock_cerr_mutex(); 
+          cerr << "ERROR!  In `pull_response':"
+               << endl
+               << "`mkstemp' failed, returning -1:"
+               << endl
+               << strerror(errno)
+               << endl 
+               << "Failed to create temporary file."
+               << endl
+               << "Exiting thread function unsuccessfully with exit status 0."
+               << endl;
+         unlock_cerr_mutex(); 
+
+         delete curr_pull_response;
+         pthread_exit(0);
+
+      }  /* |if (fd == -1)|  */
+
+@q ***** (5) @>
+@
+@<|pull_response| definition@>=
+
+#if DEBUG_COMPILE
+      else if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          cerr << "In `pull_response':"
+               << endl
+               << "`mkstemp' succeeded."
+               << endl
+               << "`temp_filename' == " << temp_filename
+               << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+ 
+      param.temp_file_vector.push_back(temp_filename);
+     
+@q ***** (5) @>
+@
+@<|pull_response| definition@>=
+
+      errno = 0;
+      status = write(fd, command_strm.str().c_str(), command_strm.str().size());
+
+      if (status == -1)
+      {
+          lock_cerr_mutex(); 
+          cerr << "ERROR!  In `pull_response':"
+               << endl
+               << "`write' failed, returning -1:"
+               << endl
+               << strerror(errno)
+               << endl 
+               << "Failed to write to temporary file `" << temp_filename << "'."
+               << endl
+               << "Exiting thread function unsuccessfully with exit status 0."
+               << endl;
+         unlock_cerr_mutex(); 
+ 
+         close(fd);
+
+         delete curr_pull_response;
+         pthread_exit(0);
+
+      }
+
+@q ***** (5) @>
+@
+@<|pull_response| definition@>=
+
+      else if (status != command_strm.str().size())
+      {
+          lock_cerr_mutex(); 
+          cerr << "ERROR!  In `pull_response':"
+               << endl
+               << "`status' == " << status << " (!= `command_strm.str().size()' == " 
+               << command_strm.str().size()
+               << endl
+               << "Failed to write contents of `command_strm' to temporary file "
+               << "`" << temp_filename << "'."
+               << endl
+               << "Exiting thread function unsuccessfully with exit status 0."
+               << endl;
+         unlock_cerr_mutex(); 
+ 
+         close(fd);
+         delete curr_pull_response;
+         pthread_exit(0);
+
+      }
+
+@q ***** (5) @>
+@
+@<|pull_response| definition@>=
+
+      close(fd);
+
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          cerr << "In `pull_response':"
+               << endl
+               << "Wrote contents of `command_strm' to temporary file "
+               << "`" << temp_filename << "' successfully."
+               << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+      memset(param.data_buffer, 0, BUFFER_SIZE);
+ 
+      param.data_filename = temp_filename;
+
+
+@q ***** (5) @>
+
+   }  /* |if (command_strm.str().size() > BUFFER_SIZE - 1)|  */
+
+@q **** (4) @>
+@
+@<|pull_response| definition@>=
+
+   else
+      strncpy(param.data_buffer, command_strm.str().c_str(), command_strm.str().length());
+
+   command_strm.str("");
+
+   status = pull_client_func(param, curr_pull_response->Distinguished_Name);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `pull_response':"
+            << endl
+            << "`pull_client_func' failed, returning " << status << "."
+            << endl 
+            << "Setting `failed' to `true'."
+            << endl; 
+       unlock_cerr_mutex(); 
+
+       failed = true;
+
+   }  /* |if (status != 0)|  */
+
+@q **** (4) @>
+@
+@<|pull_response| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `pull_response':"
+            << endl
+            << "`pull_client_func' succeeded, returning 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+@q **** (4) @>
+@
+@<|pull_response| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `pull_response':"
+            << endl
+            << "`pull_client_func' succeeded, returning 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|pull_response| definition@>=
+
+   if (update_database_flags > 0)
+   {
+       status = curr_pull_response->update_database(update_database_flags,
+                                                    param);
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `pull_response':"
+                << endl
+                << "`Pull_Response_Type::update_database' failed, returning " << status << ":"
+                << "Failed to update database entries for `curr_pull_response' "
+                << "in the `gwirdcli' database."
+                << endl; 
+           unlock_cerr_mutex(); 
+
+           failed = true;
+
+       }  /* |if (status != 0)|  */
+    
+   }  /* |if (update_database_flags > 0)|  */
+
+@q **** (4) @>
+@
+@<|pull_response| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `pull_response':"
+            << endl
+            << "`update_database_flags' == 0.  Not calling `Pull_Response_Type::update_database'"
+            << endl 
+            << "for `*curr_pull_response'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|pull_response| definition@>=
+
+    delete curr_pull_response;
+
+    if (failed)
+    {
+       lock_cerr_mutex(); 
+       cerr << "In `pull_response':  `failed' == `true'.  "
+            << endl
+            << "Exiting detached thread function unsuccessfully "
+            << "with exit status 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       pthread_exit(0);
+
+    }  /* |if (failed)|  */
+
+@q **** (4) @>
+@
+@<|pull_response| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting detached thread function `pull_response' successfully "
+            << "with exit status 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   pthread_exit(0);
+
+@q **** (4) @>
+
+}  /* End of |pull_response| definition  */
+
+@q *** (3) @>
+
+
+@q *** (3) @>
+
+@q ** (2) Putting pullrspn together.  @>
+@ Putting pullrspn together.  
+
+This is what's compiled.
+\initials{LDF 2013.04.09.}
+@c 
+using namespace std;
+@<Include files@>@;@/
+using namespace gwrdifpk;
+@<|pull_response| declaration@>@;@/
+@<|pull_response| definition@>@;@/
+
+@ This is what's written to the header file \filename{pullrspn.h}.
+\initials{LDF 2013.04.09.}
+
+@(pullrspn.h@>=
+#ifndef PULLRSPN_H
+#define PULLRSPN_H 1
+using namespace std;
+@<|pull_response| declaration@>@;@/
+#endif 
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))                          @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+

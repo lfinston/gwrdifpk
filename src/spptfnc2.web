@@ -1,0 +1,4075 @@
+@q spptfnc2.web  @>
+@q Created by Laurence D. Finston (LDF) Fri Aug 16 15:45:45 CEST 2013  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+@q ** (2) spptfnc2.web  @>
+@* {\bf Scan\_Parse\_Parameter\_Type} function definitions 2.
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+#include <stdlib.h>  /* Standard Library for C  */
+#include <stdio.h>
+#include <sys/mman.h>
+#include <errno.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <limits.h>
+#include <string.h>
+#include <ctype.h>
+
+#include <algorithm> /* Standard Template Library (STL) for C++  */
+#include <bitset>
+#include <fstream> 
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <string>
+#include <time.h>
+#include <math.h>
+#include <sstream>  
+
+#include <vector>
+#include <deque>
+#include <stack>
+#include <set>
+
+#include <pthread.h>  /* POSIX threads  */
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+#include <mysql.h>
+
+#include <expat.h>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif 
+
+#undef NAME_LEN
+#undef LOCAL_HOST
+
+#include "rspercds.h++"
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "helper.h++"
+#include "tanfncs.h++"
+#include "pidfncs.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "pullrqtp.h++"
+#include "pullpttp.h++"
+#include "pullrstp.h++"
+#include "scprpmtp.h++"
+#include "usrinftp.h++"
+
+
+@q ** (2) @>
+@
+@<External function declarations@>=
+int 
+yyparse(yyscan_t parameter);
+
+@q ** (2) |Scan_Parse_Parameter_Type| functions 2.@>
+@ {\bf Scanner\_Type} functions 2.
+\initials{LDF 2013.08.16.}
+
+@q *** (3) Undelete files (|undelete_files|).  @>
+
+@ Undelete files (|undelete_files|).
+\initials{LDF 2013.08.16.}
+
+\LOG
+\initials{LDF 2013.08.16.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Definition  @>
+
+@<|Scan_Parse_Parameter_Type::undelete_files| definition@>=
+int
+Scan_Parse_Parameter_Type::undelete_files(Response_Type &response, string thread_str)
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+  
+   int status = 0;
+   
+   Response_Type new_response;
+
+   stringstream temp_strm;
+
+   string filename_str;
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Scan_Parse_Parameter_Type::undelete_files'."
+            << endl; 
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   vector<Response_Type> response_vector;
+
+   bool database = false;
+   bool archive  = true;
+
+   unsigned int option_ctr = 0U;
+
+   if (response.options & 1U)
+   {
+      option_ctr |= 1U;
+      database = true;
+   }
+
+
+   if (response.options & 2U)
+   {
+       option_ctr |= 2U;
+       database = true;
+       archive  = false;
+
+   }
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::undelete_files| definition@>=
+
+   if (response.string_vector.size() == 0)
+   {
+       new_response.type = Response_Type::COMMAND_ONLY_TYPE;
+
+       temp_strm << "UNDELETE RESPONSE 1 " << option_ctr << "U "
+                 << "\"\" \"No iRODS objects specified\"";
+
+       new_response.command = temp_strm.str();
+ 
+       response_deque.push_back(new_response);
+
+       return 1;
+
+   }  /* |if (response.string_vector.size() == 0)|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::undelete_files| definition@>=
+
+   size_t pos;
+
+   vector<Irods_Object_Type> irods_object_vector;
+
+   Irods_Object_Type curr_irods_object;
+
+   bool set_ellipsis = false;
+
+   for (vector<string>::iterator iter = response.string_vector.begin();
+        iter != response.string_vector.end();
+        ++iter)
+   {
+@q ****** (6) @>
+
+        curr_irods_object.clear();
+
+        pos = iter->find("/");
+
+        if (pos == string::npos)
+        {
+            iter->insert(0, "/");
+            iter->insert(0, irods_current_dir);
+        }
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `Scan_Parse_Parameter_Type::undelete_files':"
+                 << endl
+                 << "`*iter' == " << *iter
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q ****** (6) @>
+
+        if (filename_str.empty())
+            filename_str = *iter;
+        else if (set_ellipsis == false)
+        {
+            filename_str += " ...";
+            set_ellipsis = true;
+        }
+
+        curr_irods_object.clear();
+
+        status = curr_irods_object.set(user_id, *iter);
+
+        if (status != 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::undelete_files':"
+                 << endl
+                 << "`Irods_Object_Type::set' failed, returning " << status << "."
+                 << endl
+                 << "Will try to continue."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            new_response.type = Response_Type::COMMAND_ONLY_TYPE;
+
+            temp_strm << "UNDELETE RESPONSE 2 " << option_ctr << "U \"" << *iter << "\" "
+                      << "\"Failed to set iRODS object\"";      
+
+            new_response.command = temp_strm.str();
+ 
+            response_deque.push_back(new_response);
+
+            ++errors_occurred; 
+
+            continue;
+            
+        }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `Scan_Parse_Parameter_Type::undelete_files':"
+                 << endl
+                 << "`Irods_Object_Type::set' succeeded, returning 0."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::undelete_files| definition@>=
+
+       status = curr_irods_object.get_from_database(mysql_ptr, false);         
+
+        if (status <= 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::undelete_files':"
+                 << endl
+                 << "`Irods_Object_Type::get_from_database' failed, returning " << status << "."
+                 << endl
+                 << "Will try to continue."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            new_response.type = Response_Type::COMMAND_ONLY_TYPE;
+
+            temp_strm << "UNDELETE RESPONSE 3 " << option_ctr << "U \"" << *iter << "\" "
+                      << "\"Failed to retrieve iRODS object from `gwirdsif' database\"";      
+
+            new_response.command = temp_strm.str();
+ 
+            response_deque.push_back(new_response);
+
+            ++errors_occurred; 
+
+            continue;
+            
+        }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `Scan_Parse_Parameter_Type::undelete_files':"
+                 << endl
+                 << "`Irods_Object_Type::set' succeeded, returning 0."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+        irods_object_vector.push_back(curr_irods_object);
+
+@q ****** (6) @>
+
+   }  /* |for|  */
+
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::undelete_files| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::undelete_files':"
+            << endl
+            << "`irods_object_vector.size()' == " << irods_object_vector.size()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::undelete_files| definition@>=
+
+   if (irods_object_vector.size() == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::undelete_files':"
+            << endl
+            << "`irods_object_vector.size()' == 0."
+            << endl
+            << "No iRODS objects retrieved from `gwirdsif' database."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       new_response.type = Response_Type::COMMAND_ONLY_TYPE;
+
+       temp_strm << "UNDELETE RESPONSE 1 " << option_ctr << "U \"" << filename_str << "\" "
+                 << "\"No iRODS objects retrieved from `gwirdsif' database\"";      
+
+       new_response.command = temp_strm.str();
+ 
+       response_deque.push_back(new_response);
+ 
+       ++errors_occurred; 
+
+       return 1;
+
+   }  /* |if (irods_object_vector.size() == 0)|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::undelete_files| definition@>=
+
+
+ 
+   status = Irods_Object_Type::undelete_irods_objects(irods_object_vector, 
+                                                      mysql_ptr, 
+                                                      archive,
+                                                      database, 
+                                                      response_vector,
+                                                      irods_env_filename,
+                                                      thread_str);
+
+   if (status != 0)
+   {
+
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::undelete_files':"
+            << endl
+            << "`Irods_Object_Type::undelete_irods_objects' failed, returning " 
+            << status << "."
+            << endl
+            << "Failed to undelete iRODS objects."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       new_response.type = Response_Type::COMMAND_ONLY_TYPE;
+
+       temp_strm << "UNDELETE RESPONSE 1 " << option_ctr << "U "
+                 << "\"" << filename_str << "\" \"Failed to undelete iRODS objects\"";      
+
+       new_response.command = temp_strm.str();
+ 
+       response_deque.push_back(new_response);
+
+       ++errors_occurred; 
+
+       return 1;
+   }
+
+@q ***** (5) @>
+
+   else
+   {
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          cerr << thread_str << "In `Scan_Parse_Parameter_Type::undelete_files':"
+               << endl
+               << "`Irods_Object_Type::undelete_irods_objects' succeeded, returning 0." 
+               << endl
+               << "Undeleted iRODS objects successfully."
+               << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+      new_response.type = Response_Type::COMMAND_ONLY_TYPE;
+
+      temp_strm << "UNDELETE RESPONSE 0 " << option_ctr << "U "
+                << "\"" << filename_str << "\" \"Undeleted iRODS objects successfully\"";      
+
+      new_response.command = temp_strm.str();
+ 
+      response_deque.push_back(new_response);
+
+   }  /* |else|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::undelete_files| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Scan_Parse_Parameter_Type::undelete_files' "
+            << "successfully with return value 0."
+            << endl; 
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+ 
+   return 0;
+
+}  /* End of |Scan_Parse_Parameter_Type::undelete_files| definition  */
+
+@q *** (3) Generate checksum (|generate_checksum|).  @>
+
+@ Generate checksum (|generate_checksum|).
+\initials{LDF 2013.12.25.}
+
+\LOG
+\initials{LDF 2013.12.25.}
+Added this function.
+
+\initials{LDF 2014.01.03.}
+Added optional argument |bool verify_only = false|.
+\ENDLOG
+
+@q **** (4) Definition  @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+int
+Scan_Parse_Parameter_Type::generate_checksum(Response_Type &response, 
+                                             bool verify_only, 
+                                             string thread_str)
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status = 0;
+
+   stringstream temp_strm;
+
+   MYSQL_RES* result = 0;
+   MYSQL_ROW curr_row;
+
+   unsigned int row_ctr = 0;
+   unsigned int field_ctr = 0;
+
+   long int affected_rows;
+
+   stringstream sql_strm;
+
+   string handles_database = (standalone_handle) ? "handlesystem_standalone" : "handlesystem";
+
+   bool create_handle = true;
+
+   vector<unsigned long int> handle_id_vector;
+   vector<Handle_Type> handle_vector;
+
+   map<unsigned long int, Handle_Value_Type>::iterator handle_value_iter;
+   string temp_str;
+   
+   unsigned long int temp_val = 0UL;
+
+   int found_ctr = 0;
+
+   bool check_handle_checksum = false;  /* If |true|, check an existing checksum 
+                                           found in a handle.  Otherwise, don't bother
+                                           checking and assume it's correct.
+                                           Default:  Don't check 
+                                           (|check_handle_checksum == false|).
+                                           \initials{LDF 2014.01.02.}  */
+
+
+   string hash_function_str[2];
+
+   int handle_index = 0;
+
+   Response_Type new_response;
+   new_response.type = Response_Type::COMMAND_ONLY_TYPE;
+
+   string checksum_str;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Scan_Parse_Parameter_Type::generate_checksum'."
+            << endl
+            << "`verify_only' == " << verify_only
+            << endl;
+     
+       response.show("response:");
+
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+@ Don't create a handle if verifying only.  
+\initials{LDF 2014.01.03.}
+
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+   if (verify_only)        
+      create_handle = false;  
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+   if (response.options & 32U)
+   {
+      hash_function_str[0] = "SHA512";
+      hash_function_str[1] = "sha512sum";
+      handle_index = Handle_Value_Type::CHECKSUM_SHA512_INDEX;
+   }
+   else if (response.options & 16U)
+   {
+      hash_function_str[0] = "SHA384";
+      hash_function_str[1] = "sha384sum";
+      handle_index = Handle_Value_Type::CHECKSUM_SHA384_INDEX;
+   }
+   else if (response.options & 8U)
+   {
+
+      hash_function_str[0] = "SHA256";
+      hash_function_str[1] = "sha256sum";
+      handle_index = Handle_Value_Type::CHECKSUM_SHA256_INDEX;
+   }
+   else if (response.options & 4U)
+   {
+      hash_function_str[0] = "SHA224";
+      hash_function_str[1] = "sha224sum";
+      handle_index = Handle_Value_Type::CHECKSUM_SHA224_INDEX;
+   }
+   else if (response.options & 2U)
+   {
+      hash_function_str[0] = "SHA1";
+      hash_function_str[1] = "sha1sum";
+      handle_index = Handle_Value_Type::CHECKSUM_SHA1_INDEX;
+   }
+   else
+   {
+      hash_function_str[0] = "MD5";
+      hash_function_str[1] = "md5sum";
+      handle_index = Handle_Value_Type::CHECKSUM_MD5_INDEX;
+   }
+
+   if (response.options & 128)
+      check_handle_checksum = true;
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl 
+            << "`response.options & 128U' == " << (response.options & 128U) << " "
+            << "(decimal) == " << oct << (response.options & 128U) << " (octal)"
+            << endl
+            << "`check_handle_checksum' == " << check_handle_checksum
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+   size_t pos = response.local_filename.find("/");
+
+   if (pos == string::npos)
+   {
+       response.local_filename.insert(0, "/");
+       response.local_filename.insert(0, irods_current_dir);
+   }
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl 
+            << "response.local_filename == " << response.local_filename << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+   if (response.options & 64U)
+   {
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+                << endl 
+                << "`response.options' & 64U == 1:  Not checking or creating handle."
+                << endl
+                << "Setting `create_handle' and `check_handle_checksum' to `false' "
+                << "and skipping to `GENERATE_CHECKSUM_POST_HANDLE'."
+                << endl;            
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       create_handle         = false;
+       check_handle_checksum = false;
+
+       goto GENERATE_CHECKSUM_POST_HANDLE;
+
+   }  /* |if (response.options & 64U)|  */
+
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl 
+            << "`response.options' & 64U == 0:  Will check and possibly create handle."
+            << endl;            
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+   sql_strm << "select distinct handle_id from " << handles_database << ".handles "
+            << "where type = 'IRODS_OBJECT' and data = '" << response.local_filename << "' "
+            << "and created_by_user_id = " << user_id;
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   status = submit_mysql_query(sql_strm.str(), result, &row_ctr, &field_ctr);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "`Scan_Parse_Parameter_Type::submit_mysql_query' failed, returning " 
+            << status << ":"
+            << endl
+            << mysql_error(mysql_ptr)
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++errors_occurred; 
+
+       if (result)
+          mysql_free_result(result);
+
+       temp_strm.str("");
+
+       temp_strm << "CHECKSUM RESPONSE " << GW_SERVER_SIDE_DATABASE_ERROR << " " 
+                 << response.options << "U "
+                 << "\"" << response.local_filename << "\" \"(No checksum)\" "
+                 << "\"Database query failed.\"";
+
+       new_response.command = temp_strm.str();
+       response_deque.push_back(new_response);
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "`Scan_Parse_Parameter_Type::submit_mysql_query' succeeded, returning 0:"
+            << endl
+            << "`row_ctr'   == " << row_ctr
+            << endl
+            << "`field_ctr' == " << field_ctr
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+   
+   if (row_ctr == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "WARNING!  In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "`Scan_Parse_Parameter_Type::submit_mysql_query' returned 0 rows."
+            << endl
+            << "No handles for iRODS object `" << response.local_filename << "'."
+            << endl
+            << "This is possible, but should not usually occur."
+            << endl
+            << "Skipping to `GENERATE_CHECKSUM_POST_HANDLE' and continuing."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++warnings_occurred; 
+
+       mysql_free_result(result);
+
+       goto GENERATE_CHECKSUM_POST_HANDLE;      
+
+   }  /* |if (row_ctr == 0)|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+   for (int i = 0; i < row_ctr; ++i)
+   {
+
+       if ((curr_row = mysql_fetch_row(result)) == 0)
+       {
+           lock_cerr_mutex();
+           cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::generate_checksum':"
+                << endl
+                << "`mysql_fetch_row' failed:"
+                << endl
+                << mysql_error(mysql_ptr)
+                << endl 
+                << "Exiting `Scan_Parse_Parameter_Type::generate_checksum' unsuccessfully "
+                << "with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result);
+
+           ++errors_occurred;
+
+           temp_strm.str("");
+
+           temp_strm << "CHECKSUM RESPONSE " << GW_SERVER_SIDE_DATABASE_ERROR << " " 
+                     << response.options << "U "
+                     << "\"" << response.local_filename << "\" \"(No checksum)\" "
+                     << "\"Database error.\"";
+
+           new_response.command = temp_strm.str();
+           response_deque.push_back(new_response);
+
+           return 1;
+
+       }  /* |if (curr_row = mysql_fetch_row(result) == 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+                << endl 
+                << "`mysql_fetch_row' succeeded."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */ 
+#endif /* |DEBUG_COMPILE|  */
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+       errno = 0;
+       temp_val = strtoul(curr_row[0], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           lock_cerr_mutex();
+           cerr << thread_str 
+                << "ERROR!  In `Scan_Parse_Parameter_Type::generate_checksum':"
+                << endl
+                << "`strtoul' failed, returning `ULONG_MAX':"
+                << endl
+                << strerror(errno)
+                << endl 
+                << "Failed to read value for `" << handles_database << ".handles.handle_id'."
+                << endl 
+                << "Exiting `Scan_Parse_Parameter_Type::generate_checksum' unsuccessfully "
+                << "with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result);
+
+           ++errors_occurred;
+
+           temp_strm.str("");
+
+           temp_strm << "CHECKSUM RESPONSE " << GW_ERROR << " " 
+                     << response.options << "U "
+                     << "\"" << response.local_filename << "\" \"(No checksum)\" "
+                     << "\"Failed to convert `handle_id'.\"";
+
+           new_response.command = temp_strm.str();
+           response_deque.push_back(new_response);
+
+
+           return 1;
+
+       }  /* |if|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+                << endl
+                << "`strtoul' succeeded, returning " << temp_val << "."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+       handle_id_vector.push_back(temp_val);
+
+   }  /* |for|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+   mysql_free_result(result);
+   result = 0;
+
+   status = Handle_Type::fetch_handles_from_database(mysql_ptr,
+                                                     handle_id_vector,
+                                                     handle_vector,
+                                                     "",
+                                                     thread_str);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex();
+       cerr << thread_str 
+            << "ERROR!  In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "`Handle_Type::fetch_handles_from_database' failed, returning " << status << "."
+            << endl
+            << "Failed to retrieve handle from `" << handles_database << ".handles' "
+            << "database table."
+            << endl 
+            << "Exiting `Scan_Parse_Parameter_Type::generate_checksum' unsuccessfully "
+            << "with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++errors_occurred;
+
+       temp_strm.str("");
+
+       temp_strm << "CHECKSUM RESPONSE " << GW_ERROR << " " 
+                 << response.options << "U "
+                 << "\"" << response.local_filename << "\" \"(No checksum)\" "
+                 << "\"Failed to fetch handle(s) from database.\"";
+
+       new_response.command = temp_strm.str();
+       response_deque.push_back(new_response);
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "`Handle_Type::fetch_handles_from_database' succeeded, returning 0."
+            << endl 
+            << "`handle_vector.size()' == " << handle_vector.size()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+   
+   if (handle_vector.size() == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "WARNING!  In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "Handle_Type::fetch_handles_from_database' retrieved 0 `Handle_Type' objects."
+            << endl
+            << "This is possible, but should not usually occur."
+            << endl
+            << "Skipping to `GENERATE_CHECKSUM_POST_HANDLE' and continuing."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++warnings_occurred; 
+
+       goto GENERATE_CHECKSUM_POST_HANDLE;      
+
+   }  /* |if (row_ctr == 0)|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "Handle_Type::fetch_handles_from_database' retrieved " 
+            << handle_vector.size() << " `Handle_Type' objects."
+            << endl
+            << "`handle_vector':"
+            << endl;
+
+       for (vector<Handle_Type>::iterator iter = handle_vector.begin();
+            iter != handle_vector.end();
+            ++iter)
+          iter->show();
+ 
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+   temp_str = "CHECKSUM_";
+   temp_str += hash_function_str[0];
+
+   found_ctr = 0;
+
+   for (vector<Handle_Type>::iterator iter = handle_vector.begin();
+        iter != handle_vector.end();
+        ++iter)
+   {
+@q ****** (6) @>
+
+       handle_value_iter = iter->find(temp_str);
+
+       if (handle_value_iter == iter->handle_value_map.end())
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "Not found.";
+
+               if (verify_only == false)
+                  cerr << "  Breaking.";
+
+               cerr << endl;
+
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+@ If there's one handle without a handle value of this type, we must generate one, 
+so there's no point in continuing to iterate through the |vector|.
+\initials{LDF 2013.12.25.} 
+@:NOTE@> !! PLEASE NOTE:  This only applies if generating and not just verifying
+a checksum.  If we're just verifying, then we might as well continue to iterate.
+In normal cases, there should only be one handle, anyway.
+\initials{LDF 2014.01.03.}
+
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+           if (verify_only == false)
+           {
+              break;  
+
+           }
+
+@q ******* (7) @>
+
+       }  /* |if|  */
+ 
+@q ****** (6) @>
+
+       else
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+                    << endl 
+                    << "Found handle." << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           ++found_ctr;
+
+       }
+
+   }  /* |for|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+   if (found_ctr > 0 && verify_only == true && check_handle_checksum == false)
+   {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+                << endl 
+                << "`found_ctr' == " << found_ctr << " (> 0) && "
+                << "`verify_only' == `true' && "
+                << "`check_handle_checksum' == `false'."
+                << endl
+                << "Will verify checksum.  Not generating new checksum for comparison."
+                << endl;
+
+           handle_value_iter->second.show("handle_value_iter->second:");
+
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+       if (strncmp(handle_value_iter->second.data, 
+                   response.string_val.c_str(), 
+                   handle_value_iter->second.data_length) == 0)
+       {
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+                    << endl
+                    << "Checksums are identical.  Verified checksum."
+                    << endl; 
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+           new_response.clear();
+           new_response.type = Response_Type::COMMAND_ONLY_TYPE;
+ 
+           temp_strm.str("");
+
+           temp_strm << "VERIFY CHECKSUM RESPONSE " << GW_SUCCESS << " "
+                     << response.options << "U "
+                     << "\"" << response.local_filename << "\" "
+                     << "\"" << response.string_val << "\" "
+                     << "\"\""
+                     << "\"Checksum verified (success)\"";
+
+
+           new_response.command = temp_strm.str();
+
+           response_deque.push_back(new_response);
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "Exiting `Scan_Parse_Parameter_Type::generate_checksum' "
+                    << "successfully with return value 0."
+                    << endl; 
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           return 0;
+
+       }  /* |if|  */
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+       else
+       {
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+                    << endl
+                    << "Checksums are not identical.  Checksum not verified."
+                    << endl; 
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+           new_response.clear();
+           new_response.type = Response_Type::COMMAND_ONLY_TYPE;
+ 
+           temp_strm.str("");
+
+           temp_strm << "VERIFY CHECKSUM RESPONSE " << GW_ERROR << " "
+                     << response.options << "U "
+                     << "\"" << response.local_filename << "\" "
+                     << "\"" << response.string_val << "\" "
+                     << "\"";
+
+           temp_strm.write(handle_value_iter->second.data, 
+                           handle_value_iter->second.data_length);
+                     
+           temp_strm << "\""
+                     << "\"Checksum not verified (failure)\"";
+
+
+           new_response.command = temp_strm.str();
+
+           response_deque.push_back(new_response);
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "Exiting `Scan_Parse_Parameter_Type::generate_checksum' "
+                    << "with return value 2."
+                    << endl; 
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           return 2;
+
+       }  /* |else|  */
+
+@q ****** (6) @>
+
+   }  /* |if|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+   else if (found_ctr > 0 && verify_only == true && check_handle_checksum == true)
+   {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+                << endl 
+                << "`found_ctr' == " << found_ctr << " (> 0) && "
+                << "`verify_only' == `true' && "
+                << "`check_handle_checksum' == `true'."
+                << endl
+                << "Will verify checksum and generate new checksum for comparison."
+                << endl;
+
+           handle_value_iter->second.show("handle_value_iter->second:");
+
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ****** (6) @>
+
+   }  /* |else if|  */
+
+
+@q ***** (5) @>
+
+@ |verify_only == false && found_ctr == handle_vector.size() && check_handle_checksum == false|.
+Checksum exists in handle.  Assume it is correct, send it to the client and exit successfully 
+with return value 0.
+\initials{LDF 2014.01.02.}
+
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+   else if (   verify_only == false 
+            && found_ctr == handle_vector.size() 
+            && check_handle_checksum == false)
+   {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+                << endl 
+                << "`found_ctr' == `handle_vector.size()' == " << found_ctr << " "
+                << "&& `check_handle_checksum' == `false'."
+                << endl
+                << "Sending checksum to client.  Not generating new checksum."
+                << endl;
+
+           handle_value_iter->second.show("handle_value_iter->second:");
+
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+       checksum_str = "";
+
+       checksum_str.append(handle_value_iter->second.data, 
+                           handle_value_iter->second.data_length);
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "Exiting `Scan_Parse_Parameter_Type::generate_checksum' "
+                << "successfully with return value 0."
+                << endl; 
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       temp_strm.str("");
+
+       temp_strm << "CHECKSUM RESPONSE " << GW_SUCCESS << " " << response.options << "U "
+                 << "\"" << response.local_filename << "\" \"" << checksum_str << "\" "
+                 << "\"Success\"";
+
+       new_response.command = temp_strm.str();
+       response_deque.push_back(new_response);
+
+       return 0;
+
+@q ****** (6) @>
+
+   }  /* |else if (   verify_only == false 
+                   && found_ctr == handle_vector.size() 
+                   && check_handle_checksum == false)|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+#if DEBUG_COMPILE
+   else if (   DEBUG 
+            && verify_only == false 
+            && found_ctr == handle_vector.size() 
+            && check_handle_checksum == true)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "`verify_only' == `false' && "
+            << "`found_ctr' == `handle_vector.size()' == " << found_ctr << ", but "
+            << "`check_handle_checksum' == `true':"
+            << endl 
+            << "Will generate new checksum and compare it to the one from the handle."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+GENERATE_CHECKSUM_POST_HANDLE:
+
+@q ***** (5) Create temporary file for the iRODS object.  @>
+
+@ Create temporary file for the iRODS object.  
+\initials{LDF 2013.12.25.}
+
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+   char temp_filename[] = "/tmp/gwirdsif.XXXXXX";
+
+   errno = 0;
+   int fd = mkstemp(temp_filename);
+ 
+   if (fd == -1)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "`mkstemp' failed, returning -1:"
+            << endl
+            << strerror(errno)
+            << endl
+            << "Failed to generated temporary file."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++errors_occurred; 
+
+       temp_strm.str("");
+
+       temp_strm << "CHECKSUM RESPONSE " << GW_ERROR << " " 
+                 << response.options << "U "
+                 << "\"" << response.local_filename << "\" \"(No checksum)\" "
+                 << "\"Failed to generate temporary file for iRODS object.\"";
+
+       new_response.command = temp_strm.str();
+       response_deque.push_back(new_response);
+
+       return 1;
+
+   }  /* |if (fd == -1)|  */
+   
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "`mkstemp' succeeded, returning 0:"
+            << endl 
+            << "`temp_filename' == " << temp_filename
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+   close(fd);  /* We just need the name.  \initials{LDF 2013.12.25.}  */
+   
+
+   temp_file_vector.push_back(temp_filename);
+
+   temp_strm << "r=`env irodsEnvFile=" << irods_env_filename << " iget -f "
+             << response.local_filename << " " << temp_filename << " 2>&1 "
+             << "&& cat " << temp_filename << " | " << hash_function_str[1] << " | " 
+             << "tr -d \"\\-[:space:]\"`; "
+             << "echo -n -e \"$?\\n$r\"";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "temp_strm.str() == " << temp_strm.str() << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+   FILE *fp = popen(temp_strm.str().c_str(), "r");
+
+   if (fp == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "`popen' failed, returning NULL:"
+            << endl
+            << "Failed to execute `iget' or `" << hash_function_str[1] << "' command in shell."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++errors_occurred; 
+
+       temp_strm.str("");
+
+       temp_strm << "CHECKSUM RESPONSE " << GW_ERROR << " " 
+                 << response.options << "U "
+                 << "\"" << response.local_filename << "\" \"(No checksum)\" "
+                 << "\"Failed to execute `iget' or checksum command in shell.\"";
+
+       new_response.command = temp_strm.str();
+       response_deque.push_back(new_response);
+
+       return 1;       
+
+   }  /* |if (fp == 0)|  */
+   
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "`popen' succeeded."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+   char buffer[BUFFER_SIZE];
+   memset(buffer, 0, BUFFER_SIZE);
+
+   status = fread(buffer, 1, BUFFER_SIZE - 1, fp);
+
+@q ****** (6) @>
+
+   if (status == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "`fread' failed, returning 0:"
+            << endl
+            << "Failed to read from pipe."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       pclose(fp);
+
+       ++errors_occurred; 
+
+       temp_strm.str("");
+
+       temp_strm << "CHECKSUM RESPONSE " << GW_ERROR << " " 
+                 << response.options << "U "
+                 << "\"" << response.local_filename << "\" \"(No checksum)\" "
+                 << "\"Failed to read output from `iget' or checksum command executed in shell.\"";
+
+       new_response.command = temp_strm.str();
+       response_deque.push_back(new_response);
+
+       return 1;       
+
+   }  /* |if (status == 0)|  */
+
+@q ****** (6) @>
+
+   else if (status == BUFFER_SIZE - 1)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "`fread' read `BUFFER_SIZE' - 1 == " << (BUFFER_SIZE - 1) << " characters:"
+            << endl
+            << "Output of `iget' command, executed in pipe, exceeds maximum amount."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       pclose(fp);
+
+       ++errors_occurred; 
+
+       temp_strm.str("");
+
+       temp_strm << "CHECKSUM RESPONSE " << GW_ERROR << " " 
+                 << response.options << "U "
+                 << "\"" << response.local_filename << "\" \"(No checksum)\" "
+                 << "\"Output of `iget' and/or checksum command executed in shell "
+                 << "exceeds maximum amount.\"";
+
+       new_response.command = temp_strm.str();
+       response_deque.push_back(new_response);
+
+       return 1;       
+
+   }  /* |if (status == BUFFER_SIZE - 1)|  */
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "`fread' succeeded, returning " << status << ":"
+            << endl
+            << "`buffer' ==" 
+            << endl 
+            << buffer
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+   pclose(fp);
+   fp = 0;
+
+
+@q ****** (6) @>
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+   int ret_val = 0;
+
+   errno = 0;
+   status = sscanf(buffer, "%d", &ret_val);
+
+@q ****** (6) @>
+
+   if (status == EOF)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "`sscanf' failed, returning `EOF':"
+            << endl
+            << strerror(errno)
+            << endl 
+            << "Failed to read return value of commands executed in pipe."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++errors_occurred; 
+
+       temp_strm.str("");
+
+       temp_strm << "CHECKSUM RESPONSE " << GW_ERROR << " " 
+                 << response.options << "U "
+                 << "\"" << response.local_filename << "\" \"(No checksum)\" "
+                 << "\"Failed to read return value of `iget' and checksum commands "
+                 << "executed in shell.\"";
+
+       new_response.command = temp_strm.str();
+       response_deque.push_back(new_response);
+
+       return 1;       
+
+   }  /* |if (status == EOF)|  */
+
+@q ****** (6) @>
+
+   else if (status != 1)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "`sscanf' returned " << status << " (!= 1).  This is not permitted."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++errors_occurred; 
+
+       temp_strm.str("");
+
+       temp_strm << "CHECKSUM RESPONSE " << GW_ERROR << " " 
+                 << response.options << "U "
+                 << "\"" << response.local_filename << "\" \"(No checksum)\" "
+                 << "\"Failed to read return value of `iget' and checksum commands "
+                 << "executed in shell.\"";
+
+       new_response.command = temp_strm.str();
+       response_deque.push_back(new_response);
+
+
+       return 1;       
+
+   }  /* |if (status != 1)|  */
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "`sscanf' succeeded, returning 1:"
+            << endl 
+            << "`ret_val' == " << ret_val
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+   if (ret_val != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "`iget' or `" << hash_function_str[1] << "' failed, returning " << ret_val << ":"
+            << endl
+            << "Failed to retrieve iRODS object or failed to generate checksum."
+            << endl
+            << "`buffer' (shell output) =="
+            << endl 
+            << buffer
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++errors_occurred; 
+
+       temp_strm.str("");
+
+       temp_strm << "CHECKSUM RESPONSE " << GW_ERROR << " " 
+                 << response.options << "U "
+                 << "\"" << response.local_filename << "\" \"(No checksum)\" "
+                 << "\"Failed to retrieve iRODS object or failed to generate checksum.\"";
+
+       new_response.command = temp_strm.str();
+       response_deque.push_back(new_response);
+
+       return 1;       
+
+   }  /* |if (status == 0)|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "`iget' and `" << hash_function_str[1] << "' succeeded, returning 0:"
+            << endl 
+            << "`buffer' (shell output) =="
+            << endl 
+            << buffer
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   checksum_str = buffer;
+
+   pos = checksum_str.find("\n");
+   checksum_str.erase(0, pos + 1);
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "`checksum_str' == \"" << checksum_str << "\"" << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2014.01.02.}
+Added this section.
+\ENDLOG
+
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+
+   if (    (   (verify_only == false && found_ctr == handle_vector.size())
+            || (verify_only == true && found_ctr > 0))
+       && check_handle_checksum == true)
+   {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+                << endl
+                << "`verify_only'                    == " << verify_only
+                << endl 
+                << "`found_ctr'                      == " << found_ctr << " "
+                << endl
+                << "`handle_vector.size()'           == " << handle_vector.size()
+                << endl 
+                << "`check_handle_checksum'          == `true':"
+                << endl 
+                << "Will check generated checksum against value from handle."
+                << endl
+                << "`checksum_str'                   == " << checksum_str
+                << endl
+                << "`handle_value_iter->second.data' == ";
+              
+            fwrite(handle_value_iter->second.data, 
+                   1,
+                   handle_value_iter->second.data_length, 
+                   stderr);
+
+            cerr << endl;
+
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+        if (checksum_str.compare(0, 
+                                 string::npos, 
+                                 handle_value_iter->second.data, 
+                                 handle_value_iter->second.data_length) != 0)
+        {
+@q ******* (7) @>
+
+           cerr << thread_str << "WARNING! In `Scan_Parse_Parameter_Type::generate_checksum':"
+                << endl
+                << "Checksum from handle and generated checksum are not equal:" 
+                << endl
+                << "`checksum_str'            == " << checksum_str
+                << endl
+                << "`handle_value_iter->second.data' == ";
+              
+            fwrite(handle_value_iter->second.data, 
+                   1,
+                   handle_value_iter->second.data_length, 
+                   stderr);
+
+            cerr << endl
+                 << "This should never happen.  "
+                 << "The administrator of this `gwirdsif' installation should check this."
+                 << endl                 
+                 << "Continuing."
+                 << endl;
+
+            ++warnings_occurred; 
+
+            new_response.clear();
+            new_response.type = Response_Type::COMMAND_ONLY_TYPE;
+
+            temp_strm.str("");
+
+            temp_strm << "CHECKSUM RESPONSE " << GW_WARNING << " " << response.options << "U "
+                      << "\"" << response.local_filename << "\" "
+                      << "\"";
+
+            temp_strm.write(handle_value_iter->second.data, handle_value_iter->second.data_length);
+
+            temp_strm << "\" "
+                      << "\"Checksum mismatch:" << endl 
+                      << "Checksum from handle (see above) and generated checksum "
+                      << "(see below) don't match:"
+                      << endl 
+                      << "Generated checksum:  " << checksum_str
+                      << endl 
+                      << "Server will try to update handle with correct (generated) checksum" 
+                      << endl 
+                      << "and send the latter again in a separate response.\"";
+
+            new_response.command = temp_strm.str();
+
+            temp_strm.str("");
+
+            response_deque.push_back(new_response);
+
+@q ******* (7) @>
+
+@ Update the handle value with the correct checksum.
+\initials{LDF 2014.01.02.}
+
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+            sql_strm.str("");
+
+            sql_strm << "update " << handles_database << ".handles "
+                     << "set data = '" << checksum_str << "', "
+                     << "last_modified = now() where handle_value_id = "
+                     << handle_value_iter->second.handle_value_id;
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+                     << endl
+                     << "`sql_strm.str()' == " << sql_strm.str()
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+            status = submit_mysql_query(sql_strm.str(), result, 0, 0, &affected_rows);
+
+            if (status != 0)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::generate_checksum':"
+                     << endl
+                     << "`Scan_Parse_Parameter_Type::submit_mysql_query' failed, returning " 
+                     << status << ":"
+                     << endl
+                     << mysql_error(mysql_ptr)
+                     << endl
+                     << "Will send message to client and exit function "
+                     << "unsuccessfully with return value 1."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                new_response.clear();
+                new_response.type = Response_Type::COMMAND_ONLY_TYPE;
+
+                temp_strm.str("");
+
+                temp_strm << "CHECKSUM RESPONSE " << GW_SERVER_SIDE_DATABASE_ERROR << " " 
+                          << response.options << "U "
+                          << "\"" << response.local_filename << "\" "
+                          << "\"" << checksum_str << "\""
+                          << "\"Failed to update handle with correct (generated) checksum.\"";
+
+                new_response.command = temp_strm.str();
+
+                temp_strm.str("");
+
+                response_deque.push_back(new_response);
+
+                ++errors_occurred; 
+
+                if (result)
+                   mysql_free_result(result);
+
+                return 1;
+
+            }  /* |if (status != 0)|  */
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+                     << endl
+                     << "`Scan_Parse_Parameter_Type::submit_mysql_query' succeeded, returning 0:"
+                     << endl
+                     << "`affected_rows'   == " << affected_rows
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            new_response.clear();
+            new_response.type = Response_Type::COMMAND_ONLY_TYPE;
+
+            temp_strm.str("");
+
+            temp_strm << "CHECKSUM RESPONSE " << GW_SUCCESS << " " << response.options << "U "
+                      << "\"" << response.local_filename << "\" "
+                      << "\"" << checksum_str << "\""
+                      << "\"Updated handle with correct (generated) checksum.\"";
+
+            new_response.command = temp_strm.str();
+
+            temp_strm.str("");
+
+            response_deque.push_back(new_response);
+
+
+@q ******* (7) @>
+
+        }  /* |if|  */ 
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+                 << endl
+                 << "Checksums are equal." << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+   }  /* |if|  */
+
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2014.01.03.}
+Added this section.
+\ENDLOG
+
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+   if (verify_only)
+   {
+@q ****** (6) @>        
+
+        if (response.string_val == checksum_str)
+        {
+            new_response.clear();
+            new_response.type = Response_Type::COMMAND_ONLY_TYPE;
+ 
+            temp_strm.str("");
+
+            temp_strm << "VERIFY CHECKSUM RESPONSE " << GW_SUCCESS << " "
+                      << response.options << "U "
+                      << "\"" << response.local_filename << "\" "
+                      << "\"" << response.string_val << "\" "
+                      << "\"\""
+                      << "\"Checksum verified (success)\"";
+
+            new_response.command = temp_strm.str();
+
+            response_deque.push_back(new_response);
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "Exiting `Scan_Parse_Parameter_Type::generate_checksum' "
+                     << "successfully with return value 0."
+                     << endl; 
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            return 0;
+
+
+        }  /* |if (response.string_val == checksum_str)|  */
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+        else
+        {
+            new_response.clear();
+            new_response.type = Response_Type::COMMAND_ONLY_TYPE;
+ 
+            temp_strm.str("");
+
+            temp_strm << "VERIFY CHECKSUM RESPONSE " << GW_ERROR << " "
+                      << response.options << "U "
+                      << "\"" << response.local_filename << "\" "
+                      << "\"" << response.string_val << "\" "
+                      << "\"" << checksum_str << "\" "
+                      << "\"Checksum not verified (failure)\"";
+
+            new_response.command = temp_strm.str();
+
+            response_deque.push_back(new_response);
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "Exiting `Scan_Parse_Parameter_Type::generate_checksum' "
+                     << "with return value 2."
+                     << endl; 
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           return 2;
+
+        }  /* |else|  */
+
+@q ****** (6) @>
+
+   }  /* |if (verify_only)|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+
+   if (create_handle && handle_vector.size() > 0 && found_ctr < handle_vector.size())
+   {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+                << endl
+                << "`create_handle' == `true' && `handle_vector.size()' == " 
+                << handle_vector.size() << " (> 0) && `found_ctr' == " 
+                << found_ctr << " < `handle_vector.size()'"
+                << endl 
+                << "Generating handle value(s)"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+       temp_str = "CHECKSUM_";
+       temp_str += hash_function_str[0];
+
+       for (vector<Handle_Type>::iterator iter = handle_vector.begin();
+            iter != handle_vector.end();
+            ++iter)
+       {
+@q ******* (7) @>
+
+            handle_value_iter = iter->find(temp_str);
+
+            if (handle_value_iter == iter->handle_value_map.end())
+            {
+@q ******** (8) @>
+
+                status = iter->add_value(mysql_ptr, 
+                                         handle_index, 
+                                         temp_str,
+                                         checksum_str,
+                                         user_id);
+
+@q ******** (8) @>
+
+                if (status != 0)
+                {
+                    lock_cerr_mutex(); 
+                    cerr << thread_str << "ERROR!  "
+                         << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+                         << endl
+                         << "`Handle_Type::add_value' failed, returning " << status << ":"
+                         << endl
+                         << "Failed to create handle."
+                         << endl 
+                         << "Exiting function unsuccessfully with return value 1."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                    ++errors_occurred; 
+
+                    temp_strm.str("");
+
+                    temp_strm << "CHECKSUM RESPONSE " << GW_SERVER_SIDE_DATABASE_ERROR << " " 
+                              << response.options << "U "
+                              << "\"" << response.local_filename << "\" "
+                              << "\"" << checksum_str << "\" "
+                              << "\"Failed to add handle value containing checksum.\"";
+
+                    new_response.command = temp_strm.str();
+                    response_deque.push_back(new_response);
+
+
+
+
+                    return 1;       
+
+                }  /* |if (status != 0)|  */
+@q ******** (8) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+                  
+#if DEBUG_COMPILE
+                else if (DEBUG)
+                {
+                    lock_cerr_mutex(); 
+                    cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+                         << endl
+                         << "`Handle_Type::add_value' succeeded, returning 0."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******** (8) @>
+
+            }  /* |if (handle_value_iter == iter->handle_value_map.end())|  */           
+
+@q ******* (7) @>
+
+       }  /* |for|  */
+
+
+@q ****** (6) @>
+
+   }  /* |if (create_handle && handle_vector.size() > 0 && found_ctr < handle_vector.size())|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex();
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::generate_checksum':"
+            << endl
+            << "`create_handle'            == " << create_handle
+            << endl 
+            << "`handle_vector.size()' == " << handle_vector.size()
+            << endl 
+            << "`found_ctr'            == " << found_ctr
+            << endl 
+            << "`create_handle' == `false' || `handle_vector.size()' == 0 || "
+            << "`found_ctr' == `handle_vector.size()'"
+            << endl 
+            << "Not generating handle value(s)"
+            << endl; 
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>=
+
+
+   temp_strm.str("");
+
+   temp_strm << "CHECKSUM RESPONSE " << GW_SUCCESS << " " << response.options << "U "
+             << "\"" << response.local_filename << "\" \"" << checksum_str << "\" "
+             << "\"Success\"";
+
+   new_response.command = temp_strm.str();
+   response_deque.push_back(new_response);
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Scan_Parse_Parameter_Type::generate_checksum' "
+            << "successfully with return value 0."
+            << endl; 
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    return 0;
+
+}  /* End of |Scan_Parse_Parameter_Type::generate_checksum| definition  */
+
+@q *** (3) Store public key (|store_public_key|).  @>
+
+@ Store public key (|store_public_key|).  
+\initials{LDF 2014.01.21.}
+
+\LOG
+\initials{LDF 2014.01.21.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Definition  @>
+
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+int
+Scan_Parse_Parameter_Type::store_public_key(string uid, 
+                                            string fingerprint, 
+                                            string public_key, 
+                                            unsigned int options, 
+                                            string thread_str)
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status = 0;
+
+   unsigned long int temp_val = 0UL;
+
+   MYSQL_RES *result = 0;
+   MYSQL_ROW curr_row;
+
+   unsigned int row_ctr   = 0;
+   unsigned int field_ctr = 0;
+
+   long int affected_rows = 0L;
+
+   stringstream sql_strm;
+
+   stringstream temp_strm;
+
+   Response_Type response;
+   response.type = Response_Type::COMMAND_ONLY_TYPE;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Scan_Parse_Parameter_Type::store_public_key'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+   if (options & 1U)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "WARNING!  In `Scan_Parse_Parameter_Type::store_public_key':"
+            << endl
+            << "UID            == " << uid
+            << endl 
+            << "Fingerprint    == " << fingerprint
+            << endl 
+            << "`options & 1U' == " << (options & 1U) 
+            << endl 
+            << "Public key has been revoked.  Will try to store in `gwirdsif.GPG_Key_Pairs' "
+            << "anyway."
+            << endl
+            << "Continuing."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++warnings_occurred; 
+
+   }  /* |if (options & 1U)|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+   sql_strm << "select gpg_key_pair_id from gwirdsif.GPG_Key_Pairs "
+            << "where user_id = " << user_id << " "
+            << "and fingerprint = '" << fingerprint << "'";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::store_public_key':"
+            << endl
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+   
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+   status = submit_mysql_query(sql_strm.str(), result, &row_ctr, &field_ctr);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::store_public_key':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Failed to query `gwirdsif.GPG_Key_Pairs' database table "
+            << "for `gpg_key_pair_id'."
+            << endl 
+            << "Will send error message to client."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       temp_strm << "STORE PUBLIC_KEY RESPONSE " << GW_SERVER_SIDE_DATABASE_ERROR << " "
+                 << "\"" << fingerprint << "\" \"Failed to store public key.\"";
+
+       response.command = temp_strm.str();
+
+       response_deque.push_back(response);
+
+       if (result)
+          mysql_free_result(result);
+
+       ++errors_occurred; 
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::store_public_key':"
+            << endl
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "Queried `gwirdsif.GPG_Key_Pairs' database table for `gpg_key_pair_id' "
+            << "successfully."
+            << endl
+            << "`row_ctr' == " << row_ctr
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+   if (row_ctr > 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "WARNING!  In `Scan_Parse_Parameter_Type::store_public_key':"
+            << endl
+            << "`row_ctr' == " << row_ctr << " (> 0):"
+            << endl
+            << "The `gwirdsif.GPG_Key_Pairs' database table already contains "
+            << "an entry for fingerprint `" << fingerprint << "'."
+            << endl 
+            << "Not storing.  Will send warning message to client."
+            << endl 
+            << "Exiting function with return value 2."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       temp_strm << "STORE PUBLIC_KEY RESPONSE " << GW_WARNING << " "
+                 << "\"" << fingerprint << "\" \"Public key already present in database.  "
+                 << "Not storing again.\"";
+
+       response.command = temp_strm.str();
+
+       response_deque.push_back(response);
+
+       mysql_free_result(result);
+
+       ++warnings_occurred; 
+
+       return 2;
+
+   }  /* |if (row_ctr > 0)|  */
+
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+   mysql_free_result(result);
+   result = 0;
+   sql_strm.str("");
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+   sql_strm << "select gpg_key_pair_id from gwirdsif.GPG_Key_Pairs "
+            << "order by gpg_key_pair_id desc limit 1";
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::store_public_key':"
+            << endl
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+   status = submit_mysql_query(sql_strm.str(), result, &row_ctr, &field_ctr);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::store_public_key':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Failed to query `gwirdsif.GPG_Key_Pairs' database table "
+            << "for `gpg_key_pair_id'."
+            << endl 
+            << "Will send error message to client."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       temp_strm << "STORE PUBLIC_KEY RESPONSE " << GW_SERVER_SIDE_DATABASE_ERROR << " "
+                 << "\"" << fingerprint << "\" \"Failed to store public key.\"";
+
+       response.command = temp_strm.str();
+
+       response_deque.push_back(response);
+
+       if (result)
+          mysql_free_result(result);
+
+       ++errors_occurred; 
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::store_public_key':"
+            << endl
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "Queried `gwirdsif.GPG_Key_Pairs' database table for `gpg_key_pair_id' "
+            << "successfully."
+            << endl
+            << "`row_ctr' == " << row_ctr
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+   if (row_ctr == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::store_public_key':"
+            << endl
+            << "`row_ctr' == 0."
+            << endl
+            << "Failed to retrieve highest value of `gpg_key_pair_id' "
+            << "from the `gwirdsif.GPG_Key_Pairs' database table."
+            << endl 
+            << "Will send error message to client."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       temp_strm << "STORE PUBLIC_KEY RESPONSE " << GW_ERROR << " "
+                 << "\"" << fingerprint << "\" \"Failed to store public key.\"";
+
+       response.command = temp_strm.str();
+
+       response_deque.push_back(response);
+
+       mysql_free_result(result);
+
+       ++errors_occurred; 
+
+       return 1;
+
+   }  /* |if (row_ctr == 0)|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::store_public_key':"
+            << endl
+            << "`row_ctr' == " << row_ctr
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+   curr_row = mysql_fetch_row(result);
+
+   if (curr_row == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::store_public_key':"
+            << endl
+            << "`mysql_fetch_row' failed, returning NULL."
+            << endl
+            << "Failed to retrieve highest value of `gpg_key_pair_id' "
+            << "from the `gwirdsif.GPG_Key_Pairs' database table."
+            << endl 
+            << "Will send error message to client."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       temp_strm << "STORE PUBLIC_KEY RESPONSE " << GW_SERVER_SIDE_DATABASE_ERROR << " "
+                 << "\"" << fingerprint << "\" \"Failed to store public key.\"";
+
+       response.command = temp_strm.str();
+
+       response_deque.push_back(response);
+
+       mysql_free_result(result);
+
+       ++errors_occurred; 
+
+       return 1;
+
+   }  /* |if (row_ctr == 0)|  */
+   
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::store_public_key':"
+            << endl
+            << "`mysql_fetch_row' succeeded."
+            << endl
+            << "`curr_row[0]' == " << curr_row[0]
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+   temp_val = strtoul(curr_row[0], 0, 10);
+
+   if (temp_val == ULONG_MAX)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::store_public_key':"
+            << endl
+            << "`strtoul' failed, returning `ULONG_MAX'."
+            << endl
+            << "Failed to retrieve highest value of `gpg_key_pair_id' "
+            << "from the `gwirdsif.GPG_Key_Pairs' database table."
+            << endl 
+            << "Will send error message to client."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       temp_strm << "STORE PUBLIC_KEY RESPONSE " << GW_SERVER_SIDE_DATABASE_ERROR << " "
+                 << "\"" << fingerprint << "\" \"Failed to store public key.\"";
+
+       response.command = temp_strm.str();
+
+       response_deque.push_back(response);
+
+       mysql_free_result(result);
+
+       ++errors_occurred; 
+
+       return 1;
+
+   }  /* |if (temp_val == ULONG_MAX)|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+   else if (temp_val > UINT_MAX)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::store_public_key':"
+            << endl
+            << "`strtoul' returned `temp_val' == " << temp_val << " (> UINT_MAX)"
+            << endl
+            << "Value out of range for `gwirdsif.GPG_Key_Pairs.gpg_key_pair_id'."
+            << endl 
+            << "Will send error message to client."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       temp_strm << "STORE PUBLIC_KEY RESPONSE " << GW_ERROR << " "
+                 << "\"" << fingerprint << "\" \"Failed to store public key.\"";
+
+       response.command = temp_strm.str();
+
+       response_deque.push_back(response);
+
+       mysql_free_result(result);
+
+       ++errors_occurred; 
+
+       return 1;
+
+   }  /* |if (temp_val == ULONG_MAX)|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::store_public_key':"
+            << endl
+            << "`strtoul' succeeded, returning `temp_val' == " << temp_val << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   mysql_free_result(result);
+   result = 0;
+   sql_strm.str("");
+
+   sql_strm << "insert into gwirdsif.GPG_Key_Pairs (gpg_key_pair_id, uid, user_id, "
+            << "fingerprint, public_key, revoked, created, last_modified) "
+            << "values (" << (temp_val + 1) << ", '" << uid << "', " 
+            << user_id << ", "
+            << "'" << fingerprint << "', '" << public_key << "', "
+            << (options & 1U) << ", now(), 0)";
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::store_public_key':"
+            << endl
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+   
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+   status = submit_mysql_query(sql_strm.str(), result, 0, 0, &affected_rows);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::store_public_key':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Failed to insert row into `gwirdsif.GPG_Key_Pairs' database table."
+            << endl 
+            << "Will send error message to client."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       temp_strm << "STORE PUBLIC_KEY RESPONSE " << GW_SERVER_SIDE_DATABASE_ERROR << " "
+                 << "\"" << fingerprint << "\" \"Failed to store public key.\"";
+
+       response.command = temp_strm.str();
+
+       response_deque.push_back(response);
+
+       if (result)
+          mysql_free_result(result);
+
+       ++errors_occurred; 
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::store_public_key':"
+            << endl
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "Inserted row into `gwirdsif.GPG_Key_Pairs' database table successfully."
+            << endl
+            << "`affected_rows' == " << affected_rows
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+   mysql_free_result(result);
+   result = 0;
+
+   temp_strm.str("");
+
+   temp_strm << "STORE PUBLIC_KEY RESPONSE " << GW_SUCCESS << " "
+             << "\"" << fingerprint << "\" \"Stored public key successfully.\"";
+
+   response.command = temp_strm.str();
+
+   response_deque.push_back(response);
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Scan_Parse_Parameter_Type::store_public_key' "
+            << "successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |Scan_Parse_Parameter_Type::store_public_key| definition  */
+
+
+
+@q *** (3) Process pull request (|process_pull_request|).  @>
+
+@ Process pull request (|process_pull_request|).  
+\initials{LDF 2014.02.03.}
+
+\LOG
+\initials{LDF 2014.02.03.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Definition  @>
+@
+@<|Scan_Parse_Parameter_Type::process_pull_request| definition@>=
+
+int
+Scan_Parse_Parameter_Type::process_pull_request(Response_Type &response, 
+                                                Pull_Request_Type *&pull_request, 
+                                                string thread_str)         
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status = 0;
+   stringstream temp_strm;
+
+   Response_Type new_response;
+   new_response.type = Response_Type::COMMAND_ONLY_TYPE;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Scan_Parse_Parameter_Type::process_pull_request'."
+            << endl;
+
+       pull_request->show("*pull_request:");  
+       show("*this:");
+
+       cerr << "user_id == " << user_id << endl;
+       cerr << "pull_request->user_id == " << pull_request->user_id << endl;
+
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::process_pull_request| definition@>=
+
+   if (privileges & SUPERUSER_PRIVILEGE || privileges & PULL_REQUEST_ALL_PRIVILEGE)
+   {
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Scan_Parse_Parameter_Type::process_pull_request':"
+                << endl
+                << "User `user_id' has \"superuser\" or \"pull_request_all\" privilege:"
+                << endl 
+                << "privileges & SUPERUSER_PRIVILEGE        == " 
+                << ((privileges & SUPERUSER_PRIVILEGE) ? 1 : 0)
+                << endl
+                << "privileges & PULL_REQUEST_ALL_PRIVILEGE == " 
+                << ((privileges & PULL_REQUEST_ALL_PRIVILEGE) ? 1 : 0)
+                << endl 
+                << "Will process pull request."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   }  /* |if (privileges & SUPERUSER_PRIVILEGE)|  */
+
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::process_pull_request| definition@>=
+
+
+    else if (   user_id == pull_request->user_id 
+             && privileges & PULL_REQUEST_SELF_PRIVILEGE)
+    {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Scan_Parse_Parameter_Type::process_pull_request':"
+                << endl
+                << "`user_id' == `pull_request->user_id' == " << user_id
+                << endl 
+                << "and `privileges' & `PULL_REQUEST_SELF_PRIVILEGE' == 1."
+                << endl
+                << "Will process pull request."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ****** (6) @>
+
+    }  /* |else if|  */
+
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::process_pull_request| definition@>=
+
+    else if (user_id != pull_request->user_id)
+    {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Scan_Parse_Parameter_Type::process_pull_request':"
+                << endl
+                << "`user_id' != `pull_request->user_id':"
+                << endl 
+                << "`user_id' == " << user_id
+                << endl 
+                << "`pull_request->user_id' == " << pull_request->user_id
+                << endl
+                << "Will check group privileges of user " << user_id << " and "
+                << "groups of user " << pull_request->user_id
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       vector<Group_Type> group_vector;
+
+       status = Group_Type::check_privileges(mysql_ptr,
+                                             user_id,
+                                             Group_Type::PULL_REQUEST_PRIVILEGE,
+                                             false,
+                                             pull_request->user_id,
+                                             &group_vector,
+                                             thread_str);
+
+@q ****** (6) @>
+
+       if (status == 2)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "WARNING!  In `Scan_Parse_Parameter_Type::process_pull_request':"
+                << endl
+                << "`Group_Type::check_privileges' returned 2:"
+                << endl 
+                << "User " << user_id << " does not have \"pull request\" privileges for"
+                << endl 
+                << "any group of which user " << pull_request->user_id << " is a member."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           ++warnings_occurred; 
+
+           temp_strm.str("");
+
+           temp_strm << "REGISTER PULL RESPONSE " << GW_ERROR 
+                     << " \"User doesn't have privilege.\"";
+
+           new_response.command = temp_strm.str();
+
+           response_deque.push_back(new_response);
+
+           return 1;
+
+       }  /* |if (status == 2)|  */
+
+@q ****** (6) @>
+
+
+       else if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::process_pull_request':"
+                << endl
+                << "`Group_Type::check_privileges' failed, returning " << status << ":"
+                << endl 
+                << "Failed to check group privileges for `user_id' == " << user_id << "."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           ++errors_occurred; 
+
+           temp_strm.str("");
+
+           temp_strm << "REGISTER PULL RESPONSE " << GW_ERROR 
+                     << " \"Failed to check privileges.\"";
+
+           new_response.command = temp_strm.str();
+
+           response_deque.push_back(new_response);
+
+           return 1;
+
+       }  /* |else if (status != 0)|  */
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::process_pull_request| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Scan_Parse_Parameter_Type::process_pull_request':"
+                << endl
+                << "`Group_Type::check_privileges' succeeded, returning 0."
+                << endl 
+                << "Checked group privileges for `user_id' == " << user_id << " successfully."
+                << endl
+                << "`group_vector.size()' == " << group_vector.size()
+                << endl;
+
+            if (group_vector.size() > 0)
+            {
+ 
+                cerr << "`group_vector':" << endl;
+
+                for(vector<Group_Type>::iterator iter = group_vector.begin();
+                    iter != group_vector.end();
+                    ++iter)
+                {
+                     iter->show();
+                }
+                cerr << endl;
+            }
+
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+    }  /* |else if (user_id != pull_request->user_id)|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::process_pull_request| definition@>=
+
+    status = pull_request->write_pull_request_to_database(mysql_ptr, thread_str);
+
+    if (status == 2)
+    {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "WARNING!  In `Scan_Parse_Parameter_Type::process_pull_request':"
+                << endl
+                << "`Pull_Request_Type::write_pull_request_to_database' failed, "
+                << "returning 2:"
+                << endl 
+                << "A corresponding pull request already exists, but `force' option "
+                << "not specified."
+                << endl 
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           ++warnings_occurred; 
+
+           temp_strm.str("");
+
+           temp_strm << "REGISTER PULL RESPONSE " << GW_ERROR 
+                     << " \"Existing pull request, but \002force\003 option not specified.\"";
+
+           new_response.command = temp_strm.str();
+
+           response_deque.push_back(new_response);
+
+           return 1;
+
+
+    }  /* |if (status != 0)|  */
+
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::process_pull_request| definition@>=
+
+    if (status != 0)
+    {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::process_pull_request':"
+                << endl
+                << "`Pull_Request_Type::write_pull_request_to_database' failed, "
+                << "returning " << status << ":"
+                << endl 
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           ++errors_occurred; 
+
+           temp_strm.str("");
+
+           temp_strm << "REGISTER PULL RESPONSE " << GW_ERROR << " \"Failure\"";
+
+           new_response.command = temp_strm.str();
+
+           response_deque.push_back(new_response);
+
+           return 1;
+
+
+    }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::process_pull_request| definition@>=
+
+#if DEBUG_COMPILE
+    else if (DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << thread_str << "In `Scan_Parse_Parameter_Type::process_pull_request':"
+             << endl
+             << "`Pull_Request_Type::write_pull_request_to_database' succeeded, "
+             << "returning 0."
+             << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::process_pull_request| definition@>=
+
+   temp_strm.str("");
+
+   temp_strm << "REGISTER PULL RESPONSE " << GW_SUCCESS << " \"Success\"";
+
+   new_response.command = temp_strm.str();
+
+   response_deque.push_back(new_response);
+
+   temp_strm.str("");
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::process_pull_request| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Scan_Parse_Parameter_Type::process_pull_request' "
+            << "successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   delete pull_request;
+
+   pull_request = 0;
+
+   return 0;
+
+}  /* End of |Scan_Parse_Parameter_Type::process_pull_request| definition  */
+
+@q *** (3) Add pull paths (|add_pull_paths|).  @>
+
+@ Add pull paths (|add_pull_paths|).  
+\initials{LDF 2014.02.18.}
+
+\LOG
+\initials{LDF 2014.02.18.}
+Added this function.
+
+\initials{LDF 2014.02.20.}
+Changed name of this function from |add_pull_path| to |add_pull_paths|.
+Removed arguments |local_path| and |remote_path|.
+Now using |Scan_Parse_Parameter_Type::filename_vector| instead.
+Rewrote to make it possible to add multiple pull paths.
+\ENDLOG
+
+@q **** (4) Definition  @>
+@
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>=
+
+int
+Scan_Parse_Parameter_Type::add_pull_paths(Pull_Response_Type &pull_response, 
+                                          int &pull_paths_added,
+                                          string thread_str)
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status = 0;
+   stringstream temp_strm;
+
+   MYSQL_RES* result = 0;
+   MYSQL_ROW curr_row;
+
+   unsigned int row_ctr = 0;
+   unsigned int field_ctr = 0;
+
+   long int affected_rows;
+
+   stringstream sql_strm;
+
+   bool new_pull_response = false;
+
+   string local_path;
+   string remote_path;
+
+   int save_pull_interval = -1;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Scan_Parse_Parameter_Type::add_pull_paths'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>=
+
+   if (is_gwirdcli == false)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "WARNING!  In `Scan_Parse_Parameter_Type::add_pull_paths':"
+            << endl
+            << "`is_gwirdcli' == `false'.  This function is only meant to be called "
+            << "but the client program `gwirdcli'."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++warnings_occurred; 
+
+       return 1;
+
+   }  /* |if (is_gwirdcli == false)|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>=
+
+   if (filename_vector.size() == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::add_pull_paths':"
+            << endl
+            << "`filename_vector' is empty.  No pull paths to add."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++errors_occurred; 
+
+       return 1;
+
+   }  /* |if|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>=
+
+   else if (filename_vector.size() % 2 != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::add_pull_paths':"
+            << endl
+            << "`filename_vector.size()' == " << filename_vector.size() << " (not even number)"
+            << endl 
+            << "This is not permitted."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++errors_occurred; 
+
+       return 1;
+
+   }  /* |else if|  */
+
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>=
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       bitset<sizeof(unsigned int) * 8> b(privileges);
+  
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::add_pull_paths':"
+            << endl 
+            << "`user_id'     == " << user_id
+            << endl 
+            << "`username'    == " << username
+            << endl 
+            << "`privileges'  == " << privileges << " (dec) == " 
+            << oct << privileges << " (octal) == " 
+            << dec << b
+            << endl;
+
+       pull_response.show("pull_response:");
+
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>=
+
+   if (pull_response.server_ip_address.empty() && pull_response.server_hostname.empty())
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::add_pull_paths':"
+            << endl
+            << "`pull_response.server_ip_address' and `pull_response.server_hostname' "
+            << "are both empty."
+            << endl
+            << "Can't add pull response."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++errors_occurred; 
+
+       return 1;
+
+   }  /* |if|  */
+
+@q ***** (5) @>
+
+@ Error handling:  If the current user doesn't have the |PULL_RESPONSE_SELF_PRIVILEGE| 
+privilege, exit unsuccessfully with return value 1.
+@:NOTE@> !! PLEASE NOTE:  This occurs even if the pull request is for another user.
+That is, any user with the |PULL_RESPONSE_GROUP_PRIVILEGE| or |PULL_RESPONSE_ALL_PRIVILEGE| 
+privilege must also have the |PULL_RESPONSE_SELF| privilege.  This could be changed, 
+if necessary, but I think it is a reasonable requirement.
+\initials{LDF 2014.02.19.}
+
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>=
+
+   if (privileges & PULL_RESPONSE_SELF_PRIVILEGE == 0U)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::add_pull_paths':"
+            << endl
+            << "User " << username << ", " << user_id 
+            << " doesn't have the `PULL_RESPONSE_SELF_PRIVILEGE' "
+            << "privilege."
+            << endl
+            << "This is a prerequisite for adding a pull path for _any_ user."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++errors_occurred; 
+
+       return 1;
+
+   }  /* |if (privileges & PULL_RESPONSE_SELF_PRIVILEGE == 0U)|  */
+
+@q ***** (5) @>
+
+@ If another user has been specified for |pull_response|, either by means of ID, username
+or Distinguished Name, the current user must have the |PULL_RESPONSE_ALL| privilege.
+|PULL_RESPONSE_GROUP| isn't checked, because groups have not been implemented on the 
+client side.
+@:TODO@> !! TODO:  Implement groups on the client side!
+\initials{LDF 2014.02.19.}
+
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>=
+
+   else if (   privileges & PULL_RESPONSE_ALL_PRIVILEGE == 0U
+            && ((pull_response.user_id > 0 && pull_response.user_id != user_id)
+            ||  (!pull_response.username.empty() && pull_response.username != username)
+            ||  (   !pull_response.Distinguished_Name.empty() 
+                 && pull_response.Distinguished_Name != distinguished_name.output())))
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::add_pull_paths':"
+            << endl
+            << "The pull response specifies a different user, but the current user "
+            << "User " << username << ", " << user_id
+            << endl 
+            << "doesn't have the `PULL_RESPONSE_ALL_PRIVILEGE' privilege."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++errors_occurred; 
+
+       return 1;
+
+   }  /* |else if|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>=
+
+   if (   pull_response.user_id == 0 
+       && pull_response.username.empty() 
+       && pull_response.Distinguished_Name.empty())
+   {
+        pull_response.user_id  = user_id;
+        pull_response.username = username;
+        pull_response.Distinguished_Name = distinguished_name.output();
+
+   }
+
+   if (pull_response.client_ip_address.empty())
+      pull_response.client_ip_address = gwirdcli_ip_address;
+
+   if (pull_response.client_hostname.empty())
+      pull_response.client_hostname = gwirdcli_hostname;
+  
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+
+       distinguished_name.show("distinguished_name:");
+       cerr << "distinguished_name.output() == " << distinguished_name.output() << endl;
+
+       pull_response.show("pull_response:");
+
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>=
+
+   save_pull_interval = pull_response.pull_interval;
+
+   status = pull_response.get_pull_response_from_database(mysql_ptr, false, true, thread_str);
+
+   if (status != 0 && status != 2)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::add_pull_paths':"
+            << endl
+            << "`Pull_Response_Type::get_pull_response_from_database' failed, "
+            << "returning " << status << ":"
+            << endl
+            << "Failed to retrieve or create new pull response from the "
+            << "`gwirdcli.Pull_Responses' database table."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++errors_occurred; 
+
+       return 1;
+
+   }  /* |if|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>=
+
+#if DEBUG_COMPILE
+   else if (status == 0 && DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::add_pull_paths':"
+            << endl
+            << "`Pull_Response_Type::get_pull_response_from_database' succeeded, returning 0:"
+            << endl
+            << "Retrieved pull response from the gwirdcli.Pull_Responses' database table "
+            << "successfully."
+            << endl;
+
+       pull_response.show("pull_response:");
+
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (status == 0 && DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>=
+
+
+#if DEBUG_COMPILE
+   else if (status == 2 && DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::add_pull_paths':"
+            << endl
+            << "`Pull_Response_Type::get_pull_response_from_database' succeeded, returning 2:"
+            << endl
+            << "Created new pull response and stored it in the gwirdcli.Pull_Responses' "
+            << "database table "
+            << "successfully."
+            << endl;
+
+       pull_response.show("pull_response:");
+
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (status == 2 && DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>=
+
+   if (status == 2)
+   {
+      new_pull_response = true;
+   }
+
+   if (   status == 0 && save_pull_interval > -1 
+       && save_pull_interval != pull_response.pull_interval)
+   {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Scan_Parse_Parameter_Type::add_pull_paths':"
+                << endl
+                << "`save_pull_interval' != `pull_response.pull_interval':" 
+                << endl 
+                << "`save_pull_interval'          == " << save_pull_interval
+                << endl 
+                << "`pull_response.pull_interval' == " << pull_response.pull_interval
+                << endl  
+                << "Will update `pull_response.pull_interval'."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+       status = pull_response.update_database(Pull_Response_Type::PULL_INTERVAL,
+                                              *this,
+                                              save_pull_interval,
+                                              thread_str);
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::add_pull_paths':"
+                << endl
+                << "`Pull_Response_Type::update_database' failed, "
+                << "returning " << status << ":"
+                << endl
+                << "Failed to update `pull_interval' field in the entry "
+                << "in the `gwirdcli.Pull_Responses' database table."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           ++errors_occurred; 
+
+           return 1;
+
+       }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Scan_Parse_Parameter_Type::add_pull_paths':"
+                << endl
+                << "`Pull_Response_Type::update_database' succeeded, "
+                << "returning 0."
+                << endl
+                << "Updated `pull_interval' field in the entry "
+                << "in the `gwirdcli.Pull_Responses' database table successfully."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+   }  /* |if|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>=
+
+   Pull_Path_Type pull_path;
+
+   for (vector<string>::iterator iter = filename_vector.begin();
+        iter !=  filename_vector.end();
+        ++iter)
+   {
+@q ****** (6) @>
+
+       pull_path.clear();
+
+       local_path  = "";
+       remote_path = "";
+
+       local_path = *iter;
+       ++iter;
+
+       if (iter == filename_vector.end())
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::add_pull_paths':"
+                << endl
+                << "After incrementing `iter':  `iter' == `filename_vector.end()'."
+                << endl
+                << "Can't set `remote_path'.  `filename_vector' should have contained an "
+                << "even number of strings."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           ++errors_occurred; 
+
+           return 1;
+
+       }  /* |if (iter == filename_vector.end())|  */
+
+@q ****** (6) @>
+
+       remote_path = *iter;
+
+       pull_path.pull_response_id         = pull_response.pull_response_id;
+       pull_path.owner_id                 = pull_response.user_id;
+       pull_path.owner_username           = pull_response.username;
+       pull_path.owner_distinguished_name = pull_response.Distinguished_Name;
+       pull_path.local_path               = local_path;
+       pull_path.remote_path              = remote_path;
+
+       if (new_pull_response == true)
+          pull_path.force_flag = false;
+       else 
+          pull_path.force_flag = pull_response.force_flag;
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>=
+
+       if (new_pull_response == false)
+       {
+@q ******* (7) @>
+       
+           vector<Pull_Path_Type>::iterator pull_path_iter 
+              = find(pull_response.pull_path_vector.begin(),
+                     pull_response.pull_path_vector.end(),
+                     pull_path);
+
+@q ******* (7) @>
+
+           if (   pull_path_iter != pull_response.pull_path_vector.end() 
+               && pull_response.force_flag == false)
+           {
+@q ******** (8) @>
+
+               lock_cerr_mutex(); 
+               cerr << thread_str << "WARNING!  In `Scan_Parse_Parameter_Type::add_pull_paths':"
+                    << endl
+                    << "A corresponding pull path already exists "
+                    << "and `pull_response::force_flag' == `false'."
+                    << endl
+                    << "Not overwriting pull path."
+                    << endl
+                    << "Continuing."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               ++warnings_occurred; 
+
+               continue; 
+
+@q ******** (8) @>
+       
+           }  /* |if|  */
+
+@q ******* (7) @>
+
+           else if (   pull_path_iter != pull_response.pull_path_vector.end() 
+                    && pull_response.force_flag == true)
+           {
+
+#if DEBUG_COMPILE
+              if (DEBUG)
+              {
+                  lock_cerr_mutex(); 
+                  cerr << thread_str << "In `Scan_Parse_Parameter_Type::add_pull_paths':"
+                       << endl
+                       << "A corresponding pull path already exists."
+                       << endl
+                       << "Setting `pull_path.pull_path_id' to `pull_path_iter->pull_path_id' == " 
+                       << pull_path_iter->pull_path_id << "."
+                       << endl;
+                  unlock_cerr_mutex(); 
+
+              }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+               pull_path.pull_path_id = pull_path_iter->pull_path_id;
+               pull_path.created = pull_path_iter->created;
+               pull_path.last_modified = pull_path_iter->last_modified;
+           }
+
+@q ******* (7) @>
+
+           else if (pull_path_iter == pull_response.pull_path_vector.end())
+           {
+#if DEBUG_COMPILE
+              if (DEBUG)
+              {
+                  lock_cerr_mutex(); 
+                  cerr << thread_str << "In `Scan_Parse_Parameter_Type::add_pull_paths':"
+                       << endl
+                       << "A corresponding pull path doesn't already exist."
+                       << endl
+                       << "Setting `pull_path.force_flag' to `false'."
+                       << endl;
+                  unlock_cerr_mutex(); 
+
+              }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+              pull_path.force_flag = false;
+
+           }  /* |else if|  */
+
+
+       }  /* |if (new_pull_response == false)|  */
+
+@q ******* (7) @>
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>=
+
+       status = pull_path.write_pull_path_to_database(mysql_ptr, true, thread_str);
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>=
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `Scan_Parse_Parameter_Type::add_pull_paths':"
+                << endl
+                << "`Pull_Path_Type::write_pull_path_to_database' failed, "
+                << "returning " << status << ":"
+                << endl
+                << "Failed to create new pull path in the "
+                << "`gwirdcli.Pull_Paths' database table."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           ++errors_occurred; 
+
+           return 1;
+
+       }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+
+       else
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "In `Scan_Parse_Parameter_Type::add_pull_paths':"
+                    << endl
+                    << "`Pull_Path_Type::write_pull_path_to_database' succeeded, returning 0."
+                    << endl 
+                    << "Stored pull path in the gwirdcli.Pull_Paths' database table successfully."
+                    << endl;
+
+               pull_path.show("pull_path:");
+
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           ++pull_paths_added;
+
+       }  /* |else|  */
+
+
+
+@q ****** (6) @>
+
+   }  /* |for|  */
+
+@q ***** (5) @>
+@
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Scan_Parse_Parameter_Type::add_pull_paths' "
+            << "successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |Scan_Parse_Parameter_Type::add_pull_paths| definition  */
+
+
+@q ** (2) @>
+@
+@<Garbage@>=
+
+
+@q ** (2) Putting `spptfnc2.web' together.  @>
+
+@ Putting {\tt spptfnc2\PERIOD web} together.
+
+@q *** (3) This is what's compiled.  @>
+@ This is what's compiled.
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+@<External function declarations@>@;@/
+@<|Scan_Parse_Parameter_Type::undelete_files| definition@>@;@/
+@<|Scan_Parse_Parameter_Type::generate_checksum| definition@>@;@/
+@<|Scan_Parse_Parameter_Type::store_public_key| definition@>@;@/
+@<|Scan_Parse_Parameter_Type::process_pull_request| definition@>@;@/
+@<|Scan_Parse_Parameter_Type::add_pull_paths| definition@>@;@/
+
+#if 0 
+@<Garbage@>@;@/
+#endif 
+
+@q *** (3) This is what's written to the header file `spptfnc2.h'.  @>
+
+@ This is what's written to the header file \filename{spptfnc2.h}.
+\initials{LDF 2013.02.13.}
+
+@(spptfnc2.h@>=
+#ifndef SPPTFNC2_H
+#define SPPTFNC2_H 1
+/* Empty  */
+#endif 
+
+@q ** (2) @>
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))                          @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

@@ -1,0 +1,924 @@
+@q optpsgen.web  @>
+
+@q Created by Laurence D. Finston (LDF) Wed Mar  7 09:33:30 CET 2012  @>
+
+@q * (1) Top @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+@ optpsgen.
+This program generates passwords using random data.
+\initials{LDF 2013.03.27.}
+
+@q ** (2) Include header files.  @>
+
+@ Include header files.
+
+@<Include header files@>=
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+
+#if 0
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif 
+
+#include <getopt.h> 
+#include <limits.h> 
+#include <errno.h> 
+
+#include <string>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <fstream>
+#include <sstream>   
+
+#include <vector>   
+#include <algorithm>   
+
+using namespace std;
+
+#include <optpsgsb.h++>
+
+@q ** (2) Main function.  @>
+
+@ Main function.
+\initials{LDF 2012.03.07.}
+
+@<Main@>=
+int
+main(int argc, char* argv[])
+{
+@q *** (3) @>
+    
+   bool DEBUG = false;  /* |true|  */
+  
+   int status = 0;
+
+   if (DEBUG) 
+      cerr << "Entering `optpsgen'." << endl;
+
+   passwd_len = DEFAULT_PASSWD_LEN;
+
+   status = handle_options(argc, argv);
+
+   if (DEBUG) 
+      cerr << "handle_options returned " << status << "." << endl;
+
+   if (status < 0)
+   {
+       cerr << "ERROR!  In `main':  `handle_options' failed, returning "
+            << status << "."
+            << endl
+            << "Exiting `optpsgen' unsuccessfully with exit status 1."
+            << endl;
+
+       exit(1);
+   }
+
+   if (debug_level > 0) DEBUG = true;
+
+@q *** (3) Sort |exclude_char_vector| and erase duplicates.  @>
+
+@ Sort |exclude_char_vector| and erase duplicates.  
+\initials{LDF 2012.03.07.}
+
+@<Main@>=
+
+  if (DEBUG)
+  {
+       cerr << "Showing `exclude_char_vector' before sorting:"
+            << endl;
+
+       for (vector<char>::const_iterator iter = exclude_char_vector.begin();
+            iter != exclude_char_vector.end();
+            ++iter)
+          cerr << "*iter == " << *iter << endl;
+
+
+  }  /* |if (DEBUG)|  */ 
+
+  sort(exclude_char_vector.begin(), exclude_char_vector.end());
+
+  if (DEBUG)
+  {
+       cerr << "Showing `exclude_char_vector' after sorting:"
+            << endl;
+
+       for (vector<char>::const_iterator iter = exclude_char_vector.begin();
+            iter != exclude_char_vector.end();
+            ++iter)
+          cerr << "*iter == " << *iter << endl;
+
+  }  /* |if (DEBUG)|  */ 
+
+  vector<char>::iterator exclude_iter = unique(exclude_char_vector.begin(), 
+                                               exclude_char_vector.end());
+
+  exclude_char_vector.erase(exclude_iter, exclude_char_vector.end());
+
+  if (DEBUG)
+  {
+       cerr << "Showing `exclude_char_vector' after erasing duplicates:"
+            << endl;
+
+       for (vector<char>::const_iterator iter = exclude_char_vector.begin();
+            iter != exclude_char_vector.end();
+            ++iter)
+          cerr << "*iter == " << *iter << endl;
+
+
+  }  /* |if (DEBUG)|  */ 
+
+@q *** (3) Show |checksum_type|.  @>
+
+@ Show |checksum_type|.  
+\initials{LDF 2012.03.07.}
+
+@<Main@>=
+
+  if (DEBUG)
+  {
+
+       cerr << "`checksum_type' == ";
+       
+       if (checksum_type == 0)
+          cerr << "0" << endl;
+
+       else if (checksum_type == SHA1_TYPE)
+          cerr << "SHA1_TYPE" << endl;
+
+       else if (checksum_type == MD5_TYPE)
+          cerr << "MD5_TYPE" << endl;
+
+       else if (checksum_type == SHA1_TYPE)
+          cerr << "SHA1_TYPE" << endl;
+
+       else if (checksum_type == SHA224_TYPE)
+          cerr << "SHA224_TYPE" << endl;
+
+       else if (checksum_type == SHA256_TYPE)
+          cerr << "SHA256_TYPE" << endl;
+
+       else if (checksum_type == SHA384_TYPE)
+          cerr << "SHA384_TYPE" << endl;
+
+
+       else if (checksum_type == SHA512_TYPE)
+          cerr << "SHA512_TYPE" << endl;
+
+  }  /* |if (DEBUG)|  */               
+
+@q *** (3) Set type of characters to include in password or passphrase.  @>
+
+@ Set type of characters to include in password or passphrase.  
+\initials{LDF 2012.03.07.}
+
+@<Main@>=
+
+   int char_type = status & PRINTABLE_TYPE;
+
+   if (char_type == 0)
+   {
+        char_type = status & GRAPH_TYPE;
+
+        if (char_type > 0 && status & SPACE_TYPE)
+        {
+             if (DEBUG)
+             {
+
+                 cerr << "GRAPH_TYPE and SPACE_TYPE set.  Setting`char_type' "
+                      << "to `PRINTABLE_TYPE'."
+                      << endl;
+
+
+             }  /* |if (DEBUG)|  */   
+      
+             char_type = PRINTABLE_TYPE;
+        }
+        
+   }
+   if (char_type == 0)
+   {
+        char_type = status & ALPHANUM_TYPE;
+   }
+
+   if (char_type == 0)
+   {
+        char_type = status & ALPHA_TYPE;
+
+   }
+
+   if (char_type == 0)
+      char_type = ALPHANUM_TYPE;
+
+
+   char_type |= status & NO_START_SPACE_TYPE;  /* These apply to |PRINTABLE_TYPE| and 
+                                                  |GRAPH_TYPE|, too.
+                                                  \initials{LDF 2012.03.07.}  */
+   char_type |= status & NO_END_SPACE_TYPE;
+
+   if (char_type & ALPHANUM_TYPE || char_type & ALPHA_TYPE)
+   {
+      char_type |= status & SPACE_TYPE;
+      char_type |= status & BLANK_TYPE;
+      char_type |= status & NO_TABS_TYPE;
+   }
+
+   if (DEBUG) 
+   {
+      cerr << "char_type == " << char_type << endl
+           << "char_type & ALPHA_TYPE == " << (char_type & ALPHA_TYPE)
+           << endl 
+           << "char_type & ALPHANUM_TYPE == " << (char_type & ALPHANUM_TYPE)
+           << endl 
+           << "char_type & SPACE_TYPE == " << (char_type & SPACE_TYPE)
+           << endl 
+           << "char_type & BLANK_TYPE == " << (char_type & BLANK_TYPE)
+           << endl 
+           << "char_type & NO_TABS_TYPE == " << (char_type & NO_TABS_TYPE)
+           << endl 
+           << "char_type & NO_START_SPACE_TYPE == " << (char_type & NO_START_SPACE_TYPE)
+           << endl 
+           << "char_type & NO_END_SPACE_TYPE == " << (char_type & NO_END_SPACE_TYPE)
+           << endl
+           << "delim_start == " << delim_start 
+           << endl
+           << "delim_end == " << delim_end 
+           << endl 
+           << "`min_block_size' == " << min_block_size
+           << endl 
+           << "`max_block_size' == " << max_block_size
+           << endl
+           << "`iterations' == " << iterations
+           << endl;
+
+   }
+
+@q *** (3) Open input file.  @>
+
+@ Open input file.  Default is \filename{/dev/urandom}.  If the \.{--extra-random} 
+option is used, \filename{/dev/random} is used instead.  This can cause the program to block,
+if not enough entropy is available in the system.  A message is issued to this effect.
+\par
+Another file to be read from may be specified using the \.{--input-filename} option.
+This may be useful for debugging and testing.  
+@:NOTE@> !! PLEASE NOTE:  If this file doesn't contain enough characters, the program will 
+block.  That is, there is no provision for closing and reopening it to read it 
+multiple times. 
+\initials{LDF 2012.03.08.}
+
+@<Main@>=
+
+   ifstream in_file;
+
+   if (in_filename.empty())
+   {
+       if (extra_random)
+          in_filename = "/dev/random";
+       else
+          in_filename = "/dev/urandom";
+   } 
+   else if (extra_random)
+   {
+       cerr << "WARNING!  If an input file is specified using `--input-filename', "
+            << "`--extra-random' has no effect."
+            << endl
+            << "Continuing."
+            << endl;
+   }
+
+   in_file.open(in_filename.c_str());
+
+   if (!in_file)
+   {
+       cerr << "ERROR!  In `main':  Failed to open `" << in_filename << "'."
+            << endl
+            << "Exiting `optpsgen' unsuccessfully with exit status 1."
+            << endl;
+
+       exit(1);
+   }
+   else if (DEBUG)
+   {
+       cerr << "In `main':  Opened `" << in_filename << "' successfully." 
+            << endl;
+
+   }  /* |else if (DEBUG)|  */ 
+ 
+
+@q *** (3) Main loop.  @>
+@ Main loop.
+\initials{LDF 2012.03.07.}
+
+@<Main@>=
+
+   char c;
+   char prev_char = 'A';
+
+   string passwd;
+
+    stringstream system_strm;
+
+@q *** (3) @>
+
+   for (int j = 0; j < iterations; ++j)
+   {
+@q **** (4) @>
+
+       char prev_char = 'A';
+       passwd = "";
+
+       block_ctr = 0;
+
+@q **** (4) Inner loop.  @>
+
+@ Inner loop.
+\initials{LDF 2012.03.08.}
+
+@<Main@>=
+
+       for (int i = 0; i < passwd_len;)
+       {   
+@q ***** (5) @>
+
+
+           if (DEBUG)
+           {
+                cerr << "Beginning loop."
+                     << endl
+                     << "`block_ctr' == " << block_ctr
+                     << endl
+                     << "i == " << i 
+                     << endl 
+                     << "passwd_len - max(min_block_size, 1) == "
+                     << (passwd_len - max(min_block_size, 1))
+                     << endl;
+
+           }  /* |if (DEBUG)|  */ 
+
+           if (   max_block_size > 0 
+               && block_ctr == max_block_size 
+               && i < passwd_len - max(min_block_size, 1))
+           {
+
+               if (DEBUG)
+               {
+
+                   cerr << "max_block_size > 0 && block_ctr == max_block_size "
+                        << "&& i < passwd_len - (max(min_block_size, 1) + 1)"
+                        << endl
+                        << "`block_ctr' == " << block_ctr
+                        << endl 
+                        << "`max_block_size' == " << max_block_size
+                        << endl 
+                        << "`min_block_size' == " << min_block_size
+                        << endl 
+                        << "Adding a space to `passwd', resetting `block_ctr' to 0 "
+                        << "and continuing."
+                        << endl;
+ 
+
+               }  /* |if (DEBUG)|  */ 
+
+               passwd += ' ';
+               prev_char = ' ';
+               ++i;
+               block_ctr = 0;
+               continue;
+       
+           }   
+
+@q ***** (5) @>
+           c = in_file.get();
+
+           exclude_iter = find(exclude_char_vector.begin(), exclude_char_vector.end(), c);
+
+           if (exclude_iter != exclude_char_vector.end())
+           {
+                if (DEBUG)
+                {
+                    cerr << "Character `" << c << "' on exclude list.  Not adding to `passwd'."
+                         << endl
+                         << "Continuing."
+                         << endl;
+
+                }  /* |if (DEBUG)|  */ 
+
+                continue;
+
+           }
+           else if (DEBUG)
+           {
+               cerr << "Character `" << c << "' not on exclude list."
+                    << endl;
+
+           }  /* |else if (DEBUG)|  */ 
+
+#if 0 
+           if (DEBUG)
+           {
+              cerr << "c (" << static_cast<int>(c) << ") == " << c << endl;
+              cerr << "i == " << i << endl;
+              cerr << "passwd_len == " << passwd_len << endl;
+              cerr << "isspace(c) == " << isspace(c) << endl;
+
+           }  /* |if (DEBUG)|  */ 
+#endif 
+
+@q ***** (5) @>
+
+           if (isspace(c))
+           {
+@q ****** (6) @>
+
+               if (char_type & NO_START_SPACE_TYPE && i == 0)
+               {
+                   if (DEBUG)
+                   {
+                       cerr << "Space and first character.  Not adding to password."
+                            << endl;
+
+                   }  /* |if (DEBUG)|  */ 
+
+                  continue;
+
+               }   
+
+@q ****** (6) @>
+
+               else if (char_type & NO_END_SPACE_TYPE && i == passwd_len - 1)
+               {
+                  if (DEBUG)
+                  {
+                      cerr << "Space and last character.  Not adding to password."
+                           << endl;
+
+                  }  /* |if (DEBUG)|  */ 
+
+                  continue;
+               }   
+
+@q ****** (6) @>
+
+               else if (   min_block_size > 0 
+                        && !isspace(prev_char)
+                        && block_ctr < min_block_size) 
+               {
+                  if (DEBUG)
+                  {
+                      cerr << "Space and `min_block_size' > 0 and `block_ctr' < `min_block_size'."
+                           << endl 
+                           << "Not adding space to password."
+                           << endl
+                           << "`block_ctr' == " << block_ctr
+                           << endl 
+                           << "`min_block_size' == " << min_block_size
+                           << endl;
+
+                  }  /* |if (DEBUG)|  */ 
+
+                  continue;
+               }   
+
+@q ****** (6) @>
+
+           }  /* |if (isspace(c))|  */
+
+@q ***** (5) @>
+
+           if (char_type & PRINTABLE_TYPE && isprint(c))
+           {
+
+               if (DEBUG)
+               {
+                  cerr << "c == `" << c << "' (" << static_cast<int>(c) << ") is printable."
+                       << endl 
+                       << "Adding to password."
+                       << endl;
+
+               }  /* |if (DEBUG)|  */ 
+
+               passwd += c;
+               prev_char = c;
+               ++i;
+
+               if (isspace(c))
+                  block_ctr = 0;
+               else
+                  ++block_ctr;
+
+               
+           }  /* |if (char_type & PRINTABLE_TYPE && isprint(c))|  */
+
+@q ***** (5) @>
+
+           else if (char_type & GRAPH_TYPE && isgraph(c))
+           {
+               if (DEBUG)
+               {
+                  cerr << "c == `" << c << "' (" << static_cast<int>(c) << ") is graphical.  "
+                       << "Adding to password."
+                       << endl;
+
+               }  /* |if (DEBUG)|  */ 
+
+               passwd += c;
+               prev_char = c;
+               ++i;
+
+           }  /* |else if (char_type & GRAPH_TYPE && isgraph(c))|  */
+
+@q ***** (5) @>
+
+           else if (char_type & ALPHANUM_TYPE || char_type & ALPHA_TYPE)
+           {   
+@q ****** (6) @>
+
+               if(char_type & ALPHA_TYPE && isalpha(c))
+               {
+                   if (DEBUG)
+                   {
+                       cerr << "c == `" << c << "' (" << static_cast<int>(c) << ") "
+                            << "is alphabetical.  "
+                            << "Adding to password."
+                            << endl;
+
+                   }  /* |if (DEBUG)|  */ 
+
+                   passwd += c;
+                   prev_char = c;
+                   ++i;
+                   ++block_ctr;
+
+                   continue;
+
+                }  /* |if(char_type & ALPHA_TYPE && isalpha(c))|  */
+
+@q ****** (6) @>
+
+                else if(char_type & ALPHANUM_TYPE && isalnum(c))
+                {
+                    if (DEBUG)
+                    {
+                        cerr << "c == `" << c << "' (" << static_cast<int>(c) << ") "
+                             << "is alphanumeric.  "
+                             << "Adding to password."
+                             << endl;
+
+                    }  /* |if (DEBUG)|  */ 
+
+                    passwd += c;
+                    prev_char = c;
+                    ++i;
+                    ++block_ctr;
+
+                    continue;
+
+                 }  /* |else if(char_type & ALPHANUM_TYPE && isalnum(c))|  */
+
+@q ****** (6) @>
+
+                 else if (isblank(c))
+                 {    
+
+@q ******* (7) @>
+
+                     if (char_type & BLANK_TYPE)
+                     {     
+@q ******** (8) @>
+                         if (char_type & NO_TABS_TYPE && c == '\t')
+                         {
+                             if (DEBUG)
+                             {
+                                 cerr << "c == `" << c << "' (" 
+                                      << static_cast<int>(c) << ") is a tab.  "
+                                      << "Not allowing tabs.  Not adding to password."
+                                      << endl;
+  
+                             }  /* |if (DEBUG)|  */ 
+ 
+                            continue;
+
+                         }      
+
+@q ******** (8) @>
+
+                         else   
+                         {
+
+                             if (DEBUG)
+                             {
+                                 cerr << "c == `" << c << "' (" << static_cast<int>(c) << ") "
+                                      << "is a blank.  "
+                                      << "Allowing blanks.  Adding to password."
+                                      << endl;
+  
+                             }  /* |if (DEBUG)|  */ 
+
+                             passwd += c;
+                             prev_char = c;
+                             ++i;
+                             block_ctr = 0;
+
+                             continue;
+
+                         }  /* |else|  */
+
+@q ******** (8) @>
+
+                     }  /* |if (char_type & BLANK_TYPE)|  */
+
+@q ******* (7) @>
+
+                     else
+                     {     
+@q ******** (8) @>
+                         if (DEBUG)
+                         {
+                             cerr << "c == `" << c << "' (" 
+                                  << static_cast<int>(c) << ") is blank.  "
+                                  << "Not allowing blanks.  "
+                                  << "Not adding to password."
+                                  << endl;
+  
+                          }  /* |if (DEBUG)|  */ 
+ 
+                          continue;
+
+@q ******** (8) @>
+
+                     }  /* |else|  */
+
+@q ******* (7) @>
+
+               }  /* |else if (isblank(c))|  */
+
+@q ****** (6) @>
+
+               else if (isspace(c))
+               {  
+
+@q ******* (7) @>
+
+                     if (char_type & SPACE_TYPE)
+                     {
+                        if (DEBUG)
+                        {
+                            cerr << "c == `" << c << "' (" 
+                                 << static_cast<int>(c) << ") is space.  "
+                                 << "Allowing spaces.  Adding to password."
+                                 << endl;
+  
+                         }  /* |if (DEBUG)|  */ 
+ 
+                         passwd += c;
+                         prev_char = c;
+                         ++i;
+                         block_ctr = 0;
+
+                         continue;
+
+                     }  /* |if (char_type & SPACE_TYPE)|  */
+
+@q ******* (7) @>
+
+                     else  
+                     {
+                        if (DEBUG)
+                        {
+                            cerr << "c == `" << c << "' (" 
+                                 << static_cast<int>(c) << ") is space.  "
+                                 << "Not allowing spaces.  "
+                                 << "Not adding to password."
+                                 << endl;
+  
+                         }  /* |if (DEBUG)|  */ 
+ 
+                         continue;
+ 
+                     }  /* |else|  */
+
+@q ******* (7) @>
+
+               }  /* |else if (isspace(c))|  */
+
+@q ****** (6) @>
+
+           } /* |else if (char_type & ALPHANUM_TYPE || char_type & ALPHA_TYPE)|  */
+
+@q ***** (5) @>
+
+           else
+           {
+                 if (DEBUG)
+                 {
+                     cerr << "c == `" << c << "' (" << static_cast<int>(c) 
+                          << ") is not right type.  "
+                          << "Not adding to password."
+                          << endl;
+
+
+                 }  /* |if (DEBUG)|  */ 
+
+                 continue;
+           }   
+
+@q ***** (5) @>
+
+       }  /* Inner |for|  */
+
+@q **** (4) Write password to standard output.  @>
+
+@ Write password to standard output.
+\initials{LDF 2012.03.08.}
+
+@<Main@>=
+
+       if (DEBUG)
+       {
+            cerr << endl 
+                 << "passwd (between `---' on each side ) == " 
+                 << endl
+                 << "---" << passwd << "---" << endl;
+
+       }  /* |if (DEBUG)|  */ 
+
+       cout << delim_start << passwd << delim_end << endl;
+
+@q **** (4) Output checksum (optional).  @>
+
+@ Output checksum (optional).  
+\initials{LDF 2012.03.08.}
+
+@<Main@>=
+
+       if (DEBUG && checksum_type ==  0)
+       {
+          cerr << "checksum_type ==  0.  Not creating checksum." << endl;
+
+       }
+
+       system_strm.str("");
+
+       if (checksum_type == MD5_TYPE)
+       {
+            system_strm << "echo -n \"md5 checksum:  \"; echo '" << passwd 
+                        << "' | md5sum | tr --squeeze-repeats \" \" | cut -f1 -d\" \"";
+       }
+       else if (checksum_type == SHA1_TYPE)
+       {
+            system_strm << "echo -n \"sha1 checksum:  \"; echo '" << passwd 
+                        << "' | sha1sum | tr --squeeze-repeats \" \" | cut -f1 -d\" \"";
+       }
+       else if (checksum_type == SHA224_TYPE)
+       {
+            system_strm << "echo -n \"sha224 checksum:  \"; echo '" << passwd 
+                        << "' | sha224sum | tr --squeeze-repeats \" \" | cut -f1 -d\" \"";
+       }
+       else if (checksum_type == SHA256_TYPE)
+       {
+            system_strm << "echo -n \"sha256 checksum:  \"; echo '" << passwd 
+                        << "' | sha256sum | tr --squeeze-repeats \" \" | cut -f1 -d\" \"";
+       }
+       else if (checksum_type == SHA384_TYPE)
+       {
+            system_strm << "echo -n \"sha384 checksum:  \"; echo '" << passwd 
+                        << "' | sha384sum | tr --squeeze-repeats \" \" | cut -f1 -d\" \"";
+       }
+       else if (checksum_type == SHA512_TYPE)
+       {
+            system_strm << "echo -n \"sha512 checksum:  \"; echo '" << passwd 
+                        << "' | sha512sum | tr --squeeze-repeats \" \" | cut -f1 -d\" \"";
+       }
+
+       if (DEBUG)
+       {
+           cerr << "system_strm.str() == " << system_strm.str() << endl;
+
+       }  /* |if (DEBUG)|  */ 
+
+@q **** (4) @>
+@
+@<Main@>=
+
+       status = system(system_strm.str().c_str());       
+
+       if (status != 0)
+       {
+            cerr << "ERROR!  In `main':  `system' failed, returning "
+                 << status << ":"
+                 << endl;
+
+            perror("system error");
+
+            if (WIFEXITED(status))
+            {
+	      cerr << "WEXITSTATUS(" << status << ") == " 
+                   << WEXITSTATUS(status) << endl;
+            }
+            else
+            {
+	      cerr << "Process didn't exit." << endl;
+
+            }    
+
+       }  /* |if (status != 0)|  */
+
+       else if (DEBUG)
+       {
+           cerr << "`system' succeeded." << endl;
+
+       }  /* |else if (DEBUG)|  */ 
+
+@q **** (4) @>
+
+#if 0 
+       if (j < iterations - 1)
+          cerr << endl;
+#endif 
+
+   }   /* Outer |for|  */
+
+@q *** (3) Close input file and exit successfully with exit status 0.  @>
+
+@ Close input file and exit successfully with exit status 0.  
+\initials{LDF 2012.03.08.}
+
+@<Main@>=
+
+   in_file.close();
+
+   if (DEBUG)
+   {
+       cerr << "Exiting `optpsgen' successfully with exit status 0." << endl;
+
+   }  /* |if (DEBUG)|  */ 
+
+   exit(0);
+
+@q *** (3) @>
+
+}  /* End of |main| definition  */
+
+
+@ Putting \.{optpsgen} together.
+\initials{LDF 2012.03.07.}
+@c
+@<Include header files@>@;@/
+@<Main@>@;@/
+
+@q * (1) @>
+
+@q (progn (cweb-mode) (outline-minor-mode))                                @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

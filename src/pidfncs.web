@@ -1,0 +1,2616 @@
+@q pidfncs.web @>
+@q [...]/Finston/gwrdifpk/src/pidfncs.web @>
+
+@q Created by Laurence D. Finston (LDF) Thu Jul 19 10:58:41 CEST 2012  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q * (1) PID functions (pidfncs.web).  @>
+
+@*  PID functions (pidfncs\PERIOD web).
+
+\LOG
+\initials{LDF 2012.07.19.}
+Added this file.
+\ENDLOG
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif 
+
+
+
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stddef.h>
+
+
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <pthread.h>
+#include <pwd.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#include <fstream>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <string>
+#include <sstream>  
+#include <deque>    
+#include <map>   
+#include <utility>   
+#include <vector>   
+#include <set>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#include <mysql.h>
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "hndlvltp.h++"
+#include "rspnstp.h++"
+#include "irdsavtp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+
+@q ** (2) Generate PIDs.  @>
+@ Generate PIDs.
+\initials{LDF 2012.09.28.}
+
+\LOG
+\initials{LDF 2012.09.28.}
+Added this function.
+
+\initials{LDF 2012.10.11.}
+Added optional argument |vector<string> *pid_vector_ptr| with default 0.
+
+\initials{LDF 2012.10.16.}
+Added code for setting \.{handles.handle\_id} and \.{handles.handle\_value\_id}.
+
+\initials{LDF 2013.01.08.}
+Added optional arguments |vector<unsigned long int> *handle_id_vector_ptr = 0|
+and |vector<unsigned long int> *handle_value_id_vector_ptr = 0|.  If they 
+are non-null, the generated values of |handle_id| and |handle_value_id| are
+pushed onto them.
+
+\initials{LDF 2013.02.13.}
+Modified to account for changing the name of 
+the \.{handlesystem\_standalone.pid\_counter} database table
+to \.{pid\_counters} and adding the \.{prefix} field to it.
+
+\initials{LDF 2013.02.15.}
+Added optional argument |string fifo_pathname = ""|.
+
+\initials{LDF 2013.02.22.}
+Added optional arguments |long int user_id = 0| and |string username = ""|.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|generate_pids| declaration@>=
+int
+generate_pids(MYSQL *mysql_ptr,
+              string prefix_str, 
+              string &pid_str,
+              vector<string> *pid_vector_ptr = 0,
+              unsigned int number_of_pids = 1,
+              vector<unsigned long int> *handle_id_vector_ptr = 0,
+              vector<unsigned long int> *handle_value_id_vector_ptr = 0,
+              bool standalone_hs = true,
+              string institute_str = "", 
+              string suffix_str = "",
+              vector<Handle_Type> *handle_vector = 0,
+              string fifo_pathname = "",
+              long int user_id = 0,
+              string username = "");
+
+@q *** (3) Definition  @>
+@
+@<|generate_pids| definition@>=
+int
+generate_pids(MYSQL *mysql_ptr,
+              string prefix_str,
+              string &pid_str,
+              vector<string> *pid_vector_ptr,
+              unsigned int number_of_pids,
+              vector<unsigned long int> *handle_id_vector_ptr,
+              vector<unsigned long int> *handle_value_id_vector_ptr,
+              bool standalone_hs,
+              string institute_str,
+              string suffix_str,
+              vector<Handle_Type> *handle_vector,
+              string fifo_pathname,
+              long int user_id,
+              string username)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `generate_pids'." << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */
+
+@q **** (4) @>
+@ |ULONG_MAX == @t$2^{64}-1$@> == 18446744073709551615| on both a 32-bit and a 
+64-bit machine I've tested.  This value is also the maximum value for the \.{unsigned bigint} 
+data type in MySQL, so I think we're on the safe side using |unsigned long| for |pid_ctr|.
+\initials{LDF 2012.09.28.}
+
+\LOG
+\initials{LDF 2013.01.11.}
+Now declaring |Handle_Value_Type curr_handle|.
+
+\initials{LDF 2013.02.27.}
+Changed |Handle_Type curr_handle| to |Handle_Value_Type curr_handle_value|.  
+Added |Handle_Type curr_handle|.
+\ENDLOG 
+
+@<|generate_pids| definition@>=
+
+   int status;
+
+   stringstream sql_strm;
+   stringstream sql_strm_1;
+   stringstream sql_strm_2;
+
+   MYSQL_RES* result      = 0;
+   MYSQL_ROW curr_row;
+
+   unsigned int row_ctr   = 0;
+   unsigned int field_ctr = 0;
+   long affected_rows     = 0;
+
+   bool failed = false;
+
+   unsigned long pid_ctr;
+
+   string handles_table_name = (standalone_hs) ?   "handlesystem_standalone.handles" 
+                                                 : "handlesystem.handles";
+
+   string comma_str = "";
+   string or_str = "";
+   size_t pos;
+   stringstream temp_strm;
+
+   unsigned long int handle_id = 0;
+
+   unsigned long int handle_value_id = 0;
+
+   string temp_str;
+
+   Handle_Type curr_handle;
+   Handle_Value_Type curr_handle_value;
+
+   int fd;
+
+   int ret_val = 0;
+
+@q **** (4) Select `handlesystem' or `handlesystem_standalone' database and lock tables.   @>
+
+@ Select \.{handlesystem} or \.{handlesystem\_standalone} database and lock tables.
+\initials{LDF 2012.09.28.}
+\initials{LDF 2012.10.16.}
+
+The \.{admin\_data} table is needed to avoid problems with subqueries when using the
+MySQL C-API.
+\initials{LDF 2012.10.05.}
+
+\LOG
+\initials{LDF 2012.10.16.}
+Now locking the \.{pid\_counter} table.  I've moved it to the \.{handlesystem\_standalone}
+database to avoid problems locking tables in different databases simultaneously.
+
+\initials{LDF 2013.01.31.}
+Now locking the \.{handle\_value\_counter} table.
+\ENDLOG 
+
+@<|generate_pids| definition@>=
+
+   if (standalone_hs)
+      status = mysql_select_db(mysql_ptr, "handlesystem_standalone");
+   else
+      status = mysql_select_db(mysql_ptr, "handlesystem");
+
+   if (status == 0)
+   {
+#if DEBUG_COMPILE         
+       if (DEBUG)
+       {
+          lock_cerr_mutex(); 
+          cerr << "In `generate_pids':  "
+               << "`mysql_select_db succeeded'."
+               << endl;
+          unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   }  /* |if (status == 0)| */
+
+   else /* |status != 0| */
+   {
+      lock_cerr_mutex(); 
+      cerr << "ERROR!  In `generate_pids':  "  
+           << "`mysql_select_db' failed, returning " << status 
+           << endl
+           << "Exiting function unsuccessfully with return value 1."
+           << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }   /* |else| (|status != 0|) */
+
+   pthread_mutex_lock(&sql_lock_tables_mutex);
+
+   sql_strm << "lock tables handles write, admin_data write, "
+            << "pid_counters write, gwirdsif.Prefixes read, gwirdsif.Users read";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr);   
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `generate_pids':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << ":"
+            << endl
+            << mysql_error(mysql_ptr)
+            << endl 
+            << "Failed to lock ";
+
+       if (standalone_hs)
+          cerr << "`handlesystem_standalone.handles', "
+               << "`handlesystem_standalone.admin_data' and "
+               << "`handlesystem_standalone.pid_counters' database tables."
+               << endl;
+       else
+          cerr << "`handlesystem.handles' "
+               << "`handlesystem.admin_data', "
+               << "`handlesystem.admin_data' database tables and "
+               << "`handlesystem.pid_counters'database tables."
+               << endl;
+
+       cerr << "Exiting function unsuccessfully with return value 1."
+            << endl;
+        unlock_cerr_mutex(); 
+
+        if (result)
+           mysql_free_result(result);
+
+        pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+        return 1;
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `generate_pids':  Locked ";
+
+       if (standalone_hs)
+          cerr << "`handlesystem_standalone.handles' ";
+       else
+          cerr << "`handlesystem.handles' ";
+
+       cerr << "and `admin_data' database tables successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   sql_strm.str("");
+
+   mysql_free_result(result);
+   result = 0;
+
+
+@q **** (4) If |user_id <= 0| and |username| is non-empty, get |user_id|.  @>
+
+@ If |user_id <= 0| and |username| is non-empty, get |user_id|.
+\initials{LDF 2013.02.22.}
+
+\LOG
+\initials{LDF 2013.02.22.}
+Added this section.
+\ENDLOG
+
+@<|generate_pids| definition@>=
+
+   if (user_id <= 0 && !username.empty())
+   {
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `generate_pids':  `user_id' == " << user_id << " (<= 0) "
+                << endl
+                << "`username' == " << username 
+                << endl
+                << "Will fetch `user_id' from `gwirdsif.Users' database table."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+
+        sql_strm.str("");
+
+        sql_strm << "select user_id from gwirdsif.Users where username = '"
+                 << username << "'";
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "In `generate_pids':  `sql_strm.str()' == " << sql_strm.str() 
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, &row_ctr, &field_ctr);
+         
+        if (status != 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << "ERROR!  In `generate_pids':"
+                 << endl
+                 << "`submit_mysql_query' failed, returning " << status << ":"
+                 << endl
+                 << mysql_error(mysql_ptr)
+                 << endl;
+             unlock_cerr_mutex(); 
+
+             failed = true;
+              
+             ret_val = 1;
+            
+             goto UNLOCK_TABLES;
+
+
+        }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "In `generate_pids':"
+                 << endl
+                 << "`submit_mysql_query' succeeded, returning 0."
+                 << endl
+                 << "`row_ctr' == " << row_ctr << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+        if (row_ctr == 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << "ERROR!  In `generate_pids':"
+                 << endl
+                 << "`row_ctr' == 0.  Failed to retrieve `gwirdsif.Users.user_id' for "
+                 << "`username' == `" << username << "'."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            failed = true;
+
+            ret_val = 1;
+ 
+            goto UNLOCK_TABLES;
+
+        }   /* |if (row_ctr == 0)|  */
+
+@q ***** (5) @>
+
+        else if (row_ctr > 1)
+        {
+            lock_cerr_mutex(); 
+            cerr << "ERROR!  In `generate_pids':"
+                 << endl
+                 << "`row_ctr' > 1.  Retrieved multiple values of `gwirdsif.Users.user_id' for "
+                 << "`username' == `" << username << "'."
+                 << endl
+                 << "This shouldn't happen."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            failed = true;
+
+            ret_val = 1;
+ 
+            goto UNLOCK_TABLES;
+
+        }   /* |if (row_ctr > 1)|  */
+
+@q ***** (5) @>
+
+        else if (row_ctr == 1)
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "In `generate_pids':"
+                    << endl
+                    << "`row_ctr' == 1.  Retrieved `gwirdsif.Users.user_id' for "
+                    << "`username' == `" << username << "'."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ****** (6) @>
+@
+@<|generate_pids| definition@>=
+ 
+           curr_row = mysql_fetch_row(result);
+
+           if (curr_row == 0)
+           {
+               lock_cerr_mutex(); 
+               cerr << "ERROR!  In `generate_pids':"
+                    << endl
+                    << "`mysql_fetch_row' failed, returning NULL:"
+                    << endl
+                    << "MySQL error:  " << mysql_error(mysql_ptr)
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               
+               mysql_free_result(result);
+               result = 0;
+
+               failed = true;
+
+               ret_val = 1;
+ 
+               goto UNLOCK_TABLES;
+
+           }  /* |if (curr_row == 0)|  */
+
+@q ****** (6) @>
+@
+@<|generate_pids| definition@>=
+
+           else 
+           {
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+              if (DEBUG) 
+              {
+                  lock_cerr_mutex(); 
+                  cerr << "In `generate_pids':"
+                       << endl
+                       << "`mysql_fetch_row' succeeded."
+                       << endl
+                       << "`curr_row[0]' == " << curr_row[0]
+                       << endl;
+                   unlock_cerr_mutex(); 
+
+              }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+@<|generate_pids| definition@>=
+
+              user_id = strtol(curr_row[0], 0, 10);
+
+              if (user_id == LONG_MAX || user_id == LONG_MIN)
+              {
+                  lock_cerr_mutex(); 
+                  cerr << "ERROR!  In `generate_pids':"
+                       << endl
+                       << "`strtol' failed, returning ";
+
+                   if (user_id == LONG_MAX)
+                       cerr << "`LONG_MAX':" << endl;
+                   else 
+                       cerr << "`LONG_MIN':" << endl;
+
+                   cerr << strerror(errno) << endl;
+                   unlock_cerr_mutex(); 
+ 
+                
+                   mysql_free_result(result);
+                   result = 0;
+
+                   failed = true;
+
+                   ret_val = 1;
+ 
+                   goto UNLOCK_TABLES;
+
+              }  /* |if (user_id == LONG_MAX || user_id == LONG_MIN)|  */
+
+@q ******* (7) @>
+@
+@<|generate_pids| definition@>=
+
+              if (user_id > INT_MAX)
+              {
+                  lock_cerr_mutex(); 
+                  cerr << "ERROR!  In `generate_pids':"
+                       << endl
+                       << "`user_id' == " << user_id << " (> `INT_MAX')"
+                       << endl
+                       << "This is not permitted."
+                       << endl;
+                   unlock_cerr_mutex(); 
+ 
+                   mysql_free_result(result);
+                   result = 0;
+
+                   failed = true;
+
+                   ret_val = 1;
+ 
+                   goto UNLOCK_TABLES;
+
+              }  /* |if (user_id > INT_MAX)|  */
+
+@q ******* (7) @>
+@
+@<|generate_pids| definition@>=
+
+#if DEBUG_COMPILE
+              if (DEBUG)
+              {
+                  lock_cerr_mutex(); 
+                  cerr << "In `generate_pids':"
+                       << endl
+                       << "`user_id' == " << user_id << endl
+                       << "`username' == " << username
+                       << endl;
+                  unlock_cerr_mutex(); 
+
+              }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */              
+
+
+@q ******* (7) @>
+
+           }    /* |else|  */         
+
+@q ****** (6) @>
+
+        }   /* |if (row_ctr == 1)|  */
+
+@q ***** (5) @>
+
+        mysql_free_result(result);
+        result = 0;
+        sql_strm.str("");
+
+   }  /* |if (user_id <= 0 && !username.empty())|  */
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2013.02.22.}
+Added this section.
+\ENDLOG
+
+@<|generate_pids| definition@>=
+
+   else if (user_id > 0)
+   {
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `generate_pids':  `user_id' == " << user_id 
+                << endl;
+
+            if (!username.empty())
+                cerr << "`username' == " << username << endl;
+            else
+                cerr << "`username' is empty."
+                     << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+   }  /* |else if (user_id > 0)|  */
+
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2012.10.16.}
+Added this section.
+
+\initials{LDF 2013.01.31.}
+Added error-handling code for the case that |strtoul| returns |ULONG_MAX| 
+when setting |handle_id| and |handle_value_id|.
+\ENDLOG
+
+@<|generate_pids| definition@>=
+
+   sql_strm.str("");
+
+   temp_str = "select handle_id from handles order by handle_id desc limit 1";
+
+   status = submit_mysql_query(temp_str, result, mysql_ptr, &row_ctr, &field_ctr);   
+ 
+   if (   status == 0 && (curr_row = mysql_fetch_row(result)) != 0
+       && row_ctr == 1 && curr_row[0] && strlen(curr_row[0]))
+   {
+
+        handle_id = strtoul(curr_row[0], 0, 10);
+
+        if (handle_id == ULONG_MAX)
+        {
+            lock_cerr_mutex(); 
+            cerr << "ERROR!  In `generate_pids':  `strtoul' failed, returning `ULONG_MAX'."
+                 << endl 
+                 << "Failed to retrieve `handle_id'."
+                 << endl
+                 << "Exiting function unsuccessfully with return value 1."
+                 << endl;
+             unlock_cerr_mutex(); 
+
+             failed = true;
+
+             ret_val = 1;
+ 
+             goto UNLOCK_TABLES;
+
+        }  /* |if (handle_id == ULONG_MAX)|  */
+ 
+
+        ++handle_id;        
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+             cerr << "handle_id == " << handle_id << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        mysql_free_result(result);
+        result = 0;
+   }
+   else
+   {
+        if (result)
+           mysql_free_result(result);
+        result = 0;
+
+
+        lock_cerr_mutex(); 
+        cerr << "ERROR!  In `generate_pids':  Failed to retrieve `handle_id'."
+             << endl
+             << "MySQL error:  " << mysql_error(mysql_ptr)
+             << endl 
+             << "Exiting function unsuccessfully with return value 1."
+             << endl;
+         unlock_cerr_mutex(); 
+
+         failed = true;
+
+         ret_val = 1;
+ 
+         goto UNLOCK_TABLES;
+
+   }  /* |else|  */
+
+   mysql_free_result(result);
+   result = 0;
+
+@q ***** (5) @>
+@
+@<|generate_pids| definition@>=
+
+   sql_strm.str("");
+
+   temp_str = "select handle_value_id from handles order by handle_value_id desc limit 1";
+
+   status = submit_mysql_query(temp_str, result, mysql_ptr, &row_ctr, &field_ctr);   
+ 
+   if (   status == 0 && (curr_row = mysql_fetch_row(result)) != 0
+       && row_ctr == 1 && curr_row[0] && strlen(curr_row[0]))
+   {
+
+        handle_value_id = strtoul(curr_row[0], 0, 10);
+
+        if (handle_value_id == ULONG_MAX)
+        {
+            lock_cerr_mutex(); 
+            cerr << "ERROR!  In `generate_pids':  `strtoul' failed, returning `ULONG_MAX'."
+                 << endl 
+                 << "Failed to retrieve `handle_value_id'."
+                 << endl
+                 << "Exiting function unsuccessfully with return value 1."
+                 << endl;
+             unlock_cerr_mutex(); 
+
+             failed = true;
+
+             ret_val = 1;
+ 
+             goto UNLOCK_TABLES;
+
+        }  /* |if (handle_value_id == ULONG_MAX)|  */
+ 
+
+        ++handle_value_id;        
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+             cerr << "handle_value_id == " << handle_value_id << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        mysql_free_result(result);
+        result = 0;
+   }
+   else
+   {
+        if (result)
+           mysql_free_result(result);
+        result = 0;
+
+
+       cerr << "ERROR!  In `generate_pids':  Failed to retrieve `handle_value_id'."
+            << endl
+            << "MySQL error:  " << mysql_error(mysql_ptr)
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+        unlock_cerr_mutex(); 
+
+        failed = true;
+
+        ret_val = 1;
+ 
+        goto UNLOCK_TABLES;
+
+   }  /* |else|  */
+
+   mysql_free_result(result);
+
+   result = 0;
+
+@q **** (4) @>
+@
+@<|generate_pids| definition@>=
+
+   if (!pid_str.empty())
+   {
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          cerr << "In `generate_pids':  `pid_str' is not empty:  "
+               << pid_str
+               << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+      string temp_prefix_str = pid_str;
+
+      pos = temp_prefix_str.find("/");
+
+@q ***** (5) @>
+@
+@<|generate_pids| definition@>=
+
+      if (pos != string::npos)
+      {
+@q ****** (6) @>
+
+          temp_prefix_str.erase(pos);
+          pid_str.erase(0, pos + 1);
+
+#if DEBUG_COMPILE
+          if (DEBUG)
+          {
+              lock_cerr_mutex(); 
+              cerr << "In `generate_pids':  `pid_str' contained a prefix."
+                   << endl 
+                   << "`temp_prefix_str' == " << temp_prefix_str
+                   << endl
+                   << "`pid_str' == " << pid_str
+                   << endl;
+              unlock_cerr_mutex(); 
+
+          }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+          if (prefix_str.empty())
+          {
+
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "In `generate_pids':  `prefix_str' is empty "
+                      << "and `temp_prefix_str' is non-empty:"
+                      << endl 
+                      << "`temp_prefix_str' == " << temp_prefix_str
+                      << endl 
+                      << "Setting `prefix_str' to `temp_prefix_str'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+              prefix_str = temp_prefix_str;
+
+          }  /* |if (prefix_str.empty())|  */
+
+
+@q ****** (6) @>
+
+          else if (!prefix_str.empty() && prefix_str != temp_prefix_str)
+          {
+              lock_cerr_mutex(); 
+              cerr << "ERROR!  In `generate_pids':  `prefix_str' is non-empty "
+                   << "and doesn't match `temp_prefix_str':"
+                   << endl 
+                   << "`prefix_str' == " << prefix_str
+                   << endl 
+                   << "Exiting function unsuccessfully with return value 1."
+                   << endl;
+              unlock_cerr_mutex(); 
+
+              failed = true;
+
+              ret_val = 1;
+ 
+              goto UNLOCK_TABLES;
+
+          }  /* |else if (!prefix_str.empty() && prefix_str != temp_prefix_str)|  */
+
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+          else if (DEBUG && !prefix_str.empty() && prefix_str == temp_prefix_str)
+          {
+
+              lock_cerr_mutex(); 
+              cerr << "`generate_pids':  `prefix_str' is non-empty "
+                   << "and matches `temp_prefix_str':"
+                   << endl 
+                   << "`prefix_str' == `temp_prefix_str' == " << prefix_str
+                   << endl 
+                   << "No need to do anything."
+                   << endl;
+              unlock_cerr_mutex(); 
+
+          }  /* |else if (DEBUG && !prefix_str.empty() && prefix_str == temp_prefix_str)|  */
+
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ****** (6) @>
+
+      }  /* |if (pos != string::npos)|  */
+
+@q ***** (5) @>
+@
+@<|generate_pids| definition@>=
+
+      else if (prefix_str.empty())
+      {
+
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `generate_pids':  `pid_str' does not contain a prefix "
+                << "and `prefix_str' is empty."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           failed = true;
+
+           ret_val = 1;
+ 
+           goto UNLOCK_TABLES;
+
+      }  /* |else if (prefix_str.empty())|  */
+
+
+@q ***** (5) @>
+@
+@<|generate_pids| definition@>=
+
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          cerr << "pid_str == " << pid_str << endl
+               << "prefix_str == " << prefix_str << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|generate_pids| definition@>=
+
+      unsigned int prefix_id;
+
+      status = check_prefix(mysql_ptr, prefix_str, prefix_id);
+
+      if (status == 1)
+      {
+          lock_cerr_mutex(); 
+          cerr << "ERROR!  In `generate_pids':  `check_prefix' failed, "
+               << "returning 1:" 
+               << endl 
+               << "MySQL error:  query or fetch row failed for "
+               << "Prefix `" << prefix_str << "'."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          failed = true;
+
+          ret_val = 1;
+ 
+          goto UNLOCK_TABLES;
+
+      }  /* |if (status == 1)|  */
+
+      else if (status == 2)
+      {
+          lock_cerr_mutex(); 
+          cerr << "ERROR!  In `generate_pids':  `check_prefix' failed, "
+               << "returning 2:" 
+               << endl 
+               << "Prefix `" << prefix_str << "' not found."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          failed = true;
+
+          ret_val = 2;
+ 
+          goto UNLOCK_TABLES;
+
+      }  /* |if (status == 2)|  */
+
+      else if (status == 3)
+      {
+          lock_cerr_mutex(); 
+          cerr << "ERROR!  In `generate_pids':  `check_prefix' failed, "
+               << "returning 3:" 
+               << endl 
+               << "Prefix `" << prefix_str << "' (ID " << prefix_id << ") "
+               << "is disabled."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          failed = true;
+
+          ret_val = 3;
+ 
+          goto UNLOCK_TABLES;
+
+      }  /* |if (status == 3)|  */
+          
+      else if (status != 0)
+      {
+          lock_cerr_mutex(); 
+          cerr << "ERROR!  In `generate_pids':  `check_prefix' failed, "
+               << "returning " << status << "."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          failed = true;
+
+          ret_val = status;
+ 
+          goto UNLOCK_TABLES;
+
+      }  /* |if (status != 0)|  */
+          
+#if DEBUG_COMPILE
+      else if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          cerr << "In `generate_pids':  `check_prefix' succeeded, returning 0."
+               << endl
+               << "`prefix_id' == " << prefix_id
+               << endl
+               << "`prefix_str' == " << prefix_str
+               << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.02.13.}
+@:BUG FIX@> BUG FIX:  Now removing slash and anything following it from |prefix_str| here.
+Previously, this was done much further below.
+\ENDLOG 
+
+@<|generate_pids| definition@>=
+
+     pos = prefix_str.find("/");  /* If |prefix_str| contains a slash, remove it
+                                     and anything that follows it.
+                                     \initials{LDF 2012.10.08.}  */
+                                
+     if (pos != string::npos)
+       prefix_str.erase(pos);    
+
+
+     pid_str.insert(0, "/");
+     pid_str.insert(0, prefix_str);
+
+
+
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          cerr << "In `generate_pids':  `pid_str' after prepending prefix:  " 
+               << pid_str << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+@ |pid_str| is not empty.  Set |sql_strm_1| and |sql_strm_2|.  Only a single handle
+is created (possibly with multiple handle values).
+\initials{LDF 2013.02.22.}
+
+\LOG
+\initials{LDF 2013.01.14.}
+@:BUG FIX@> BUG FIX:  Now using |time(0)| to set |timestamp| value instead of |now()|.
+\ENDLOG 
+
+@<|generate_pids| definition@>=
+
+
+       sql_strm_1 << "insert into " << handles_table_name << " (handle, idx, type, "
+                  << "ttl_type, ttl, timestamp, refs, admin_read, admin_write, "
+                  << "pub_read, pub_write, handle_id, handle_value_id, created, "
+                  << "created_by_user_id) "
+                  << "values "
+                  << "('" << pid_str << "', 300, 'HS_ADMIN', "
+                  << "0, 86400, " << time(0) << ", '', 1, 1, 1, 0, " << handle_id 
+                  << ", " << handle_value_id << ", now(), " << user_id << ")";
+
+       sql_strm_2 << "update handles set data = (select data from admin_data where handle "
+                  << "= '" << prefix_str
+                  << "/ADMIN_SAVE') where handle = '" << pid_str << "' and type = 'HS_ADMIN'";
+
+@q ***** (5) @>
+
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `generate_pids':  `pid_str' is not empty.  Skipping to "
+                << "`END_CREATE_PID_STR'."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       if (pid_vector_ptr)
+          pid_vector_ptr->push_back(pid_str);
+
+       if (handle_id_vector_ptr)
+           handle_id_vector_ptr->push_back(handle_id);
+
+       if (handle_value_id_vector_ptr)
+           handle_value_id_vector_ptr->push_back(handle_value_id);
+
+       ++handle_id;
+       ++handle_value_id;
+
+       goto END_CREATE_PID_STR;
+
+@q ***** (5) @>
+
+   }  /* |if (!pid_str.empty())|  */
+
+@q **** (4) @>
+@
+@<|generate_pids| definition@>=
+
+   sql_strm.str("");
+
+   sql_strm << "select pid_counter from pid_counters "
+            << "where prefix = '" << prefix_str << "' "
+            << "order by pid_counter desc limit 1";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `generate_pids':  `sql_strm.str()' == "
+            << endl
+            << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, &row_ctr, &field_ctr);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `generate_pids':  `submit_mysql_query' failed, returning "
+            << status << "."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       failed = true;
+ 
+       ret_val = 1;
+
+       goto UNLOCK_TABLES;
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `generate_pids':  `submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "`row_ctr'   == " << row_ctr
+            << endl 
+            << "`field_ctr' == " << field_ctr
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|generate_pids| definition@>=
+
+   if ((curr_row = mysql_fetch_row(result)) == 0)
+   {
+       lock_cerr_mutex();
+       cerr << "ERROR!  In `generate_pids':  `mysql_fetch_row' failed:"
+            << endl
+            << mysql_error(mysql_ptr)
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result);
+       result = 0;
+
+       failed = true;
+ 
+       ret_val = 1;
+ 
+       goto UNLOCK_TABLES;
+
+   }  /* |if (curr_row = mysql_fetch_row(result) == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `generate_pids':  `mysql_fetch_row' succeeded."
+            << endl
+            << "curr_row[0] == " << curr_row[0] 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */
+
+@q **** (4) @>
+@ 
+@<|generate_pids| definition@>=
+
+   errno = 0;
+   pid_ctr = strtoul(curr_row[0], 0, 10);
+
+   if (errno != 0)
+   {
+       lock_cerr_mutex();
+       cerr << "ERROR!  In `generate_pids':  `strtoul' failed:"
+            << endl
+            << "`errno' == " << errno 
+            << endl 
+            << "stroul error:  " << strerror(errno)
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result);
+       result = 0;
+
+       ret_val = 1;
+
+       failed = true;
+ 
+       goto UNLOCK_TABLES;
+
+   }  /* |if (errno != 0)|  */
+
+   else if (pid_ctr == ULONG_MAX)
+   {
+       lock_cerr_mutex();
+       cerr << "ERROR!  In `generate_pids':  `strtoul' returned `ULONG_MAX'."
+            << endl
+            << "Either the maximum value for PID counter has been reached, or, more "
+            << "probably, something has gone wrong."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result);
+       result = 0;
+       failed = true;
+
+       ret_val = 1;
+
+       goto UNLOCK_TABLES;
+
+   }  /* |else if (pid_ctr == ULONG_MAX)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `generate_pids':  `strtoul' returned " << pid_ctr << "."
+            << endl
+            << "`pid_ctr' == " << pid_ctr
+            << endl 
+            << "Will increment and create PID string."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|generate_pids| definition@>=
+
+   mysql_free_result(result);
+   result = 0;
+
+   sql_strm.str("");
+
+   sql_strm << "update pid_counters set pid_counter = " << pid_ctr + number_of_pids 
+            << " where prefix = '" << prefix_str << "'";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `generate_pids':  `sql_strm.str()' == "
+            << endl
+            << sql_strm.str()
+            << endl 
+            << "`pid_ctr' (hex) == " << hex << pid_ctr
+            << endl 
+            << "`pid_ctr + number_of_pids' (hex) == " << hex << (pid_ctr + number_of_pids)
+            << dec 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, &affected_rows);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `generate_pids':  `submit_mysql_query' failed, returning "
+            << status << "."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       failed = true;
+
+       ret_val = 1;
+ 
+       goto UNLOCK_TABLES;
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `generate_pids':  `submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "`affected_rows'   == " << affected_rows
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   mysql_free_result(result);
+   result = 0;
+   sql_strm.str("");
+
+END_GET_PID_COUNTER:
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2013.02.22.}
+@:BUG FIX@> BUG FIX:  Now using |prefix_str| in |sql_strm_2|.
+\ENDLOG 
+
+@<|generate_pids| definition@>=
+
+   temp_strm.str("");
+  
+   sql_strm_1 << "insert into " << handles_table_name << " (handle, idx, type, "
+              << "ttl_type, ttl, timestamp, refs, admin_read, admin_write, "
+              << "pub_read, pub_write, handle_id, handle_value_id, created, "
+              << "created_by_user_id) "
+              << "values ";
+
+   sql_strm_2 << "update handles set data = (select data from admin_data where handle "
+              << "= '";
+
+   if (!prefix_str.empty())
+      sql_strm_2 << prefix_str;
+   else
+      sql_strm_2 << "12345";
+
+   sql_strm_2 << "/ADMIN_SAVE') where ";
+
+@q **** (4) Loop for creating PIDs.  @>
+
+@ Loop for creating PIDs.  
+\initials{LDF 2012.10.11.}
+
+@<|generate_pids| definition@>=
+
+   for (int i = 0; i < number_of_pids; ++i)
+   {   
+
+       ++pid_ctr;
+
+       curr_handle_value.clear();
+       curr_handle.clear();
+
+@q ***** (5) Create PID string.  @>
+
+@ Create PID string.  
+\initials{LDF 2012.09.28.}
+
+\LOG
+\initials{LDF 2012.10.05.}
+Now using a counter string in hexadecimal notation of at least 5 characters.  If the
+value of the counter is $> FFFFF$, then more characters are used, but the string is
+not broken up with hyphens.  Previously, the pattern used was meant to appear like 
+the PIDs from the GWDG Handle Service (EPIC-API-v1), e.g., 
+|"11858/00-ZZZZ-0000-0000-0228-2"|, or using a suffix, 
+|"11858/00-ZZZZ-0000-0000-1458-E-LDF-A"|.
+
+\initials{LDF 2013.01.14.}
+Now using |time(0)| to set the |timestamp| value instead of using 1348833495.
+\ENDLOG 
+
+@<|generate_pids| definition@>=
+
+        pid_str = "";
+        temp_strm.str("");   
+
+        temp_strm << setw(5) << setfill('0') << uppercase << hex << pid_ctr;
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "temp_strm.str() == " << temp_strm.str() << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+        pid_str = temp_strm.str();
+
+        temp_strm.str("");
+        temp_strm.clear();
+
+        temp_strm << prefix_str << "/";
+
+        if (!institute_str.empty())
+           temp_strm << institute_str << "-";
+
+        temp_strm << pid_str;
+
+        if (!suffix_str.empty())
+           temp_strm << "-" << suffix_str;
+
+        pid_str = temp_strm.str();
+
+       if (pid_vector_ptr)
+          pid_vector_ptr->push_back(pid_str);
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "pid_str == " << pid_str << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        sql_strm_1 << comma_str 
+                   << "('" << pid_str << "', 300, 'HS_ADMIN', "
+                   << "0, 86400, " << time(0) << ", '', 1, 1, 1, 0, " 
+                   << handle_id << ", " << handle_value_id << ", now(), " 
+                   << user_id << ")";
+
+        comma_str = ", ";
+
+        sql_strm_2 << or_str << "(handle = '" << pid_str << "' and type = 'HS_ADMIN')";
+
+        or_str = " or ";
+
+        if (handle_id_vector_ptr)
+            handle_id_vector_ptr->push_back(handle_id);
+
+        if (handle_value_id_vector_ptr)
+            handle_value_id_vector_ptr->push_back(handle_value_id);
+
+
+
+@q ***** (5) If |handle_vector| is non-null, set |curr_handle_value|,       @>
+@q ***** (5) insert |curr_handle_value| into |curr_handle.handle_value_map| @>
+@q ***** (5) and push |curr_handle| onto |handle_vector|.                   @>
+
+@ If |handle_vector| is non-null, set |curr_handle_value|, insert
+|curr_handle_value| into |curr_handle.handle_value_map| and push |curr_handle|
+onto |handle_vector|.
+\initials{LDF 2013.01.11.}
+\initials{LDF 2013.02.27.}
+
+\LOG
+\initials{LDF 2013.01.11.}
+Added this section.
+
+\initials{LDF 2013.02.27.}
+Now using |curr_handle| and |handle_vector|.
+\ENDLOG 
+
+@<|generate_pids| definition@>=
+ 
+        if (handle_vector != 0)
+        {
+@q ****** (6) @>
+
+            status = curr_handle_value.set(pid_str, 300, "HS_ADMIN", admin_data, 
+                                           admin_data_length, 0,
+                                           86400, time(0), 0, 0, 1, 1, 1, 0, user_id, 
+                                           handle_id, handle_value_id, false, time(0), 0);
+
+@q ****** (6) @>
+
+            if (status != 0)
+            {
+                lock_cerr_mutex(); 
+                cerr << "ERROR!  In `generate_pids':  `Handle_Value_Type::set' failed, returning "
+                     << status << "."
+                     << endl
+                     << "Will try to unlock database tables before "
+                     << "exiting function unsuccessfully."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                failed = true;
+ 
+                ret_val = 1;
+
+                goto UNLOCK_TABLES;
+
+
+            }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "In `generate_pids':  `Handle_Value_Type::set' succeeded, returning 0."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2013.01.14.}
+@:BUG FIX@> BUG FIX:  Now setting |curr_handle_value.data| and |curr_handle_value.refs| to 0.
+This avoids ``corruption or double free'' when the |Handle_Value_Type| destructor is called 
+on the elements of |handle_value_vector|.
+
+\initials{LDF 2013.01.31.}
+@:BUG FIX@> BUG FIX:  Now incrementing |handle_id| and |handle_value_id| here.
+Previously, they were incremented before calling |Handle_Value_Type::set| on 
+|curr_handle_value|.
+
+\initials{LDF 2013.02.27.}
+@:BUG FIX@> BUG FIX:  Now setting |curr_handle.handle| and |curr_handle.handle_id|.
+\ENDLOG 
+
+@<|generate_pids| definition@>=
+
+            curr_handle.handle    = curr_handle_value.handle;
+            curr_handle.handle_id = curr_handle_value.handle_id;
+
+            curr_handle.handle_value_map[curr_handle_value.idx] = curr_handle_value;
+
+            handle_vector->push_back(curr_handle);
+
+            ++handle_id;
+            ++handle_value_id;
+
+            curr_handle_value.data = 0;
+            curr_handle_value.refs = 0;
+
+@q ****** (6) @>
+
+        }  /* |if (handle_vector != 0)|  */
+
+@q ***** (5) @>
+
+   }  /* |for|  */
+
+END_CREATE_PID_STR:
+
+@q **** (4) Insert rows for the handles into the `handles' table.  @>
+
+@ Insert rows for the handles into the \.{handles} table, so that the
+names are reserved.  A single handle value is created with type \.{HS\_ADMIN}.
+@:NOTE@> !! PLEASE NOTE:  This code assumes that the handle \.{<prefix>/ADMIN\_SAVE} 
+exists and that there is a handle value for this handle with index 100 and 
+type \.{HS\_ADMIN} containing valid data.  This handle value is copied (except for 
+the \.{handle} field, of course) for the new handle, so that the latter has an
+administrator.  This makes it possible to access it using the means provided by
+the Handle System.  Otherwise, it would only be accessible by using the means provided
+by the database software.
+\par
+The best way to generate the handle \.{<prefix>/ADMIN\_SAVE} is by using 
+\.{hdl-admintool}.
+\initials{LDF 2012.09.28.}
+
+@<|generate_pids| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "sql_strm_1.str() == " << sql_strm_1.str() << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   status = submit_mysql_query(sql_strm_1.str(), result, mysql_ptr, 0, 0, &affected_rows);   
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `generate_pids':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << ":"
+            << endl
+            << mysql_error(mysql_ptr)
+            << endl 
+            << "Failed to insert rows for PIDs into ";
+
+       if (standalone_hs)
+          cerr << "`handlesystem_standalone.handles' ";
+       else
+          cerr << "`handlesystem.handles' ";
+
+       cerr << "database table."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+        unlock_cerr_mutex(); 
+
+        if (result)
+           mysql_free_result(result);
+       
+        result = 0;
+
+        failed = true;
+
+        ret_val = 1;
+
+        goto UNLOCK_TABLES;
+   
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `generate_pids':  Inserted rows for PIDs into ";
+
+       if (standalone_hs)
+          cerr << "`handlesystem_standalone.handles' ";
+       else
+          cerr << "`handlesystem.handles' ";
+
+       cerr << "table successfully."
+            << endl
+            << "`affected_rows' == " << affected_rows
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   sql_strm_1.str("");
+
+   mysql_free_result(result);
+   result = 0;
+
+
+@q **** (4) Update handles, insert `data'.  @>
+
+@ Update handles, insert \.{data}.
+\initials{LDF 2012.10.05.}
+
+\LOG
+\initials{LDF 2012.10.05.}
+Added this section.  The \.{UPDATE} command and the \.{admin\_data} table are needed
+because of problems with subqueries when using the MySQL C-API:  It didn't work to use a 
+subquery when multiple rows were inserted using \.{INSERT}.  It might be possible to 
+get rid of the \.{admin\_data} table and just use the \.{handles} table instead, 
+but there were problems locking the latter using an alias.  I think it may be simpler
+to just use the \.{admin\_data} table.
+\ENDLOG
+
+@<|generate_pids| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "sql_strm_2.str() == " << sql_strm_2.str() << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   status = submit_mysql_query(sql_strm_2.str(), result, mysql_ptr, 0, 0, &affected_rows);   
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `generate_pids':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << ":"
+            << endl
+            << mysql_error(mysql_ptr)
+            << endl 
+            << "Failed to update rows for PIDs in ";
+
+       if (standalone_hs)
+          cerr << "`handlesystem_standalone.handles' ";
+       else
+          cerr << "`handlesystem.handles' ";
+
+       cerr << "database table."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+        unlock_cerr_mutex(); 
+
+        if (result)
+           mysql_free_result(result);
+       
+        result = 0;
+
+        failed = true;
+
+        ret_val = 1;
+
+        goto UNLOCK_TABLES;
+   
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `generate_pids':  Updated rows for PIDs in ";
+
+       if (standalone_hs)
+          cerr << "`handlesystem_standalone.handles' ";
+       else
+          cerr << "`handlesystem.handles' ";
+
+       cerr << "table successfully."
+            << endl
+            << "`affected_rows' == " << affected_rows
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   sql_strm_2.str("");
+
+   mysql_free_result(result);
+   result = 0;
+
+@q **** (4) Unlock tables.  @>
+
+@ Unlock tables.
+\initials{LDF 2012.09.28.}
+
+@<|generate_pids| definition@>=
+
+UNLOCK_TABLES:
+
+   if (result)
+   {
+      mysql_free_result(result);
+      result = 0;
+   }
+
+   sql_strm.str("");
+   sql_strm << "unlock tables";
+
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr); 
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `generate_pids':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << ":"
+            << endl
+            << mysql_error(mysql_ptr)
+            << endl 
+            << "Failed to unlock tables."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+        unlock_cerr_mutex(); 
+
+        if (result)
+           mysql_free_result(result);
+
+        pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+        return 1;
+
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `generate_pids':  Unlocked tables successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   pthread_mutex_unlock(&sql_lock_tables_mutex);
+   mysql_free_result(result);
+   result = 0;
+   sql_strm.str("");
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2013.02.22.}
+Added this section.  Now exiting after trying to unlock the database tables before
+continuing.  Formerly, this function exited at this point.  Now, it may write the
+PID or PIDs to a FIFO.
+\ENDLOG
+
+@<|generate_pids| definition@>=
+
+   if (failed)
+   {
+       lock_cerr_mutex();
+       cerr << "In `generate_pids':  `failed' == `true'."
+            << endl 
+            << "Exiting function unsuccessfully with return value " << ret_val << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return ret_val;
+   }
+#if DEBUG_COMPILE
+
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `generate_pids':  `failed' == `false'.  Continuing."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */ 
+
+#endif  /* |DEBUG_COMPILE|  */
+
+@q **** (4) @>
+@
+@<|generate_pids| definition@>=
+
+   if (!fifo_pathname.empty())
+   { 
+@q ***** (5) @>
+
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `generate_pids':  `fifo_pathname' is non-empty:"
+                << endl
+                << "`fifo_pathname' == `" << fifo_pathname << "'."
+                << endl
+                << "Will try to open and write to it."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+       errno = 0;
+       status = access(fifo_pathname.c_str(), F_OK);
+
+       if (status == -1)
+       {
+           lock_cerr_mutex();
+           cerr << "ERROR!  In `generate_pids':  `access' failed, returning -1:"
+                << endl 
+                << strerror(errno)
+                << endl
+                << "Failed to check for existence of FIFO `" << fifo_pathname << "'."
+                << endl 
+                << "Not writing to FIFO `" << fifo_pathname << "'.  "
+                << endl;
+           unlock_cerr_mutex(); 
+
+           failed = true;
+
+           ret_val = 1;
+
+           goto GENERATE_PIDS_POST_FIFO;
+
+       }  /* |if (status != 0)|  */
+
+@q ***** (5) @>       
+ 
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `generate_pids':  `access' succeeded, returning 0."
+                << endl
+                << "Checked for existence of FIFO `" << fifo_pathname << "' successfully."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q ***** (5) @>
+@
+@<|generate_pids| definition@>=
+
+       errno = 0;
+       fd = open(fifo_pathname.c_str(), O_WRONLY | O_NONBLOCK);
+
+       if (status == -1)
+       {
+           lock_cerr_mutex();
+           cerr << "ERROR!  In `generate_pids':  `open' failed, returning -1:"
+                << endl 
+                << strerror(errno)
+                << endl
+                << "Failed to open FIFO `" << fifo_pathname << "' for writing.  "
+                << endl;
+           unlock_cerr_mutex(); 
+
+           failed = true;
+
+           ret_val = 1;
+
+           goto GENERATE_PIDS_POST_FIFO;
+
+
+       }  /*  |if (status == -1)|  */
+
+
+@q ***** (5) @>       
+ 
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `generate_pids':  `open' succeeded."
+                << endl
+                << "Opened FIFO `" << fifo_pathname << "' for writing successfully."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+       
+@q ***** (5) @>
+@
+@<|generate_pids| definition@>=
+
+      if (pid_vector_ptr && pid_vector_ptr->size() > 0)
+      {
+@q ****** (6) @>
+
+          for (vector<string>::const_iterator iter = pid_vector_ptr->begin();
+               iter != pid_vector_ptr->end();
+               ++iter)
+          {
+@q ******* (7) @>
+
+              errno = 0;
+              status = write(fd, iter->c_str(), iter->size());
+
+              if (status == -1)
+              {
+                   lock_cerr_mutex();
+                   cerr << "WARNING!  In `generate_pids':  `write' failed, returning -1:"
+                        << endl 
+                        << strerror(errno)
+                        << endl
+                        << "Failed to write to FIFO `" << fifo_pathname << "'."
+                        << endl
+                        << "It may just not be open for writing."
+                        << endl
+                        << "This occurs, for example, when `iput' is called directly,"
+                        << endl 
+                        << "i.e., not from a program that opens the FIFO for reading."
+                        << endl;
+                   unlock_cerr_mutex(); 
+
+                   close(fd);
+
+                   goto GENERATE_PIDS_POST_FIFO;             
+
+              }  /* |if (status == -1)|  */
+
+@q ******* (7) @>
+
+              else if (status == 0)
+              {
+                   lock_cerr_mutex();
+                   cerr << "ERROR!  In `generate_pids':  `write' succeeded, but returned 0:"
+                        << endl 
+                        << "Wrote 0 bytes to FIFO `" << fifo_pathname << "'."
+                        << endl;
+                   unlock_cerr_mutex(); 
+
+                   failed = true;
+
+                   close(fd);
+
+                   ret_val = 1;
+
+                   goto GENERATE_PIDS_POST_FIFO;             
+
+              }  /* |if (status == 0)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+              else if (DEBUG)
+              {
+                  lock_cerr_mutex(); 
+                  cerr << "In `generate_pids':  `write' succeeded, returning " << status << "."
+                       << endl 
+                       << "Wrote to FIFO `" << fifo_pathname << "' successfully."
+                       << endl;
+                  unlock_cerr_mutex(); 
+
+              }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+              
+          }  /* |for|  */
+
+@q ****** (6) @>
+
+      }  /* |if (pid_vector_ptr && pid_vector_ptr->size() > 0)|  */
+
+@q ***** (5) @>
+@
+@<|generate_pids| definition@>=
+
+      else if (pid_str.size() > 0)
+      {
+@q ****** (6) @>
+
+          errno = 0;
+          status = write(fd, pid_str.c_str(), pid_str.size());
+
+          if (status == -1)
+          {
+               lock_cerr_mutex();
+               cerr << "WARNING!  In `generate_pids':  `write' failed, returning -1:"
+                    << endl 
+                    << strerror(errno)
+                    << endl
+                    << "Failed to write to FIFO `" << fifo_pathname << "'."
+                    << endl
+                    << "It may just not be open for writing."
+                    << endl
+                    << "This occurs, for example, when `iput' is called directly,"
+                    << endl 
+                    << "i.e., not from a program that opens the FIFO for reading."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               close(fd);
+
+               goto GENERATE_PIDS_POST_FIFO;             
+
+          }  /* |if (status == -1)|  */
+
+@q ****** (6) @>
+
+          else if (status == 0)
+          {
+               lock_cerr_mutex();
+               cerr << "ERROR!  In `generate_pids':  `write' succeeded, but returned 0:"
+                    << endl 
+                    << "Wrote 0 bytes to FIFO `" << fifo_pathname << "'."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               close(fd);
+
+               failed = true;
+
+               ret_val = 1;
+
+               goto GENERATE_PIDS_POST_FIFO;             
+
+          }  /* |if (status == 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+          else if (DEBUG)
+          {
+              lock_cerr_mutex(); 
+              cerr << "In `generate_pids':  `write' succeeded, returning " << status << "."
+                   << endl 
+                   << "Wrote to FIFO `" << fifo_pathname << "' successfully."
+                   << endl;
+              unlock_cerr_mutex(); 
+
+          }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+      }  /* |else if (pid_str.size() > 0)|  */
+
+@q ***** (5) @>
+
+      else
+      {
+          lock_cerr_mutex(); 
+          cerr << "ERROR!  In `generate_pids':  `pid_ctr' is empty and `pid_vector' is "
+               << "NULL or empty."
+               << endl 
+               << "No PIDs to write to FIFO `" << fifo_pathname << "'."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          close(fd);
+
+          failed = true;
+
+          ret_val = 1;
+
+          goto GENERATE_PIDS_POST_FIFO;             
+
+      }  /* |else|  */
+
+@q ***** (5) @>
+
+      close(fd);
+
+   }  /* |if (!fifo_pathname.empty())|  */
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `generate_pids':  `fifo_pathname' is empty."
+            << endl
+            << "Not writing to FIFO."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+GENERATE_PIDS_POST_FIFO:
+;
+
+@q **** (4) @>
+@
+@<|generate_pids| definition@>=
+
+   if (failed)
+   {
+       lock_cerr_mutex();
+       cerr << "In `generate_pids':  `failed' == `true'."
+            << endl 
+            << "Exiting function unsuccessfully with return value " << ret_val << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return ret_val;
+   }
+#if DEBUG_COMPILE
+
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `generate_pids':  `failed' == `false'.  Continuing."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */ 
+
+#endif  /* |DEBUG_COMPILE|  */
+
+
+
+@q **** (4) Exit successfully.  @>
+
+@ Exit successfully.  
+\initials{LDF 2012.09.28.}
+
+@<|generate_pids| definition@>=
+
+#if DEBUG_COMPILE
+
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `generate_pids' successfully with return value 0." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */ 
+
+#endif  /* |DEBUG_COMPILE|  */
+
+   return 0;
+
+@q **** (4) @>
+
+}  /* |generate_pids|  */
+
+
+@q *** (3) Check prefix.  @>
+@ Check prefix.
+\initials{LDF 2012.10.08.}
+
+\LOG
+\initials{LDF 2012.10.08.}
+Added this function.
+\ENDLOG
+
+\vskip\baselineskip
+\halign{#:\quad&#\hfil\cr
+%
+{\bf Return values}\span\cr
+\noalign{\vskip.5\baselineskip}
+%%0&\cr
+%
+0&Success\cr
+%
+1&MySQL error, i.e., query or fetch row failed\cr
+%
+2&Prefix not found, i.e., no database entry for prefix\cr
+%
+3&Prefix disabled\cr
+%
+}
+
+
+@q **** (4) Declaration  @>
+
+@<|check_prefix| declaration@>=
+int
+check_prefix(MYSQL *mysql_ptr, string prefix_str, unsigned int &prefix_id);
+
+@q **** (4) Definition  @>
+@
+@<|check_prefix| definition@>=
+int
+check_prefix(MYSQL *mysql_ptr, string prefix_str, unsigned int &prefix_id)
+{
+@q ***** (5) @>
+
+    bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+    int status = 0;
+
+    stringstream sql_strm;
+
+    MYSQL_RES* result      = 0;
+    MYSQL_ROW curr_row;
+
+    unsigned int row_ctr   = 0;
+    unsigned int field_ctr = 0;
+
+
+#if DEBUG_COMPILE
+    if (DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "Entering `check_prefix'."
+             << endl;
+        unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2012.11.22.}
+@:BUG FIX@> BUG FIX:  Now specifying the database \.{gwirdsif} where \.{Prefixes}
+is located.  Previously, the query failed because another database was selected
+as the default when this function was called.
+\ENDLOG 
+
+
+@<|check_prefix| definition@>=
+
+   sql_strm << "select prefix_id, enabled from gwirdsif.Prefixes where prefix = '" 
+            << prefix_str << "'";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `check_prefix':  `sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, &row_ctr, &field_ctr);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `check_prefix':  `submit_mysql_query' failed, returning "
+            << status << "."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `check_prefix':  `submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "`row_ctr'   == " << row_ctr
+            << endl 
+            << "`field_ctr' == " << field_ctr
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|check_prefix| definition@>=
+
+   if (row_ctr == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `check_prefix':  `row_ctr' == 0.  "
+            << "Prefix `" << prefix_str << "' not found."
+            << endl 
+            << "Exiting function unsuccessfully with return value 2."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result);
+       result = 0;
+
+       return 2;
+
+   }  /* |if (row_ctr == 0)|  */
+
+@q **** (4) @>
+@
+@<|check_prefix| definition@>=
+
+   if ((curr_row = mysql_fetch_row(result)) == 0)
+   {
+       lock_cerr_mutex();
+       cerr << "ERROR!  In `check_prefix':  `mysql_fetch_row' failed:"
+            << endl
+            << mysql_error(mysql_ptr)
+            << endl 
+            << "Exiting `check_prefix' unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result);
+       result = 0;
+
+       return 1;
+
+
+   }  /* |if (curr_row = mysql_fetch_row(result) == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `check_prefix':  `mysql_fetch_row' succeeded."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */
+
+   prefix_id = atoi(curr_row[0]);
+
+   unsigned int enabled = atoi(curr_row[1]);
+
+   if (enabled == 0)
+   {
+       lock_cerr_mutex();
+       cerr << "WARNING!  In `check_prefix':  Prefix `" << prefix_str << "' is "
+            << "disabled.  `enabled' == " << enabled
+            << endl
+            << "Exiting `check_prefix' unsuccessfully with return value 3."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result);
+       result = 0;
+
+       return 3;
+
+   }  /* |if (enabled == 0)|  */
+
+   mysql_free_result(result);
+   result = 0;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `check_prefix':  `prefix_id' == " << prefix_id
+            << endl 
+            << "`prefix_str' == " << prefix_str
+            << endl
+            << "`enabled' == " << enabled
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+    if (DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "Exiting `check_prefix' successfully with return value 0."
+             << endl;
+        unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+    return 0;
+
+}  /* End of |check_prefix| definition  */
+
+@q *** (3) @>
+
+@q ** (2) Putting PID functions together.@>
+
+@ Putting PID functions  together.
+\initials{LDF 2008.12.05.}
+
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+@<|generate_pids| declaration@>@;@/
+@<|check_prefix| declaration@>@;@/
+@<|generate_pids| definition@>@;@/
+@<|check_prefix| definition@>@;@/
+
+@q *** (3) This is what's written to the header file `pidfncs.h'.  @>
+
+@ This is what's written to the header file \filename{pidfncs.h}.  
+\initials{LDF 2008.12.05.}
+
+@(pidfncs.h@>=
+#ifndef PIDFNCS_H
+#define PIDFNCS_H 1
+using namespace std;
+using namespace gwrdifpk;
+@<|generate_pids| declaration@>@;@/
+@<|check_prefix| declaration@>@;@/
+#endif 
+
+@q (progn (cweb-mode) (outline-minor-mode))                           @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

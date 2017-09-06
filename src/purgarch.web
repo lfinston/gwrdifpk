@@ -1,0 +1,1320 @@
+@q purgarch.web  @>
+@q [...]/Finston/gwrdifpk/src/purgarch.web  @>
+
+@q Created by Laurence D. Finston (LDF) Thu Aug  8 14:42:50 CEST 2013  @>
+
+@q * (1) Top @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@* Functions for purging the archives (currently only the iRODS system).
+\initials{LDF 2013.08.08.}
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE         
+#endif 
+
+#include <stdlib.h>  /* Standard Library for C  */
+#include <stdio.h>
+#include <errno.h>
+#include <limits.h>
+
+#include <unistd.h>
+
+#if 0 
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <limits.h>
+#endif 
+
+#include <string.h>
+
+#include <algorithm> /* Standard Template Library (STL) for C++  */
+#include <fstream> 
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <string>
+#include <time.h>
+#include <math.h>
+#include <sstream>  
+#include <deque>
+#include <stack>
+#include <vector>
+#include <set>
+
+#include <pthread.h>  /* POSIX threads  */
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+#include <expat.h>
+
+#include <mysql.h>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif 
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "usrinftp.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+
+@q ** (2) Purge iRODS archive.@>
+
+@ Purge iRODS archive.
+\initials{LDF 2013.08.08.}
+
+@q *** (3) Declaration  @>
+
+@<|purge_irods_archive| declaration@>=
+
+void* 
+purge_irods_archive(void *v);
+
+@q *** (3) Definition  @>
+@
+@<|purge_irods_archive| definition@>=
+
+void* 
+purge_irods_archive(void *v)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status = 0;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `purge_irods_archive'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q **** (4) @>
+@
+@<|purge_irods_archive| definition@>=
+
+   time_t limit;
+
+   time_t went_to_sleep;
+   time_t curr_time;
+
+   struct timespec timeout;
+
+   stringstream temp_strm;
+
+   temp_strm << "[Thread " << purge_irods_archive_thread_ctr << "] ";
+
+   string thread_str = temp_strm.str();
+
+   temp_strm.str("");
+
+
+@q **** (4) @>
+@
+@<|purge_irods_archive| definition@>=
+
+   MYSQL *mysql_ptr;
+
+   MYSQL_RES* result = 0;
+   MYSQL_ROW curr_row;
+
+#if 0 
+   long int affected_rows;
+#endif 
+
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+
+   stringstream sql_strm;
+
+   mysql_ptr = mysql_init(0);
+
+@q **** (4) @>
+
+   if (mysql_ptr)
+   {
+#if DEBUG_COMPILE 
+      if (DEBUG)
+      {
+         lock_cerr_mutex(); 
+         cerr << thread_str << "In `purge_irods_archive':  " 
+              << "`mysql_init' succeeded."
+              << endl;
+         unlock_cerr_mutex();
+
+      }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   }  /* |if (mysql_ptr)| */
+
+@q **** (4) @>
+
+   else
+   {
+      lock_cerr_mutex(); 
+      cerr << thread_str << "ERROR!  In `purge_irods_archive':" 
+           << endl
+           << "`mysql_init' failed.  Exiting thread unsuccessfully with "
+           << "return value 0."
+           << endl;
+      unlock_cerr_mutex();
+ 
+      pthread_exit(0);
+
+   }   
+
+@q **** (4) Set |mysql_socket_filename|.  @>
+@ Set |mysql_socket_filename|.  
+\initials{LDF 2013.07.14.}
+
+@<|purge_irods_archive| definition@>=
+
+   string mysql_socket_filename;
+
+   errno = 0;
+
+   status = access("/var/run/mysqld/mysqld.sock", F_OK);
+
+@q ***** (5) @>
+
+   if (status == -1)
+   {  
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_irods_archive':" 
+                 << endl
+                 << "MySQL server socket file `/var/run/mysqld/mysqld.sock' doesn't exist:"
+                 << endl 
+                 << "`access' error: " << strerror(errno)
+                 << endl 
+                 << "Trying `/var/run/mysql/mysql.sock'."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+        errno = 0;
+
+        status = access("/var/run/mysql/mysql.sock", F_OK);
+
+        if (status == -1)
+        {
+             lock_cerr_mutex(); 
+             cerr << thread_str << "ERROR!  In `purge_irods_archive':" 
+                  << endl
+                  << "MySQL server socket file `/var/run/mysql/mysql.sock' doesn't exist:"
+                  << endl 
+                  << "`access' error: " << strerror(errno)
+                  << endl
+                  << "Tested for `/var/run/mysqld/mysqld.sock' previously."
+                  << endl
+                  << "Exiting thread unsuccessfully with "
+                  << "return value 0."
+                  << endl;
+             unlock_cerr_mutex();
+
+             mysql_close(mysql_ptr); 
+             mysql_ptr = 0;
+ 
+             pthread_exit(0);
+
+        }  /* |if (status == -1)|  */
+
+@q ****** (6) @>
+ 
+        else
+        {
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << thread_str << "In `purge_irods_archive':" 
+                      << endl
+                      << "MySQL server socket file `/var/run/mysql/mysql.sock' exists."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             mysql_socket_filename = "/var/run/mysql/mysql.sock";
+
+        }  /* |else|  */
+
+@q ****** (6) @>
+
+   }  /* |if (status == -1)|  */
+     
+@q ***** (5) @>
+
+   else
+   {
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_irods_archive':" 
+                 << endl
+                 << "MySQL server socket file `/var/run/mysqld/mysqld.sock' exists."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        mysql_socket_filename = "/var/run/mysqld/mysqld.sock";         
+
+   }  /* |else|  */
+
+@q ***** (5) @>
+
+@q **** (4) @>
+@
+@<|purge_irods_archive| definition@>=
+
+   my_bool reconnect    = 1;
+   unsigned int mysql_timeout = 120;
+
+   mysql_options(mysql_ptr, MYSQL_OPT_RECONNECT, &reconnect); 
+   mysql_options(mysql_ptr, MYSQL_OPT_CONNECT_TIMEOUT, &mysql_timeout); 
+
+   if (!mysql_real_connect(mysql_ptr, 
+                           0, 
+                           mysql_username.c_str(),
+                           mysql_password, 
+                           0,
+                           0, 
+                           mysql_socket_filename.c_str(), 0))
+   {
+      lock_cerr_mutex(); 
+      cerr << thread_str << "ERROR!  In `purge_irods_archive':" 
+           << endl
+           << "`mysql_real_connect' failed.  "
+           << "Error:  " << mysql_error(mysql_ptr)
+           << endl 
+           << "Error number:  " << mysql_errno(mysql_ptr)
+           << endl 
+           << "Exiting thread unsuccessfully with "
+           << "return value 0."
+           << endl;
+       unlock_cerr_mutex();
+
+       mysql_close(mysql_ptr); 
+       mysql_ptr = 0;
+
+       pthread_exit(0);
+   }
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << thread_str << "In `purge_irods_archive':"
+           << endl
+           << "`mysql_real_connect' succeeded."
+           << endl; 
+      unlock_cerr_mutex();
+   } 
+
+#endif /* |DEBUG_COMPILE|  */
+
+
+@q **** (4) @>
+@
+@<|purge_irods_archive| definition@>=
+
+   bool failed = false;
+
+   unsigned long int temp_val[2];
+   temp_val[0] = temp_val[1] = 0UL;
+
+   Irods_Object_Type curr_irods_object;
+   
+   vector<Irods_Object_Type> irods_object_vector;
+
+   int delete_ctr[2] = {0, 0};
+
+   for (;;)
+   {
+@q ***** (5) @>
+@
+@<|purge_irods_archive| definition@>=
+
+       delete_ctr[0] = delete_ctr[1] = 0;
+
+       failed = false;
+  
+       irods_object_vector.clear();
+
+       timeout.tv_sec = time(0) + purge_irods_archive_interval;
+       timeout.tv_nsec = 0;
+
+       errno = 0;
+       limit = time(0);
+
+       if (limit == static_cast<time_t>(-1))
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str << "ERROR!  In `purge_irods_archive':  `time' failed, "
+               << "returning `(time_t) -1':"
+               << endl 
+               << "Error number:   " << errno 
+               << endl
+               << "Error message:  " << strerror(errno)
+               << endl
+               << "Breaking." 
+               << endl;
+          unlock_cerr_mutex(); 
+
+          break;
+
+       }  /* |if (limit == static_cast<time_t>(-1))|  */
+
+       limit -= purge_irods_archive_limit;
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.08.16.}
+Now locking the \.{handles} table in the \.{handlesystem} or \.{handlesystem\_standalone} 
+database.
+\ENDLOG 
+
+@<|purge_irods_archive| definition@>=
+
+       string handle_database = (standalone_handle) ? "handlesystem_standalone" 
+                                   : "handlesystem";
+
+       sql_strm.str("");
+
+       pthread_mutex_lock(&sql_lock_tables_mutex);
+
+       sql_strm << "lock tables gwirdsif.Irods_Objects write, gwirdsif.Irods_AVUs write, "
+                << "gwirdsif.Irods_Info write, " << handle_database << ".handles write";
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|purge_irods_archive| definition@>=
+
+       status = submit_mysql_query(sql_strm.str(), result, mysql_ptr);
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `purge_irods_archive':  `submit_mysql_query' failed, "
+                << "returning " << status << "."
+                << endl 
+                << "Failed to lock database tables."
+                << endl
+                << "Breaking." 
+                << endl;
+           unlock_cerr_mutex(); 
+
+           if (result)
+           {
+              mysql_free_result(result);
+              result = 0;
+           }
+
+           pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+           break;
+
+       }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|purge_irods_archive| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `purge_irods_archive':  `submit_mysql_query' succeeded, "
+                << "returning 0."
+                << endl 
+                << "Locked database tables successfully:"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       mysql_free_result(result);
+       result = 0;
+
+@q ***** (5) @>
+@
+@<|purge_irods_archive| definition@>=
+      
+       sql_strm.str("");
+
+       sql_strm << "select irods_object_id, user_id, irods_object_path " 
+                << "from gwirdsif.Irods_Objects "
+                << "where (marked_for_deletion_from_archive = 1 "
+                << "and unix_timestamp(delete_from_archive_timestamp) < " 
+                << limit << ") "
+                << "or (marked_for_deletion_from_gwirdsif_db = 1 "
+                << "and unix_timestamp(delete_from_gwirdsif_db_timestamp) < " 
+                << limit << ") "
+                << "order by irods_object_id";
+ 
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|purge_irods_archive| definition@>=
+
+       status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, &row_ctr, &field_ctr);
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `purge_irods_archive':  `submit_mysql_query' failed, "
+                << "returning " << status << "."
+                << endl 
+                << "Failed to retrieve data from `gwirdsif.Irods_Objects' database table."
+                << endl
+                << "Breaking." 
+                << endl;
+           unlock_cerr_mutex(); 
+
+           if (result)
+           {
+              mysql_free_result(result);
+              result = 0;
+           }
+
+           break;
+
+       }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|purge_irods_archive| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `purge_irods_archive':  `submit_mysql_query' succeeded, "
+                << "returning 0."
+                << endl 
+                << "Retrieved data from `gwirdsif.Irods_Objects' database table successfully:"
+                << endl
+                << "`row_ctr' == " << row_ctr
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|purge_irods_archive| definition@>=
+
+      for (int i = 0; i < row_ctr; ++i)
+      {
+@q ****** (6) @>
+
+         curr_irods_object.clear();
+
+         if ((curr_row = mysql_fetch_row(result)) == 0)
+         {
+             lock_cerr_mutex(); 
+             cerr << thread_str << "ERROR!  In `purge_irods_archive':"
+                  << endl 
+                  << "`mysql_fetch_row' failed:"
+                  << endl
+                  << "Error:  " << mysql_error(mysql_ptr)
+                  << endl 
+                  << "Error number:  " << mysql_errno(mysql_ptr)
+                  << endl;
+             unlock_cerr_mutex(); 
+
+             mysql_free_result(result);
+             result = 0;
+
+             failed = true;
+
+             goto UNLOCK_TABLES;
+
+         }  /* |if (curr_row = mysql_fetch_row(result) == 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `purge_irods_archive':"
+                     << endl 
+                     << "`mysql_fetch_row' succeeded."
+                     << endl
+                     << "`curr_row[0]' == " << curr_row[0]
+                     << endl 
+                     << "`curr_row[1]' == " << curr_row[1]
+                     << endl 
+                     << "`curr_row[2]' == " << curr_row[2]
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|purge_irods_archive| definition@>=
+
+            errno = 0;
+            temp_val[0] = strtoul(curr_row[0], 0, 10);
+
+            if (temp_val[0] == ULONG_MAX)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `purge_irods_archive':"
+                     << endl 
+                     << "`strtoul' failed, returning `ULONG_MAX':"
+                     << endl
+                     << "Error:  " << errno
+                     << endl 
+                     << "Error number:  " << strerror(errno)
+                     << endl
+                     << "Failed to retrieve `gwirdsif.Irods_Objects.irods_object_id'."
+                     << endl
+                     << "Will try to continue."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                continue;
+
+            }  /* |if (temp_val[0] == ULONG_MAX)|  */
+
+@q ****** (6) @>
+@
+@<|purge_irods_archive| definition@>=
+
+           else
+           {
+#if DEBUG_COMPILE
+                if (DEBUG)
+                {
+                    lock_cerr_mutex(); 
+                    cerr << thread_str << "In `purge_irods_archive':"
+                         << endl 
+                         << "`strtoul' succeeded, returning " << temp_val[0] << "."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           }  /* |else|  */
+
+@q ****** (6) @>
+@
+@<|purge_irods_archive| definition@>=
+
+            errno = 0;
+            temp_val[1] = strtoul(curr_row[1], 0, 10);
+
+            if (temp_val[1] == ULONG_MAX)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `purge_irods_archive':"
+                     << endl 
+                     << "`strtoul' failed, returning `ULONG_MAX':"
+                     << endl
+                     << "Error:  " << errno
+                     << endl 
+                     << "Error number:  " << strerror(errno)
+                     << endl
+                     << "Failed to retrieve `gwirdsif.Irods_Objects.user_id'."
+                     << endl
+                     << "Will try to continue."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                continue;
+
+            }  /* |if (temp_val[1] == ULONG_MAX)|  */
+
+@q ****** (6) @>
+@
+@<|purge_irods_archive| definition@>=
+
+           else
+           {
+#if DEBUG_COMPILE
+                if (DEBUG)
+                {
+                    lock_cerr_mutex(); 
+                    cerr << thread_str << "In `purge_irods_archive':"
+                         << endl 
+                         << "`strtoul' succeeded, returning " << temp_val[1] << "."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           }  /* |else|  */
+             
+@q ****** (6) @>
+@
+@<|purge_irods_archive| definition@>=
+
+           if (curr_row[2] == 0 || strlen(curr_row[2]) == 0)
+           {
+                cerr << thread_str << "ERROR!  In `purge_irods_archive':"
+                     << endl 
+                     << "`curr_row[2]' is NULL or empty:"
+                     << endl
+                     << "Failed to retrieve `gwirdsif.Irods_Objects.irods_object_path'."
+                     << endl
+                     << "Will try to continue."
+                     << endl;
+
+                continue;
+              
+           }
+
+@q ****** (6) @>
+         
+           curr_irods_object.id      = temp_val[0];
+           curr_irods_object.user_id = temp_val[1];
+           curr_irods_object.path    = curr_row[2];
+
+           irods_object_vector.push_back(curr_irods_object);
+
+           curr_irods_object.clear();
+
+@q ****** (6) @>
+
+
+       }  /* |for|  */
+
+@q ***** (5) @>
+@
+@<|purge_irods_archive| definition@>=
+
+       if (result)
+       {
+          mysql_free_result(result);
+          result = 0;
+       } 
+
+@q ***** (5) @>
+@
+@<|purge_irods_archive| definition@>=
+
+       if (irods_object_vector.size() == 0)
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "In `purge_irods_archive':"
+                    << endl 
+                    << "`irods_object_vector' is empty.  Skipping to `UNLOCK_TABLES'."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           goto UNLOCK_TABLES;
+
+       }  /* |if (irods_object_vector.size() == 0)|  */
+
+@q ***** (5) @>
+@
+@<|purge_irods_archive| definition@>=
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `purge_irods_archive':"
+                << endl 
+                << "`irods_object_vector.size()' == " << irods_object_vector.size()
+                << endl
+                << "`irods_object_vector:'"
+                << endl;
+
+           for (vector<Irods_Object_Type>::const_iterator iter = irods_object_vector.begin();
+                iter != irods_object_vector.end();
+                ++iter)
+           {
+               iter->show();
+           }
+
+           cerr << endl;
+
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|purge_irods_archive| definition@>=
+
+UNLOCK_TABLES:
+
+       if (result)
+       {
+          mysql_free_result(result); 
+          result = 0;
+       }
+
+       sql_strm.str("");
+
+       sql_strm << "unlock tables";
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|purge_irods_archive| definition@>=
+
+       status = submit_mysql_query(sql_strm.str(), result, mysql_ptr);
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `purge_irods_archive':  `submit_mysql_query' failed, "
+                << "returning " << status << "."
+                << endl 
+                << "Failed to unlock database tables."
+                << endl
+                << "Breaking." 
+                << endl;
+           unlock_cerr_mutex(); 
+
+           if (result)
+           {
+              mysql_free_result(result);
+              result = 0;
+           }
+
+           pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+           break;
+
+       }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|purge_irods_archive| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `purge_irods_archive':  `submit_mysql_query' succeeded, "
+                << "returning 0."
+                << endl 
+                << "Unlocked database tables successfully:"
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+       mysql_free_result(result);
+       result = 0;
+
+@q ***** (5) Loop through |irods_object_vector|.  @>
+
+@ Loop through |irods_object_vector|.  
+\initials{LDF 2013.08.16.}
+
+@<|purge_irods_archive| definition@>=
+
+       for (vector<Irods_Object_Type>::iterator iter = irods_object_vector.begin();
+            iter != irods_object_vector.end();
+            ++iter)
+       {
+@q ****** (6) @>
+@
+@<|purge_irods_archive| definition@>=        
+            
+           status = iter->get_from_database(mysql_ptr);
+
+           if (status != 1)
+           {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `purge_irods_archive':"
+                     << endl 
+                     << "`Irods_Object_Type::get_from_database' failed, returning " 
+                     << status << "."
+                     << endl
+                     << "`iter->id' == " << iter->id
+                     << endl
+                     << "`iter->user_id' == " << iter->user_id
+                     << endl
+                     << "`iter->path' == " << iter->path
+                     << endl 
+                     << "Will try to continue."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                continue;
+
+           }  /* |if (status != 1)|  */
+
+#if DEBUG_COMPILE
+           else if (DEBUG)
+           {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `purge_irods_archive':"
+                     << endl 
+                     << "`Irods_Object_Type::get_from_database' succeeded, returning 1." 
+                     << endl;
+
+                iter->show("*iter:");
+
+                unlock_cerr_mutex(); 
+
+
+           }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ****** (6) @>
+@
+@<|purge_irods_archive| definition@>=
+
+           if (iter->marked_for_deletion_from_archive)
+           {
+@q ******* (7) @>
+
+               status = iter->delete_from_archive(mysql_ptr, thread_str);
+
+               if (status != 0)
+               {
+                    lock_cerr_mutex(); 
+                    cerr << thread_str << "ERROR!  In `purge_irods_archive':"
+                         << endl 
+                         << "`Irods_Object_Type::delete_from_archive' failed, returning " 
+                         << status << "."
+                         << endl
+                         << "`iter->id' == " << iter->id
+                         << endl
+                         << "`iter->user_id' == " << iter->user_id
+                         << endl
+                         << "`iter->path' == " << iter->path
+                         << endl 
+                         << "Will try to continue."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+               }  /* |if (status != 0)|  */
+
+@q ******* (7) @>
+
+               else
+               {
+
+#if DEBUG_COMPILE
+                   if (DEBUG)
+                   {
+                       lock_cerr_mutex(); 
+                       cerr << thread_str << "In `purge_irods_archive':"
+                            << endl 
+                            << "`Irods_Object_Type::delete_from_archive' succeeded, returning 0."
+                            << endl;
+                       unlock_cerr_mutex(); 
+
+                   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+                   ++delete_ctr[0];
+
+               }  /* |else|  */
+
+@q ******* (7) @>
+
+           }  /* |if (iter->marked_for_deletion_from_archive)|  */
+
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2013.08.12.}
+Added this section.
+\ENDLOG
+
+@<|purge_irods_archive| definition@>=
+
+          if (iter->marked_for_deletion_from_gwirdsif_db)
+          {
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << thread_str << "In `purge_irods_archive':"
+                      << endl 
+                      << "`iter->marked_for_deletion_from_gwirdsif_db' == `true'."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+@<|purge_irods_archive| definition@>=
+
+
+             status = iter->delete_from_gwirdsif_db(mysql_ptr, thread_str);
+
+             if (status != 0)
+             {
+                    lock_cerr_mutex(); 
+                    cerr << thread_str << "ERROR!  In `purge_irods_archive':"
+                         << endl 
+                         << "`Irods_Object_Type::delete_from_gwirdsif_db' failed, returning " 
+                         << status << "."
+                         << endl
+                         << "`iter->id' == " << iter->id
+                         << endl
+                         << "`iter->user_id' == " << iter->user_id
+                         << endl
+                         << "`iter->path' == " << iter->path
+                         << endl 
+                         << "Will try to continue."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+
+             }  /* |if (status != 0)|  */
+
+             else
+             {
+
+#if DEBUG_COMPILE
+                 if (DEBUG)
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << thread_str << "In `purge_irods_archive':"
+                          << endl 
+                          << "`Irods_Object_Type::delete_from_gwirdsif_db' succeeded, "
+                          << "returning 0."
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                 }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+                   ++delete_ctr[1];
+
+             }  /* |else|  */
+
+@q ******* (7) @>
+@
+@<|purge_irods_archive| definition@>=
+
+
+          }  /* |if (iter->marked_for_deletion_from_gwirdsif_db)|  */
+
+@q ****** (6) @>
+
+       }  /* |for|  */
+
+@q ***** (5) @>
+@
+@<|purge_irods_archive| definition@>=
+
+        lock_cerr_mutex(); 
+        lock_cout_mutex();
+        cout << thread_str << "In `purge_irods_archive':  "
+             << "Deleted " << delete_ctr[0] << " iRODS objects from archive."
+             << endl
+             << "Deleted " << delete_ctr[1] << " iRODS objects from `gwirdsif' database."
+             << endl;
+        unlock_cout_mutex(); 
+        unlock_cerr_mutex(); 
+
+@q ***** (5) Go to sleep for |purge_irods_archive_interval| seconds.  @>
+
+@ Go to sleep for |purge_irods_archive_interval| seconds, unless another thread 
+wakes this one up in order to perform immediate deletion.  This is done
+in |Irods_Object::mark_irods_object_for_deletion|.
+\initials{LDF 2013.08.12.}
+
+\LOG
+\initials{LDF 2013.08.12.}
+Added this section.
+\ENDLOG
+
+@<|purge_irods_archive| definition@>=
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `purge_irods_archive':  Going to sleep for "
+                << purge_irods_archive_interval  
+                << " seconds ..."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        went_to_sleep = time(0);
+
+        pthread_mutex_lock(&purge_irods_archive_mutex);
+
+        status = pthread_cond_timedwait(&purge_irods_archive_cond, 
+                                        &purge_irods_archive_mutex, 
+                                        &timeout);
+
+        curr_time = time(0);
+
+
+        if (status == ETIMEDOUT)
+        {
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "Timed-out after " << (curr_time - went_to_sleep) << " seconds."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        }
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.11.28.}
+@:BUG FIX@> BUG FIX:  Now unlocking |purge_irods_archive_mutex| before breaking.
+\ENDLOG 
+@<|purge_irods_archive| definition@>=
+
+        else if (status != 0)
+        {
+             lock_cerr_mutex(); 
+             cerr << "ERROR!  `pthread_cond_timedwait' failed, returning " << status << "." 
+                  << endl
+                  << "Error:  " << strerror(status) << endl
+                  << endl
+                  << "Breaking."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+             failed = true;
+
+             pthread_mutex_unlock(&purge_irods_archive_mutex);
+
+             break;
+        }
+
+@q ***** (5) @>
+@
+@<|purge_irods_archive| definition@>=
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "`pthread_cond_timedwait' succeeded, returning 0."
+                 << endl 
+                 << "Woke up after " << (curr_time - went_to_sleep) << " seconds."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */         
+
+        pthread_mutex_unlock(&purge_irods_archive_mutex);
+
+@q ***** (5) @>
+
+   }  /* |for| (main loop)  */
+
+
+@q **** (4) Exit.  This code will normally never be reached.  @>
+
+@ Exit.  This code will normally never be reached.
+\initials{LDF 2013.04.09.}
+
+@<|purge_irods_archive| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `purge_irods_archive' with exit status 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   if (result)
+   {
+      mysql_free_result(result);
+      result = 0;
+   }
+
+   mysql_close(mysql_ptr);
+   mysql_ptr = 0;
+
+   pthread_exit(0);
+
+}  /* End of |purge_irods_archive| definition  */
+
+@q *** (3) @>
+
+
+@q *** (3) @>
+
+@q ** (2) Putting purgarch together.  @>
+@ Putting purgarch together.  
+
+This is what's compiled.
+\initials{LDF 2013.04.09.}
+@c 
+using namespace std;
+@<Include files@>@;@/
+using namespace gwrdifpk;
+@<|purge_irods_archive| declaration@>@;@/
+@<|purge_irods_archive| definition@>@;@/
+
+@ This is what's written to the header file \filename{purgarch.h}.
+\initials{LDF 2013.04.09.}
+
+@(purgarch.h@>=
+#ifndef PURGARCH_H
+#define PURGARCH_H 1
+using namespace std;
+@<|purge_irods_archive| declaration@>@;@/
+#endif 
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))                          @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+

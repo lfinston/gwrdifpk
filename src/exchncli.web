@@ -1,0 +1,1467 @@
+@q exchncli.web  @>
+@q [...]/gwrdifpk/src/exchncli.web @>
+
+@q Created by Laurence D. Finston (LDF) Fri Jul 27 16:33:15 CEST 2012 @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+@q * (1) Exchange data with client (|exchange_data_with_client|).  @>
+@* Exchange data with client.  (|exchange_data_with_client|).
+\initials{LDF 2012.07.27.}
+
+This file belongs to the {\it server}.
+|exchange_data_with_client| is called by the server, so \filename{exchncli.o} is
+linked with \.{gwirdsif}.
+\initials{LDF 2012.07.30.}
+
+\LOG
+\initials{LDF 2012.07.27.}
+Added this file.
+\ENDLOG
+
+@q * (1) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#include <sys/types.h>
+#include <pwd.h>
+#include <errno.h>
+#include <grp.h>
+#include <sys/wait.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+#include <time.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <fcntl.h>
+
+#include <string>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <stdarg.h>
+#include <limits.h>
+#include <algorithm>
+#include <fstream>
+#include <iterator>
+#include <time.h>
+#include <math.h>
+#include <sstream>   
+
+#include <map>
+#include <vector>
+#include <deque>
+#include <stack>
+#include <set>
+
+#include <pthread.h>
+
+#include <expat.h>
+
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+#include <mysql.h>
+
+#undef NAME_LEN
+#undef LOCAL_HOST
+
+#if HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "helper.h++"
+#include "parser.h++"  
+#include "scanner.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+#include "pidfncs.h++"
+
+@q ** (2) Exchange data with client (|exchange_data_with_client|).  @>
+@ Exchange data with client (|exchange_data_with_client|).
+\initials{LDF 2012.07.27.}
+
+\LOG
+\initials{LDF 2012.07.27.}
+Added this function.
+\ENDLOG
+
+@q *** (3) Declaration @>
+
+
+@<|exchange_data_with_client| declaration@>=
+int
+exchange_data_with_client (Scan_Parse_Parameter_Type &param);
+
+@q *** (3) Definition  @>
+@
+@<|exchange_data_with_client| definition@>=
+int
+exchange_data_with_client(Scan_Parse_Parameter_Type &param)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status;
+
+   stringstream temp_strm;
+
+   int fd;
+
+   ofstream out_strm;
+   ifstream in_strm;
+
+   char buffer[BUFFER_SIZE];
+   memset(buffer, 0, BUFFER_SIZE);
+
+   char *buffer_ptr = 0;
+
+   yyscan_t parameter;
+
+   yylex_init(&parameter);      
+
+   yyset_extra(&param, parameter);
+
+   YY_BUFFER_STATE yy_buffer_state;
+
+   char out_strm_filename[] = "/tmp/gwirdsif.XXXXXX";
+
+   string temp_filename;
+
+   FILE *fp = 0;
+
+   bool read_data = false;
+
+   bool authentication_error = false;
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2012.12.13.}
+@:BUG FIX@> BUG FIX:  Cleaned up the code for dumping input to a file.  This will need to
+be tested.  The amount of input has been small so far, so it may never have been dumped.
+\ENDLOG 
+@<|exchange_data_with_client| definition@>=
+
+   for (;;)
+   {
+@q ***** (5) @>
+
+      status = 0;
+      fp = 0;
+
+      read_data = false;
+
+      fd = 0;
+
+      do 
+      {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "[gwirdsif] [Thread " << param.thread_ctr 
+                << "] In `exchange_data_with_client':"
+                << endl 
+                << "`param.remote_connection' == " << param.remote_connection
+                << endl;
+
+            if (param.remote_connection)
+                cerr << "Calling `gnutls_record_recv' ... " << endl;
+            else
+                cerr << "Calling `recv' ... " << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+          memset(buffer, 0, BUFFER_SIZE);
+
+          if (param.remote_connection == true)
+          {
+              status = gnutls_record_recv (param.session, buffer, BUFFER_SIZE);
+          }
+          else
+          {
+              status = recv(param.sock, buffer, BUFFER_SIZE, 0);    
+          }
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "[gwirdsif] [Thread " << param.thread_ctr 
+                << "] In `exchange_data_with_client':  ";
+
+           if (param.remote_connection)
+               cerr << "`gnutls_record_recv' ";
+           else
+               cerr << "`recv' ";
+ 
+           cerr << "returned " << status << "." 
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|exchange_data_with_client| definition@>=
+
+          if (status > 0) 
+          {
+#if DEBUG_COMPILE
+              if (DEBUG)
+              {
+                  lock_cerr_mutex(); 
+                  cerr << "[gwirdsif] [Thread " << param.thread_ctr << "] "
+                       << "Received text from client:  buffer == " 
+                       << endl;
+
+                  fwrite(buffer, 1, status, stderr);
+
+                  cerr << endl;
+
+                  unlock_cerr_mutex(); 
+
+              }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ******* (7) @>
+@
+\LOG
+\initials{LDF 2013.04.09.}
+@:BUG FIX@> BUG FIX:  Now pushing |out_strm_filename| onto |param.temp_file_vector|,
+if |save_temp_files == false|.  This ensures that the temporary file is deleted when 
+the thread exits (unless temporary files are being saved).
+\ENDLOG 
+
+@<|exchange_data_with_client| definition@>=
+
+              if (status == BUFFER_SIZE && read_data == false)
+              {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+                  if (DEBUG)
+                  {
+                      lock_cerr_mutex(); 
+                      cerr << "[gwirdsif] [Thread " << param.thread_ctr << "] "
+                           << "In `exchange_data_with_client':"
+                           << endl
+                           << "`status' == `BUFFER_SIZE'.  Will dump input to file."
+                           << endl;                    
+                      unlock_cerr_mutex(); 
+
+                  }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ******** (8) @>
+
+                   strcpy(out_strm_filename, "/tmp/gwirdsif.XXXXXX");
+             
+                   fd = mkstemp(out_strm_filename);
+
+                   if (fd == -1)
+                   {
+                      lock_cerr_mutex(); 
+                      cerr << "[gwirdsif] [Thread " << param.thread_ctr << "] "
+                           << "ERROR!  In `exchange_data_with_client':  "
+                           << "`mkstemp' failed, returning -1."
+                           << endl
+                           << "mkstemp error:  " << strerror(errno)
+                           << endl 
+                           << "Exiting function unsuccessfully with return value 1."
+                           << endl;
+                      unlock_cerr_mutex(); 
+
+                      close(param.sock);
+                      param.sock = 0;
+
+                      return 1;
+
+                   }  /* |if (fd == -1)|  */
+
+#if DEBUG_COMPILE
+                   else if (DEBUG)
+                   {
+                       lock_cerr_mutex(); 
+                       cerr << "[gwirdsif] [Thread " << param.thread_ctr
+                            << "] In `exchange_data_with_client':  `mkstemp' succeeded.  "
+                            << "`out_strm_filename' == "
+                            << "`" << out_strm_filename << "'."
+                            << endl;
+                       unlock_cerr_mutex(); 
+
+                   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */
+
+                   if (!save_temp_files)
+                      param.temp_file_vector.push_back(out_strm_filename);
+
+                   close(fd);  /* We just need the name.  \initials{LDF 2012.07.30.}  */
+                   fd = 0;
+
+                   out_strm.open(out_strm_filename,  ios_base::out | ios_base::binary);
+
+@q ******** (8) @>
+
+                   if (!(out_strm && out_strm.is_open()))
+                   {
+                      lock_cerr_mutex(); 
+                      cerr << "[gwirdsif] [Thread " << param.thread_ctr
+                           << "] ERROR!  In `exchange_data_with_client':  "
+                           << "`out_strm.open()' failed."
+                           << endl 
+                           << "Failed to open temporary output file `" 
+                           << out_strm_filename << "'."
+                           << endl 
+                           << "Exiting function unsuccessfully with return value 1."
+                           << endl;
+                      unlock_cerr_mutex(); 
+
+                      close(param.sock);
+                      param.sock = 0;
+
+                      return 1;
+
+                   }  /* |if (!(out_strm && out_strm.is_open()))|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+                   else if (DEBUG)
+                   {
+                       lock_cerr_mutex(); 
+                       cerr <<  "[gwirdsif] [Thread " << param.thread_ctr
+                            << "] In `exchange_data_with_client':  `out_strm.open()' succeeded."
+                            << endl;
+                       unlock_cerr_mutex(); 
+
+                   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+                    out_strm.write(buffer, status);
+                    read_data = true;
+
+@q ******** (8) @>
+
+              }  /* |if (status == BUFFER_SIZE && read_data == false)|  */
+
+
+@q ******* (7) @>
+
+              else if (status == BUFFER_SIZE && read_data == true)
+              {
+
+#if DEBUG_COMPILE
+                   if (DEBUG)
+                   {
+                       lock_cerr_mutex(); 
+                       cerr << "[gwirdsif] [Thread " << param.thread_ctr 
+                            << "] In `exchange_data_with_client':"
+                            << endl
+                            << "`status' <= `BUFFER_SIZE':"
+                            << endl
+                            << "`status' == " << status
+                            << endl
+                            << "`BUFFER_SIZE' == " << BUFFER_SIZE
+                            << endl
+                            << "`read_data' == `true'.  Writing to `out_strm'."
+                            << endl;
+                       unlock_cerr_mutex(); 
+
+                   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+                    out_strm.write(buffer, status);
+                    memset(buffer, 0, BUFFER_SIZE);
+
+              }  /* |else if (status == BUFFER_SIZE && read_data == true)|  */
+
+@q ******* (7) @>
+
+              else if (status < BUFFER_SIZE && read_data == true)
+              {
+                    
+#if DEBUG_COMPILE
+                   if (DEBUG)
+                   {
+                       lock_cerr_mutex(); 
+                       cerr << "[gwirdsif] [Thread " << param.thread_ctr 
+                            << "] In `exchange_data_with_client':"
+                            << endl
+                            << "`status' < `BUFFER_SIZE':"
+                            << endl
+                            << "`status' == " << status
+                            << endl
+                            << "`BUFFER_SIZE' == " << BUFFER_SIZE
+                            << endl
+                            << "`read_data' == `true'.  Writing to `out_strm' and breaking."
+                            << endl;
+                       unlock_cerr_mutex(); 
+
+                   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+                    out_strm.write(buffer, status);
+                    memset(buffer, 0, BUFFER_SIZE);
+
+                    break; 
+
+              }  /* |else if (status < BUFFER_SIZE && read_data == true)|  */
+
+
+@q ******* (7) @>
+
+              else if (status < BUFFER_SIZE && read_data == false)
+              {
+                    
+#if DEBUG_COMPILE
+                   if (DEBUG)
+                   {
+                       lock_cerr_mutex(); 
+                       cerr << "[gwirdsif] [Thread " << param.thread_ctr 
+                            << "] In `exchange_data_with_client':"
+                            << endl
+                            << "`status' < `BUFFER_SIZE':"
+                            << endl
+                            << "`status' == " << status
+                            << endl
+                            << "`BUFFER_SIZE' == " << BUFFER_SIZE
+                            << endl
+                            << "`read_data' == `false'.  Breaking."
+                            << endl;
+                       unlock_cerr_mutex(); 
+
+                   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+                    break; 
+
+              }  /* |else if (status == BUFFER_SIZE && read_data == false)|  */
+
+
+@q ******* (7) @>
+
+           }   /* |if (status > 0) |  */
+
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2013.07.11.}
+Added conditional |if (param.client_finished && param.server_finished)|.  No longer
+outputting error message if the client breaks off the connection in this case.  
+Due to other changes, the client may break the connection in normal use.
+\ENDLOG
+
+@<|exchange_data_with_client| definition@>=
+
+           else 
+           {
+               if (param.client_finished && param.server_finished)
+               {
+#if DEBUG_COMPILE
+                   if (DEBUG)
+                   {
+                       lock_cerr_mutex(); 
+                       cerr << "`param.client_finished' and `param.server_finished'."
+                            << endl
+                            << "Client ended connection."
+                            << endl;  
+                       unlock_cerr_mutex(); 
+
+                   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+ 
+                   lock_cerr_mutex(); 
+                   cerr << "[Thread " << param.thread_ctr << "] Client ended connection" 
+                        << endl;
+                   unlock_cerr_mutex(); 
+
+                   close(param.sock);
+                   param.sock = 0;
+
+                   return 0;
+               }    
+
+               if (status < 0) 
+               {
+                  lock_cerr_mutex(); 
+                  cerr << "[Thread " << param.thread_ctr
+                       << "] ERROR!  In `exchange_data_with_client':  ";
+
+                  if (param.remote_connection)
+                    cerr << "`gnutls_record_recv' ";
+                  else
+                    cerr << "`recv' ";
+
+                  cerr << "failed, returning " 
+                       << status << "." << endl;
+                  perror("recv");
+                  unlock_cerr_mutex(); 
+               }
+               else 
+               {
+                  lock_cerr_mutex(); 
+                  cerr << "[gwirdsif] [Thread " << param.thread_ctr
+                       << "] In `exchange_data_with_client':  "
+                       << "Client closed connection\n";
+                  unlock_cerr_mutex(); 
+
+               }
+
+               lock_cerr_mutex();
+               cerr << "[gwirdsif] [Thread " << param.thread_ctr << "] "
+                    << "Exiting function unsuccessfully with return value 1."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               close(param.sock);
+               param.sock = 0;
+
+               return 1;
+
+           }  /* |else|  */
+
+
+@q ****** (6) @>
+
+      }  /* |do|  */
+
+      while (status == BUFFER_SIZE);
+
+@q ***** (5) Call |yyparse|.  @>
+
+@ Call |yyparse|.
+   \initials{LDF 2012.06.26.}
+
+\LOG
+@:BUG FIX@> BUG FIX:  Now calling |yyrestart| instead of |yyset_in|.
+Previously, using |zzset_in| in |exchange_data_with_server| (i.e., {\it not\/} this 
+function) sometimes (but not always!) caused a segmentation fault,
+apparently because changing the input source caused the address of the lookahead token 
+to become invalid.  No problem ever occurred in this function, but it seems like 
+a good idea to make this change, anyway.  One reason no problem has ever occurred is 
+probably because the only time input has been stored in the file is when the client first
+sends the contents of the input file.  Otherwise, the amount of text in the commands has 
+probably been very small.
+\ENDLOG
+
+
+@<|exchange_data_with_client| definition@>=
+
+       fp = 0;
+
+       if (read_data)
+       {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+          if (DEBUG)
+          {
+              lock_cerr_mutex(); 
+              cerr << "`read_data' == `true'."
+                   << endl;
+              unlock_cerr_mutex(); 
+
+          }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+          out_strm.close();
+
+          fp = fopen(out_strm_filename, "r");
+
+          if (fp == 0)
+          {
+               lock_cerr_mutex(); 
+               cerr << "[gwirdsif] [Thread " << param.thread_ctr
+                    << "] ERROR!  In `exchange_data_with_client':  "
+                    << "`fopen' failed, returning NULL." 
+                    << endl 
+                    << "Failed to open input file `" << out_strm_filename << "'."
+                    << endl 
+                    << "Exiting function unsuccessfully with return value 1."
+                    << endl;
+              unlock_cerr_mutex(); 
+
+              close(param.sock);
+              param.sock = 0;
+
+              return 1;
+
+          }  /* |if (fp == 0)|  */
+
+
+          else if (DEBUG)
+          {
+                  lock_cerr_mutex(); 
+                  cerr << "[gwirdsif] [Thread " << param.thread_ctr
+                       << "] In `exchange_data_with_client':  "
+                       << "Calling `yyrestart' (reading from input file `"
+                       << out_strm_filename << "')."
+                       << endl;
+                  unlock_cerr_mutex(); 
+                 
+          }  /* |else if (DEBUG)|  */ 
+
+          yyrestart(fp, parameter);
+
+#if 0 
+          yyset_in(fp, parameter);  /* See log entry above.  \initials{LDF 2013.05.29.}  */
+#endif 
+
+@q ****** (6) @>
+
+       }  /* |if|  */
+
+@q ***** (5) @>
+
+       else
+          yy_buffer_state = yy_scan_string(buffer, parameter);
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2012.09.19.}
+Added this section.  Now not calling |yyparse| if |buffer| is empty.
+
+\initials{LDF 2012.12.13.}
+Now testing whether |read_data == false| in the conditional below.
+\ENDLOG 
+
+@<|exchange_data_with_client| definition@>=
+
+       if (read_data == false && buffer[0] == '\0')
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "[gwirdsif] [Thread " << param.thread_ctr
+                    << "] In `exchange_data_with_client':"
+                    << endl 
+                    << "`buffer' is empty and `read_data' is `false'.  "
+                    << "Not calling `yyparse' to parse input."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       }  /* |if| (No data to process) */
+
+@q ***** (5) @>
+@
+@<|exchange_data_with_client| definition@>=
+
+       else  /* Data to be processed is present  */
+       {
+@q ****** (6) @>
+
+           param.client_finished = false;
+
+           status = yyparse(parameter);
+
+           if (status == 2)
+           {
+               lock_cerr_mutex(); 
+               cerr << "[gwirdsif] [Thread " << param.thread_ctr
+                    << "] ERROR!  In `exchange_data_with_client':  "
+                    << "`yyparse' failed, returning 2." 
+                    << endl
+                    << "Authentication error.  Will send message to client and break."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               authentication_error = true; 
+
+           }  /* |if (status == 2)|  */
+
+           else if (status != 0)
+           {
+               lock_cerr_mutex(); 
+               cerr << "[gwirdsif] [Thread " << param.thread_ctr
+                    << "] ERROR!  In `exchange_data_with_client':  "
+                    << "`yyparse' failed, returning " 
+                    << status << "."
+                    << endl
+                    << "Exiting function unsuccessfully with return value 1."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               if (fp == 0)
+                  yy_delete_buffer(yy_buffer_state, parameter);
+               else
+               {
+                  fclose(fp);
+                  fp = 0;
+               }
+
+               close(param.sock);
+               param.sock = 0;
+
+               return 1;
+
+           }  /* |else if (status != 0)|  */
+      
+           else if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "[gwirdsif] [Thread " << param.thread_ctr 
+                    << "] In `exchange_data_with_client':  "
+                    << "`yyparse' succeeded, returning 0." 
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |else if (DEBUG)|  */ 
+
+
+           if (fp == 0)
+              yy_delete_buffer(yy_buffer_state, parameter);
+           else
+           {
+               fclose(fp);
+               fp = 0;
+           }
+
+@q ****** (6) @>
+
+
+       }  /* |else| (Data to be processed is present)  */
+
+@q ***** (5) @>
+@
+@<|exchange_data_with_client| definition@>=
+
+      memset(buffer, 0, BUFFER_SIZE);
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.05.10.}
+Added this section.
+\ENDLOG
+
+@<|exchange_data_with_client| definition@>=
+
+      if (   authentication_error 
+          || (   param.connection_type != Scan_Parse_Parameter_Type::X_509_AUTH_TYPE
+              && param.user_id <= 0))
+      {
+
+          lock_cerr_mutex(); 
+          cerr << "[gwirdsif] [Thread " << param.thread_ctr
+               << "] ERROR!  In `exchange_data_with_client':"
+               << endl 
+               << "`authentication_error' == " << authentication_error
+               << endl 
+               << "`param.connection_type' == " << param.connection_type 
+               << endl 
+               << "`param.user_id' == " << param.user_id 
+               << endl
+               << "Authentication error:  For non-authenticated connections, "
+               << "the \"DISTINGUISHED_NAME\" command must be called with a correct argument "
+               << "during the first invocation of `yyparse'."
+               << endl
+               << "Please note that non-authenticated connections are only for "
+               << "testing purposes and should not be used for production!"
+               << endl 
+               << "Sending error message to client and breaking."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          memset(buffer, 0, BUFFER_SIZE);
+          strcpy(buffer, "AUTHENTICATION ERROR 1");
+ 
+          if (param.remote_connection == true)
+          {
+
+              gnutls_record_send(param.session, buffer, strlen(buffer));
+
+          }
+          else
+          {
+              send(param.sock, buffer, strlen(buffer), 0);
+          }
+
+         break;
+
+
+      }  /* |if| (Authentication error)  */
+
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.05.24.}
+Added this section.
+\ENDLOG
+
+@<|exchange_data_with_client| definition@>=
+
+
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          cerr << "[gwirdsif] [Thread " << param.thread_ctr 
+               << "] In `exchange_data_with_client':"
+               << endl               
+               << "`param.response_deque.size()' == " 
+               << param.response_deque.size() 
+               << endl
+               << "`param.delayed_response_deque.size()' == " 
+               << param.delayed_response_deque.size() 
+               << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+      if (   param.response_deque.size() == 0
+          && param.delayed_response_deque.size() > 0)
+      {
+          param.response_deque = param.delayed_response_deque;
+          param.delayed_response_deque.clear();
+
+#if DEBUG_COMPILE
+          if (DEBUG)
+          {
+              lock_cerr_mutex(); 
+              cerr << "[gwirdsif] [Thread " << param.thread_ctr 
+                   << "] In `exchange_data_with_client':"
+                   << endl              
+                   << "`param.response_deque' was empty, but `param.delayed_response_deque' "
+                   << "contained responses."
+                   << endl
+                   << "Copied them to `param.response_deque' and cleared "
+                   << "`param.delayed_response_deque'."
+                   << endl;
+              unlock_cerr_mutex(); 
+
+          }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+      }  /* |if|  */
+     
+
+@q ***** (5) @>
+@
+@<|exchange_data_with_client| definition@>=
+
+      if (param.response_deque.size() > 0)
+      {
+
+          param.server_finished = false; 
+
+#if DEBUG_COMPILE
+          if (DEBUG)
+          {
+              lock_cerr_mutex(); 
+              cerr << "[gwirdsif] [Thread " << param.thread_ctr 
+                   << "] In `exchange_data_with_client':"
+                   << endl               
+                   << "`param.response_deque.size()' == " 
+                   << param.response_deque.size() << "."
+                   << endl;
+             
+             int i = 0;
+
+             for (deque<Response_Type>::iterator iter = param.response_deque.begin();
+                  iter != param.response_deque.end();
+                  ++iter)
+             {
+                   cerr << "Response " << i++ << " type == " 
+                        << Response_Type::typename_map[iter->type]
+                        << endl;
+
+                   if (!iter->command.empty())
+                      cerr << "Command:  " << iter->command
+                           << endl;
+             }
+
+             cerr << endl;
+
+             unlock_cerr_mutex(); 
+
+          }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+      }  /* |if (param.response_deque.size() > 0)|  */
+
+@q ***** (5) @>
+@
+@<|exchange_data_with_client| definition@>=
+      
+      else /* |param.response_deque.size() == 0|  */
+      {
+
+#if DEBUG_COMPILE
+          if (DEBUG)
+          {
+              lock_cerr_mutex(); 
+              cerr << "[gwirdsif] [Thread " << param.thread_ctr 
+                   << "] In `exchange_data_with_client':"
+                   << endl               
+                   << "`param.response_deque.size()' == 0." 
+                   << endl;
+              unlock_cerr_mutex(); 
+
+          }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+          param.server_finished = true;  
+
+      }  /* |else| (|param.response_deque.size() == 0|)  */
+
+@q ***** (5) @>
+@      
+\LOG
+\initials{LDF 2013.07.15.}
+@:BUG FIX@> BUG FIX:  Add space character afer |"SERVER FINISHED END"|.  
+Previously, this sometimes caused a client-side parse error (i.e., in |zzparse|), 
+when these commands were sent multiple times, because |"END"| and |"SERVER"| 
+were combined to |"ENDSERVER"|.
+\ENDLOG 
+
+@<|exchange_data_with_client| definition@>=
+
+      if (param.client_finished && param.server_finished)
+      {
+#if DEBUG_COMPILE
+         if (DEBUG)
+         {
+             lock_cerr_mutex(); 
+             cerr << "[gwirdsif] [Thread " << param.thread_ctr 
+                  << "] In `exchange_data_with_client':"
+                  << endl 
+                  << "`param.client_finished' == `true' and "
+                  << "`param.server_finished' == `true'."
+                  << endl 
+                  << "Sending \"SERVER FINISHED\" command to client."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+         }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+         memset(buffer, 0, BUFFER_SIZE);
+         strcpy(buffer, "SERVER FINISHED END ");
+ 
+         if (param.remote_connection == true)
+         {
+
+             gnutls_record_send(param.session, buffer, strlen(buffer));
+
+         }
+         else
+         {
+             send(param.sock, buffer, strlen(buffer), 0);
+         }
+
+         memset(buffer, 0, BUFFER_SIZE);
+
+      }  /* |if (param.client_finished && param.server_finished)|  */
+
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2012.09.07.}
+Added this section.  
+@:BUG FIX@> BUG FIX:  Now testing whether |param.response_deque| is empty.
+
+\initials{LDF 2012.09.19.}
+Now sending \.{SERVER FINISHED END} to client.  Added error-handling code for the
+case that |send| fails.
+
+\initials{LDF 2013.07.15.}
+@:BUG FIX@> BUG FIX:  Add space character afer |"SERVER FINISHED END"|.  
+Previously, this sometimes caused a client-side parse error (i.e., in |zzparse|), 
+when these commands were sent multiple times, because |"END"| and |"SERVER"| 
+were combined to |"ENDSERVER"|.
+\ENDLOG
+
+@<|exchange_data_with_client| definition@>=
+
+      if (param.response_deque.size() == 0)
+      {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "[gwirdsif] [Thread " << param.thread_ctr 
+                    << "] In `exchange_data_with_client':"
+                    << endl 
+                    << "`param.response_deque.size()' == 0."
+                    << endl 
+                    << "Setting `param.server_finished' to `true' and "
+                    << "sending `SERVER FINISHED END' to client."
+                    << endl
+                    << "param.client_finished == " << param.client_finished 
+                    << endl
+                    << "param.server_finished == " << param.server_finished 
+                   << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           param.server_finished = true;
+
+           memset(buffer, 0, BUFFER_SIZE);
+           strcpy(buffer, "SERVER FINISHED END ");
+
+           errno = 0;
+
+           if (param.remote_connection == true)
+           {
+               status = gnutls_record_send (param.session, buffer, strlen(buffer));
+           }
+           else
+           {
+               status = send(param.sock, buffer, strlen(buffer), 0);    
+           }
+           memset(buffer, 0, BUFFER_SIZE);
+
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2013.07.15.}
+Added test of |param.client_finished| to conditional.  
+If |param.client_finished == true|, then the client may have exited, in which case
+|send| or |gnutls_record_send| will have failed.  However, this doesn't matter 
+at this point, so no error message should be output in this case.
+\ENDLOG 
+
+@<|exchange_data_with_client| definition@>=
+
+           if (status < 0 && !param.client_finished) 
+           {
+               lock_cerr_mutex(); 
+               cerr << "[gwirdsif] [Thread " << param.thread_ctr
+                    << "] ERROR!  In `exchange_data_with_client':  ";
+
+                if (param.remote_connection)
+                  cerr << "`gnutls_record_send' failed, returning " << status << "."
+                       << endl
+                       << "error:  " << gnutls_strerror(status) << endl;
+                else
+                  cerr << "`send' failed, returning " << status << "." 
+                       << endl
+                       << "error:  " << strerror(errno) << endl;
+
+                cerr << "Exiting function unsuccessfully with return value 1."
+                     << endl;
+               unlock_cerr_mutex(); 
+
+               close(param.sock);
+               param.sock = 0;
+
+               return 1;      
+
+           }   /* |if (status < 0 && !param.client_finished)|  */
+
+@q ****** (6) @>
+@
+@<|exchange_data_with_client| definition@>=
+
+#if DEBUG_COMPILE
+          else if (DEBUG && status >= 0)
+          {
+              lock_cerr_mutex(); 
+              cerr << "[gwirdsif] [Thread " << param.thread_ctr
+                   << "] In `exchange_data_with_client':  ";
+
+              if (param.remote_connection)
+                  cerr << "`gnutls_record_send' ";
+              else
+                  cerr << "`send' ";
+
+              cerr << "succeeded, returning " << status << "."
+                   << endl;
+              unlock_cerr_mutex(); 
+
+          }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           continue;
+
+@q ****** (6) @>
+
+      }  /* |if (param.response_deque.size() == 0)|  */
+
+@q ***** (5) Server not finished.  Handling responses.  @>
+
+@ Server not finished.  Handling responses.  
+\initials{LDF 2012.09.06.}
+
+@<|exchange_data_with_client| definition@>=
+
+      Response_Type response = param.response_deque.front();
+ 
+      param.response_deque.pop_front();
+ 
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          response.show("response:");
+          unlock_cerr_mutex(); 
+
+      }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) Find the "server action" function to call, based on |response.type|.  @>
+
+@ Find the "server action" function to call, based on |response.type|.
+\initials{LDF 2013.05.27.}
+
+\LOG
+\initials{LDF 2013.05.27.}
+Added this section.
+
+\initials{LDF 2013.05.30.}
+Finished moving code from this function to ``server action'' member 
+functions of |Scan_Parse_Parameter_Type|, defined in \filename{srvractn.web}.
+\ENDLOG
+
+@<|exchange_data_with_client| definition@>=
+
+@q ***** (5) @>
+@
+@<|exchange_data_with_client| definition@>=
+
+      typedef int (Scan_Parse_Parameter_Type::*func_ptr)(Response_Type &);
+
+      string server_action_name;
+
+      map<unsigned int, func_ptr>::iterator iter
+          = param.Scan_Parse_Parameter_Type::server_action_map.find(response.type);
+
+@q ***** (5) @>
+@
+@<|exchange_data_with_client| definition@>=
+
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+
+          cerr << "Response type:  " << Response_Type::typename_map[response.type] << " "
+               << "(" << response.type << ")"
+               << endl;
+
+          if (!response.command.empty())
+              cerr << "`response.command' == " << response.command
+                   << endl;
+
+          if (iter != Scan_Parse_Parameter_Type::server_action_map.end())
+          {
+
+              cerr << "Server action:  " 
+                   << Scan_Parse_Parameter_Type::server_action_name_map[response.type]
+                   << endl;
+          }
+          else
+          {
+              cerr << "Server action not found:  " << Response_Type::typename_map[response.type]
+                   << endl;
+          } 
+          unlock_cerr_mutex(); 
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ***** (5) @>
+
+@ Under normal circumstances, this code should never be reached.  It can be reached during 
+development, if a new response type has been added, but a corresponding 
+``server action'' function has not yet been added to 
+|Scan_Parse_Parameter_Type::server_action_map|.
+\initials{LDF 2013.05.30.}
+
+@<|exchange_data_with_client| definition@>=
+
+      if (iter == Scan_Parse_Parameter_Type::server_action_map.end())
+      {
+
+           server_action_name = "Scan_Parse_Parameter_Type::server_action_unknown";
+
+           status = param.Scan_Parse_Parameter_Type::server_action_unknown(response);
+ 
+      }
+
+@q ***** (5) Found the ``server action'' function.  Now call it.  @>
+
+@ Found the ``server action'' function.  Now call it.  
+\initials{LDF 2013.05.30.}
+
+@<|exchange_data_with_client| definition@>=
+
+      else if (iter != Scan_Parse_Parameter_Type::server_action_map.end())
+      {
+@q ****** (6) @>
+
+            server_action_name 
+               = Scan_Parse_Parameter_Type::server_action_name_map[response.type];
+
+            /* Don't bother checking if |server_action_name| is set. 
+               It should be, and it's only used in an error message or 
+               debugging output, below.
+               \initials{LDF 2013.05.27.}  */
+
+            status = (param.*iter->second)(response);
+
+@q ****** (6) @>
+
+            if (   response.type == Response_Type::END_SERVER_TYPE 
+                && status == 2)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[gwirdsif] [Thread " << param.thread_ctr
+                     << "In `exchange_data_with_client':"
+                     << endl 
+                     << "`END_SERVER' command succeeded.  "
+                     << "Exiting function successfully with return value 2."
+                     << endl;
+                 unlock_cerr_mutex(); 
+
+                 close(param.sock);
+                 param.sock = 0;
+
+                 return 2;
+
+            }  /* |if|  */
+
+@q ****** (6) @>
+
+            else if (status == 2)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[gwirdsif] [Thread " << param.thread_ctr
+                     << "] WARNING!  In `exchange_data_with_client':"
+                     << endl
+                     << "`" << server_action_name << "' failed, returning "
+                     << status << "."
+                     << endl
+                     << "Will try to continue."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                ++param.warnings_occurred;
+
+                memset(buffer, 0, BUFFER_SIZE);
+                buffer_ptr = buffer;
+
+                continue;
+                
+            }  /* |if (status == 2)|  */
+
+
+@q ****** (6) @>
+
+            else if (status != 0)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[gwirdsif] [Thread " << param.thread_ctr
+                     << "] ERROR!  In `exchange_data_with_client':"
+                     << endl
+                     << "`" << server_action_name << " ' failed, returning "
+                     << status << "."
+                     << endl
+                     << "Exiting function unsuccessfully with return value 1."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+
+                param.send_to_peer(0, 1);  /* Send a single NULL byte to prevent 
+                                              client from blocking, just in case.
+                                              Don't bother checking the return value
+                                              of |Scan_Parse_Parameter_Type::send_to_peer|.
+                                              \initials{LDF 2013.05.29.}  */
+
+                close(param.sock);
+                param.sock = 0;
+
+                return 1;      
+
+            }  /* |if (status != 0)|  */
+
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "[gwirdsif] [Thread " << param.thread_ctr
+                     << "] In `exchange_data_with_client':"
+                     << endl
+                     << "`" << server_action_name << "' succeeded, returning 0."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+      }  /* |else if (iter != Scan_Parse_Parameter_Type::server_action_map.end())|  */
+
+@q ***** (5) @>
+
+   }  /* |for|  */
+
+@q ***** (5) @>
+@
+@<|exchange_data_with_client| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdsif] [Thread " << param.thread_ctr
+            << "] Exiting `exchange_data_with_client'  "
+            << "successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+@q **** (4) @>
+
+}  /* End of |exchange_data_with_client| definition  */
+
+@q *** (3) @>
+
+@q ** (2) @>
+@
+@<External function declarations@>=
+int 
+yyparse(yyscan_t parameter);
+
+@q **** (4) @>
+@
+@<Garbage@>=
+
+@q **** (4) @>
+
+@q *** (3) Putting `exchncli.web' together.  @>
+
+@ Putting {\tt exchncli\PERIOD web} together.
+
+@q **** (4) This is what's compiled.  @>
+@ This is what's compiled.
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+@<External function declarations@>@;@/
+@<|exchange_data_with_client| declaration@>@;@/
+@<|exchange_data_with_client| definition@>@;@/
+#if 0 
+@<Garbage@>@;@/
+#endif 
+
+@q **** (4) This is what's written to the header file `exchncli.h'.  @>
+
+@ This is what's written to the header file \filename{exchncli.h}.
+\initials{LDF 2012.06.27.}
+
+@(exchncli.h@>=
+#ifndef EXCHNCLI_H
+#define EXCHNCLI_H 1
+using namespace std;
+using namespace gwrdifpk;
+@<|exchange_data_with_client| declaration@>@;@/
+#endif 
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))                          @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+

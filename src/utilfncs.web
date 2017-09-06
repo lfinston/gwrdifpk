@@ -1,0 +1,5377 @@
+@q utilfncs.web @>
+
+@q Created by Laurence D. Finston (LDF) Wed Jun 27 12:42:35 CEST 2012 @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+@q * (1) Utility functions (utilfncs.web).  @>
+
+@*  Utility functions (utilfncs\PERIOD web).
+
+\LOG
+\initials{LDF 2012.06.27.}
+Copied from ``quali'' project and modified.
+\ENDLOG 
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif 
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stddef.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+
+#include <sys/types.h>
+#include <dirent.h>
+#include <string.h>
+#include <pwd.h>
+#include <errno.h>
+#include <limits.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <sys/mman.h>
+
+#include <pthread.h>
+
+#include <fstream>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <string>
+#include <sstream>  
+#include <deque>    
+#include <map>   
+#include <vector>   
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#include <mysql.h>
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "gpgkprtp.h++"
+
+@q ** (2) Mutex functions.  @>
+@ Mutex functions.
+\initials{LDF 2012.06.27.}
+
+\LOG
+\initials{LDF 2012.06.27.}
+Added this section.
+
+\initials{LDF 2012.07.27.}
+Removed the definitions of |lock_cerr_mutex| and |unlock_cerr_mutex|.  They are
+now defined in \filename{otptfnc0.c++} and \filename{otptfnc1.c++}.  |cerr_mutex| isn't
+useful for FastCGI applications, so I don't want to lock and unlock it in functions
+when they're called from such an application, e.g., \.{gwrdwbap.fcgi}, whereas
+I must lock and unlock it, when these functions are called from a ``normal'' application, 
+e.g., \.{gwirdcli} or \.{gwirdsif}.  
+\par
+@^optimization@>
+The definitions in \filename{otptfnc0.c++} are therefore empty, except for a |return| statement,
+and I hope that the compiler will optimize the function calls out.
+\ENDLOG
+
+@q *** (3) Lock |cerr_mutex|.  @>
+@ Lock {\it cerr\_mutex\/}.  
+\initials{LDF 2012.06.27.}
+
+\LOG
+\initials{LDF 2012.06.27.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration @>
+@
+@<Mutex function declarations@>=
+
+void
+lock_cerr_mutex(void);
+
+@q *** (3) Unlock |cerr_mutex|.  @>
+@ Unlock  {\it cerr\_mutex\/}.  
+\initials{LDF 2012.06.27.}
+
+\LOG
+\initials{LDF 2012.06.27.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<Mutex function declarations@>=
+
+void
+unlock_cerr_mutex(void);
+
+@q *** (3) Lock |cout_mutex|.  @>
+@ Lock {\it cout\_mutex\/}.  
+\initials{LDF 2013.05.02.}
+
+\LOG
+\initials{LDF 2013.05.02.}
+Added this function.  It is defined in \filename{otptfnc0.c++} and \filename{otptfnc1.c++}.
+\ENDLOG
+
+@q **** (4) Declaration @>
+@
+@<Mutex function declarations@>=
+
+void
+lock_cout_mutex(void);
+
+@q *** (3) Unlock |cout_mutex|.  @>
+@ Unlock  {\it cout\_mutex\/}.  
+\initials{LDF 2013.05.02.}
+
+\LOG
+\initials{LDF 2013.05.02.}
+Added this function.  It is defined in \filename{otptfnc0.c++} and \filename{otptfnc1.c++}.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<Mutex function declarations@>=
+
+void
+unlock_cout_mutex(void);
+
+
+@q ** (2) Submit SQL query. @>
+
+@ Submit SQL query.
+\initials{LDF 2012.07.11.}
+
+\LOG
+\initials{LDF 2012.07.11.}
+Added this function.  I've copied it from the version I wrote for the OptiNum-Grid project and
+modified it slightly.
+
+\initials{LDF 2012.07.16.}
+Moved this function from \filename{scprpmtp.web} to this file
+(\filename{utilfncs.web}).  Changed it, so that it is no longer a member
+function of |Scan_Parse_Parameter_Type|.  Added the required argument 
+|MYSQL *mysql_ptr| and the optional argument |string thread_ctr_str| with default |""|.  
+About to add a corresponding member function for |Scan_Parse_Parameter_Type| 
+that calls this function.
+
+\initials{LDF 2012.09.20.}
+@:BUG FIX@> BUG FIX:  Now locking and unlocking |pthread_mutex_t sql_mutex|.  Previously,
+the connection to the MySQL server was lost when I called the client multiple times.
+
+\initials{LDF 2013.04.18.}
+Now calling |pthread_setcancelstate| to disable and reenable thread cancellation.
+It's disabled when this function is entered and reenabled when it exits.  Thread
+cancellation should not occur while this function is executing, otherwise the 
+database may be left in an invalid state.
+
+\initials{LDF 2013.04.19.}
+When disabling thread cancellation, now saving old thread cancellation state in
+|int old_cancel_state|.  When |pthread_setcancelstate| is called again before
+exiting, the old state is restored.  Previously, cancellation was enabled.
+@:NOTE@> !! PLEASE NOTE: The result of the call to |pthread_setcancelstate| when
+attempting to restore the old state is only checked when this function exits
+successfully.  That is, upon error exits, the result of |pthread_setcancelstate|
+is not checked.  However, normally it should succeed.
+
+\initials{LDF 2013.07.14.}
+@:BUG FIX@> BUG FIX: Changed the argument |MYSQL *mysql_ptr| to |MYSQL *&mysql_ptr|.  
+This ensures that the pointer variable passed as |mysql_ptr| is really set to 0.
+Previously, this wasn't happening for |Scan_Parse_Parameter_Type::mysql_ptr| and
+a segmentation fault error occurred in the |Scan_Parse_Parameter_Type| destructor.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|submit_mysql_query| declaration@>=
+int
+submit_mysql_query(string query,
+                   MYSQL_RES*& result,
+                   MYSQL *&mysql_ptr,
+                   unsigned int *row_ctr = 0, 
+                   unsigned int *field_ctr = 0,
+                   long *affected_rows = 0, 
+                   string thread_str = "");
+
+@q *** (3) Definition  @>
+@
+@<|submit_mysql_query| definition@>=
+
+int
+submit_mysql_query(string query,
+                   MYSQL_RES*& result, 
+                   MYSQL *&mysql_ptr,
+                   unsigned int *row_ctr, 
+                   unsigned int *field_ctr,
+                   long *affected_rows,
+                   string thread_str)
+{
+@q **** (4) @>
+
+     int status;
+     int DEBUG = false;  /* |true|  */
+
+     if (DEBUG)
+     {
+         lock_cerr_mutex(); 
+         cerr << thread_str << "Entering `submit_mysql_query'."
+              << endl;
+         unlock_cerr_mutex(); 
+
+     }  /* |if (DEBUG)|  */
+
+@q **** (4) @>
+
+    
+     int old_cancel_state;
+
+     status = pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &old_cancel_state);
+
+     if (status != 0)
+     {
+         lock_cerr_mutex(); 
+         cerr << "WARNING!  In `submit_mysql_query':  `pthread_setcancelstate' failed, "
+              << "returning " << status << ":"
+              << endl
+              << strerror(status)
+              << endl
+              << "Failed to disable thread cancellation.  Will try to continue."
+              << endl;
+         unlock_cerr_mutex(); 
+
+     }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+     else if (DEBUG)
+     {
+         lock_cerr_mutex(); 
+         cerr << "In `submit_mysql_query':  `pthread_setcancelstate' succeeded, "
+              << "returning 0." 
+              << endl
+              << "Disabled thread cancellation successfully."
+              << endl;
+         unlock_cerr_mutex(); 
+
+     }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+
+     pthread_mutex_lock(&sql_mutex);
+
+     if (affected_rows)
+        *affected_rows = 0L;
+
+@q **** (4) @>
+
+     status = mysql_query(mysql_ptr, query.c_str());
+
+@q **** (4) @>
+
+     if (status != 0)
+     {
+         lock_cerr_mutex(); 
+         cerr << thread_str << "ERROR!  In `submit_mysql_query':"
+              << endl 
+              << "`mysql_query' failed, returning " << status << ":"
+              << endl 
+              << "Error:  " << mysql_error(mysql_ptr)
+              << endl 
+              << "Error number:  " << mysql_errno(mysql_ptr)
+              << endl 
+              << "Exiting function unsuccessfully with return value 1." 
+              << endl;
+         unlock_cerr_mutex(); 
+
+         pthread_mutex_unlock(&sql_mutex);
+
+         pthread_setcancelstate(old_cancel_state, 0);
+
+         return 1;
+         
+     }  /* |if| (|mysql_query| failed.)  */
+
+@q **** (4) @>
+
+        result = mysql_store_result(mysql_ptr);        
+
+        if (result == 0)
+        {
+            if (row_ctr)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "WARNING!  In `submit_mysql_query':"
+                     << endl 
+                     << "`mysql_store_result' returned " << result
+                     << endl
+                     << mysql_error(mysql_ptr)
+                     << endl 
+                     << "Exiting function with return value 0."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                pthread_mutex_unlock(&sql_mutex);
+  
+                pthread_setcancelstate(old_cancel_state, 0);
+
+                return 0;
+
+            }  /* |if (row_ctr)|  */
+           
+            else if (DEBUG) 
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `submit_mysql_query':"
+                     << endl 
+                     << "`mysql_store_result' returned 0."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)| */
+
+            
+        }  /* |if| (No result)  */
+
+@q **** (4) @>
+
+        if (row_ctr == 0 || field_ctr == 0)
+        {
+            if (DEBUG) 
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `submit_mysql_query':"
+                     << endl 
+                     << "`row_ctr' and/or `field_ctr' is NULL."
+                     << endl 
+                     << "Not storing rows or columns returned."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)| */
+
+
+        }   /* |if (row_ctr == 0 || field_ctr == 0)| */
+
+@q **** (4) @>
+
+        else
+        {
+            *row_ctr   = mysql_num_rows(result);
+            *field_ctr = mysql_num_fields(result);
+
+            if (DEBUG)
+            {
+
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `submit_mysql_query':"
+                     << endl 
+                     << "`*row_ctr' == " << *row_ctr 
+                     << endl
+                     << "`*field_ctr' == " << *field_ctr 
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+
+        }  /* |else|  */
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2012.04.30.}
+Added this section.
+\ENDLOG
+
+@<|submit_mysql_query| definition@>=
+
+        if (affected_rows != 0)
+        {
+            *affected_rows = (long) mysql_affected_rows(mysql_ptr);
+
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `submit_mysql_query':"
+                     << "`*affected_rows' == " << *affected_rows
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+
+        }  /* |if (affected_rows != 0)|  */
+
+@q **** (4) @>
+@
+@<|submit_mysql_query| definition@>=
+
+     if (DEBUG)
+     {
+         lock_cerr_mutex(); 
+         cerr << thread_str << "Exiting `submit_mysql_query' "
+              << "successfully with return value 0."
+              << endl;
+         unlock_cerr_mutex(); 
+
+     }  /* |if (DEBUG)|  */
+
+     pthread_mutex_unlock(&sql_mutex);
+
+@q **** (4) @>
+@
+@<|submit_mysql_query| definition@>=
+
+     status = pthread_setcancelstate(old_cancel_state, 0);
+
+     if (status != 0)
+     {
+         lock_cerr_mutex(); 
+         cerr << "WARNING!  In `submit_mysql_query':  `pthread_setcancelstate' failed, "
+              << "returning " << status << ":"
+              << endl
+              << strerror(status)
+              << endl
+              << "Failed to restore previous thread cancellation state.  Will try to continue."
+              << endl;
+         unlock_cerr_mutex(); 
+
+     }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+     else if (DEBUG)
+     {
+         lock_cerr_mutex(); 
+         cerr << "In `submit_mysql_query':  `pthread_setcancelstate' succeeded, "
+              << "returning 0." 
+              << endl
+              << "Restored previous thread cancellation state successfully."
+              << endl;
+         unlock_cerr_mutex(); 
+
+     }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+
+     return 0;
+
+@q **** (4) @>
+
+}  /* End of |submit_mysql_query|  */
+
+@q ** (2) Submit multiple SQL queries (|submit_mysql_queries|). @>
+
+@ Submit multiple SQL queries (|submit_mysql_queries|).
+\initials{LDF 2013.08.19.}
+
+\LOG
+\initials{LDF 2013.08.19.}
+Added this function.
+
+\initials{LDF 2013.09.03.}
+Changed the |vector| arguments so that references are passed (instead of passing them
+by value, which entails copying them and their contents).
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|submit_mysql_queries| declaration@>=
+int
+submit_mysql_queries(vector<string> &query_vector,
+                     MYSQL_RES **result_array,
+                     MYSQL *&mysql_ptr,
+                     vector<unsigned int *> &row_ctr_vector,
+                     vector<unsigned int *> &field_ctr_vector,
+                     vector<long int *> &affected_rows_vector,
+                     bool continue_on_error = false,
+                     string thread_str = "");
+
+@q *** (3) Definition  @>
+@
+@<|submit_mysql_queries| definition@>=
+
+
+int
+submit_mysql_queries(vector<string> &query_vector,
+                     MYSQL_RES **result_array, 
+                     MYSQL *&mysql_ptr,
+                     vector<unsigned int *> &row_ctr_vector,
+                     vector<unsigned int *> &field_ctr_vector,
+                     vector<long int *> &affected_rows_vector,
+                     bool continue_on_error,
+                     string thread_str)
+{
+@q **** (4) @>
+
+     bool DEBUG = false;  /* |true|  */
+     set_debug_level(DEBUG, 0, 0); 
+
+     int status;
+
+     if (DEBUG)
+     {
+         lock_cerr_mutex(); 
+         cerr << thread_str << "Entering `submit_mysql_queries'."
+              << endl;
+         unlock_cerr_mutex(); 
+
+     }  /* |if (DEBUG)|  */
+
+@q **** (4) @>
+@
+@<|submit_mysql_queries| definition@>=
+
+     int i = 0;
+
+     for (vector<string>::iterator iter = query_vector.begin();
+          iter != query_vector.end();
+          ++iter)
+     {
+@q ***** (5) @>
+ 
+          if (iter->empty())
+          {
+#if DEBUG_COMPILE
+              if (DEBUG) 
+              {
+                  lock_cerr_mutex(); 
+                  cerr << thread_str << "In `submit_mysql_queries':"
+                       << endl
+                       << "``query_vector[" << i << "]' is empty.  "
+                       << "Not calling `submit_mysql_query'."
+                       << endl;
+                  unlock_cerr_mutex(); 
+
+              }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */                
+
+              ++i;
+
+              continue;
+
+          }  /* |if (iter->empty())|  */
+
+@q ***** (5) @>
+
+          status = submit_mysql_query(*iter, 
+                                      result_array[i],
+                                      mysql_ptr, 
+                                      row_ctr_vector[i], 
+                                      field_ctr_vector[i],
+                                      affected_rows_vector[i],
+                                      thread_str);
+
+          if (status != 0)
+          {
+@q ****** (6) @>
+             lock_cerr_mutex(); 
+             cerr << thread_str << "ERROR!  In `submit_mysql_queries':"
+                  << endl
+                  << "`submit_mysql_query' failed, returning " << status << "."
+                  << endl
+                  << "`i' (iteration counter) == " << i 
+                  << endl 
+                  << "Query:  " << *iter
+                  << endl;
+
+             if (continue_on_error)
+             {
+                 cerr << "`continue_on_error' == `true'.  Will try to continue."
+                      << endl;
+             }
+             else
+             {
+                 cerr << "`continue_on_error' == `false'."
+                      << endl 
+                      << "Exiting function unsuccessfully with return value 1."
+                      << endl;
+ 
+             }
+
+             unlock_cerr_mutex(); 
+
+@q ****** (6) @>
+
+             if (result_array[i])
+             {
+                mysql_free_result(result_array[i]);
+                result_array[i] = 0;
+             }
+
+             if (continue_on_error)
+             {
+                ++i;
+                continue;
+
+             }
+             else
+                return 1;
+
+@q ****** (6) @>
+
+          }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+         else if (DEBUG)
+         {
+             lock_cerr_mutex(); 
+             cerr << thread_str << "In `submit_mysql_queries':"
+                  << endl
+                  << "`submit_mysql_query' succeeded, returning 0."
+                  << endl
+                  << "`i' (iteration counter) == " << i 
+                  << endl
+                  << "Query:  " << *iter
+                  << endl;
+             unlock_cerr_mutex(); 
+
+         }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+         ++i;
+
+@q ***** (5) @>
+
+     }  /* |for|  */
+
+@q **** (4) @>
+
+     if (DEBUG)
+     {
+         lock_cerr_mutex(); 
+         cerr << thread_str 
+              << "Exiting `submit_mysql_queries' successfully with return value 0."
+              << endl;
+         unlock_cerr_mutex(); 
+
+     }  /* |if (DEBUG)|  */
+
+     return 0;
+
+@q **** (4) @>
+
+}  /* End of |submit_mysql_queries| definition  */
+
+
+@q ** (2) Get datestamp.  @>
+
+@ Get datestamp.
+\initials{LDF 2010.03.11.}
+
+\LOG
+\initials{LDF 2010.03.11.}
+Added this function.
+
+\initials{LDF 2011.12.22.}
+Copied this function from \filename{glblfncs.web} in the 
+\filename{dbsrvcli/src} directory and modified it: 
+1.  Now outputting timestamp in GMT format for use as the value of the |expire| field
+of a cookie.\hfil\break 
+2.  Added optional |int hour_offset| and |int min_offset| arguments.  The default for 
+both is 0.
+
+\initials{LDF 2012.07.23.}
+Copied this function from 
+\filename{$lbrack\ldots\rbrack$/optinum/Installer/optwbsrv/src/utilfncs.web}
+of the OptiNum-Grid project.
+
+\initials{LDF 2012.07.24.}
+Added optional argument |time_t *seconds| with default 0.  If non-zero, the number of seconds
+since the epoch corresponding to the timestamp returned is stored in |*seconds|.
+
+\initials{LDF 2013.02.08.}
+Added calls to |lock_cerr_mutex| and |unlock_cerr_mutex|.  Now conditionally compiling the
+debugging output.
+
+\initials{LDF 2013.04.10.}
+Added optional arguments |unsigned int sse = 0|, |string separator = "  "|,
+|string delim_0 = ""| and |string delim_1 = ""|.  
+``sse'' stands for ``seconds since the Epoch''.  If |sse == 0| the seconds since the Epoch 
+aren't output.  If it's |sse == 1|, they are output by themselves.  If |sse > 1|,
+they are output followed by |separator| and the human-readable timestamp.
+The latter is preceded by |delim_0| and followed by |delim_1|.  If |delim_1| is the empty string
+and |delim_0| is not, then |delim_1| is set to |delim_0|.
+\ENDLOG
+
+@:TODO@> !! TODO  Look up |clock_t|, |times|, etc., to get processor times.
+This isn't urgent.
+\initials{LDF 2010.03.11.}
+
+@q *** (3) Declaration  @>
+
+@<|get_datestamp| declaration@>=
+string
+get_datestamp(int hour_offset = 0, 
+              int min_offset = 0, 
+              time_t *seconds = 0, 
+              unsigned int sse = 0,
+              string delim_0 = "",
+              string delim_1 = "",
+              string separator = "  ");
+
+@q *** (3) Definition  @>
+@
+@<|get_datestamp| definition@>=
+string
+get_datestamp(int hour_offset, 
+              int min_offset, 
+              time_t *seconds, 
+              unsigned int sse, 
+              string delim_0,
+              string delim_1,
+              string separator)
+{
+@q **** (4) @>
+
+    bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0);
+
+    string s = "";
+
+    char outstr[64];
+
+    memset(outstr, 0, 64);
+
+    time_t t;
+    struct tm tmp;
+
+    t = time(NULL);
+
+    if (hour_offset > 0)
+       t += 3600 * hour_offset;
+
+    if (min_offset > 0)
+       t += 600 * min_offset;
+
+@q **** (4) @>
+
+    if (gmtime_r(&t, &tmp) == 0) 
+    {
+
+        lock_cerr_mutex(); 
+        cerr << "ERROR!  In `get_datestamp':  `gmtime_r' failed, returning 0:"
+             << endl
+             << "Not creating datestamp.  Exiting function with empty `string' "
+             << "as return value."
+             << endl;
+        unlock_cerr_mutex(); 
+
+        if (seconds)
+          *seconds = 0;
+         
+        return s;
+
+    }
+
+@q **** (4) @>
+ 
+    if (sse > 0)
+    {
+        if (strftime(outstr, sizeof(outstr), "%s", &tmp) == 0) 
+        {
+            lock_cerr_mutex(); 
+            cerr << "ERROR!  In `get_datestamp':  `strftime' failed, returning 0."
+                 << endl
+                 << "Not creating datestamp.  Exiting function with empty `string' "
+                 << "as return value."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            if (seconds)
+              *seconds = 0;
+
+            return s;
+
+        }   
+        else
+        {
+            s = outstr;
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+                lock_cerr_mutex(); 
+                cerr << "Result string is " << s << endl;
+                unlock_cerr_mutex(); 
+
+            } /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        }
+
+    }  /* |if (sse > 0)|  */
+
+    if (sse == 1)
+    {
+        if (seconds)
+           *seconds = t;
+    
+        return s;
+    }
+
+@q **** (4) @>
+@
+@<|get_datestamp| definition@>=
+
+    if (!delim_0.empty() && delim_1.empty())
+        delim_1 = delim_0;
+
+    if (strftime(outstr, sizeof(outstr), "%a, %d %b %Y %T %Z", &tmp) == 0) 
+    {
+        lock_cerr_mutex(); 
+        cerr << "ERROR!  In `get_datestamp':  `strftime' failed, returning 0."
+             << endl
+             << "Not creating datestamp.  Exiting function with empty `string' "
+             << "as return value."
+             << endl;
+        unlock_cerr_mutex(); 
+
+        if (seconds)
+          *seconds = 0;
+
+        return string("");
+
+    }
+    else
+    {
+        if (sse >= 2)
+        {
+           s += separator;
+           s += delim_0;
+           s += outstr;
+           s += delim_1;
+        }
+        else
+        {
+           s += delim_0;
+           s = outstr;
+           s += delim_1;
+        }
+
+#if DEBUG_COMPILE 
+        if (DEBUG) 
+        {
+            lock_cerr_mutex(); 
+            cerr << "Result string is " << s << endl;
+            unlock_cerr_mutex(); 
+
+        } /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        if (seconds)
+          *seconds = t;
+    
+        return s;
+ 
+    }  /* |else|  */
+
+@q **** (4) @>
+
+}  /* End of |get_datestamp| definition  */
+
+@q ** (2) Convert seconds.  @>
+
+@ Convert seconds.
+\initials{LDF 2013.02.08.}
+
+This function creates a |string| from a |time_t|.  The |string| can be used in SQL 
+commands for setting a field of type \.{timestamp}.
+\initials{LDF 2013.07.10.}
+
+If the argument |bool timezone == true|, the three-letter abbreviation for the timezone 
+is included at the end of the |string| returned by this function.
+\par
+If the argument |bool utc == true|, ``Universal Time'', i.e., ``UTC'' is used.  Otherwise, 
+localtime is used, which is what the MySQL database expects.
+\initials{LDF 2013.07.25.}
+
+\LOG
+\initials{LDF 2013.02.08.}
+Added this function.
+
+\initials{LDF 2013.07.10.}
+Made the argument |time_t seconds| optional, with default |static_cast<time_t>(0)|.
+
+\initials{LDF 2013.07.15.}
+Now calling |localtime_r| instead of |gmtime_r|.  
+Added optional argument |bool timezone = false|.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|convert_seconds| declaration@>=
+string
+convert_seconds(time_t seconds = static_cast<time_t>(0), bool timezone = false, bool utc = false);
+
+@q *** (3) Definition  @>
+@
+@<|convert_seconds| definition@>=
+string
+convert_seconds(time_t seconds, bool timezone, bool utc)
+{
+@q **** (4) @>
+
+    
+    bool DEBUG = false;  /* |true|  */
+    set_debug_level(DEBUG, 0, 0);
+
+    string s;
+
+    char outstr[64];
+
+    memset(outstr, 0, 64);
+
+    struct tm tmp;
+    
+    if (seconds == static_cast<time_t>(0))
+    {
+       errno = 0;
+       seconds = time(0);
+
+       if (seconds == static_cast<time_t>(-1))
+       {
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `convert_seconds':  `time' failed, returning -1:"
+                << endl
+                << strerror(errno)
+                << endl 
+                << "Can't create timestamp.  Exiting function with empty string "
+                << "as return value."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return s;
+
+       }  
+
+    }  /* |if (seconds == static_cast<time_t>(0))|  */
+    
+    if (utc)
+    {
+        if (gmtime_r(&seconds, &tmp) == 0) 
+        {
+
+            lock_cerr_mutex(); 
+            cerr << "ERROR!  In `convert_seconds':  `gmtime_r' failed, returning 0:"
+                 << endl
+                 << "Not creating timestamp.  Exiting function with empty string "
+                 << "as return value."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            return s;
+
+        }   
+    } 
+    else
+    {
+        if (localtime_r(&seconds, &tmp) == 0) 
+        {
+
+            lock_cerr_mutex(); 
+            cerr << "ERROR!  In `convert_seconds':  `localtime_r' failed, returning 0:"
+                 << endl
+                 << "Not creating timestamp.  Exiting function with empty string "
+                 << "as return value."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            return s;
+
+        }   
+
+    }  /* |else| (|!utc|)  */
+
+
+    string format_str = "%Y-%m-%d %H:%M:%S";
+
+    if (timezone && utc)
+       format_str += " UTC";
+    else if (timezone)
+       format_str += " %Z";
+
+    if (strftime(outstr, sizeof(outstr), format_str.c_str(), &tmp) == 0) 
+    {
+        lock_cerr_mutex(); 
+        cerr << "ERROR!  In `convert_seconds':  `strftime' failed, returning 0."
+             << endl
+             << "Not creating timestamp.  Exiting function with empty `string' "
+             << "as return value."
+             << endl;
+        unlock_cerr_mutex(); 
+
+        return s;
+
+    }
+    else
+    {
+        
+        s = outstr;
+
+#if DEBUG_COMPILE
+        if (DEBUG) 
+        {
+           lock_cerr_mutex(); 
+           cerr << "Result string is " << s << endl;
+           unlock_cerr_mutex(); 
+
+        } /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        return s;
+ 
+    }  /* |else|  */
+
+@q **** (4) @>
+
+}  /* End of |convert_seconds| definition  */
+
+@q *** (3) Get seconds since the Epoch.  @>
+
+@ Get seconds since the Epoch.
+\initials{LDF 2013.05.15.}
+
+\LOG
+\initials{LDF 2013.05.15.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|get_seconds_since_epoch| declaration@>=
+int
+get_seconds_since_epoch(const char *timestamp, 
+                        time_t& sse, 
+                        string format_str = "%Y-%m-%d %H:%M:%S");
+
+@q **** (4) Definition  @>
+@
+@<|get_seconds_since_epoch| definition@>=
+int
+get_seconds_since_epoch(const char *timestamp, 
+                        time_t& sse, 
+                        string format_str)
+{
+
+   size_t status;
+
+   struct tm tm;
+ 
+   char buffer[16];
+   memset(buffer, 0, 16);
+
+   char *temp_str = strptime(timestamp, format_str.c_str(), &tm);
+
+   if (temp_str == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `get_seconds_since_epoch':  `strptime' failed, returning NULL."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }
+
+   status = strftime(buffer, 16, "%s", &tm);
+
+   if (status == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `get_seconds_since_epoch':  `strftime' failed, returning 0."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }
+
+   errno = 0;
+   unsigned long temp_val = strtoul(buffer, 0, 10);
+
+   if (temp_val == ULONG_MAX)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `get_seconds_since_epoch':  `strtoul' failed, returning `ULONG_MAX':"
+            << endl
+            << strerror(errno)
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }
+
+   sse = temp_val;   
+
+   return 0;
+
+}  /* End of |get_seconds_since_epoch|  definition  */
+
+@q ** (2) Convert time specification.  @>
+
+@ Convert time specification.
+\initials{LDF 2013.08.07.}
+
+\LOG
+\initials{LDF 2013.08.07.}
+Added this function.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|convert_time_spec| declaration@>=
+unsigned long int
+convert_time_spec(string time_spec);
+
+@q *** (3) Definition  @>
+@
+@<|convert_time_spec| definition@>=
+unsigned long int
+convert_time_spec(string time_spec)
+{
+@q **** (4) @>
+
+    
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0);
+
+   unsigned long int ret_val = 0UL;
+
+   string temp_str;
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `convert_time_spec'.  `time_spec' == " << time_spec
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|convert_time_spec| definition@>=
+
+   unsigned long int temp_val[4];
+
+   for (int i = 0; i < 4; ++i)
+     temp_val[i] = 0UL;
+
+   size_t pos;
+
+   int i = 0;
+   int j = 0;
+
+   pos = time_spec.find(":");
+
+   if (pos == string::npos)
+   {
+
+       lock_cerr_mutex(); 
+       cerr << "ERROR! In `convert_time_spec':  No `:' characters in `string time_spec' argument."
+            << endl 
+            << "This shouldn't be possible."
+            << endl
+            << "Exiting function unsuccessfully with return value `ULONG_MAX'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return ULONG_MAX;
+   
+   }  /* |if (pos == string::npos)|  */
+
+
+@q **** (4) @>
+@
+@<|convert_time_spec| definition@>=
+
+   for (int i = 0; i < 4; ++i)
+   {
+@q ***** (5) @>
+
+       if (time_spec.length() == 0)
+       {
+#if DEBUG_COMPILE
+          if (DEBUG)
+          {
+              lock_cerr_mutex(); 
+              cerr << "`time_spec' is empty.  Breaking."
+                   << endl;
+              unlock_cerr_mutex(); 
+
+          }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+          break;
+
+       }  /* |if (time_spec.length() == 0)|  */
+     
+@q ***** (5) @>
+@
+@<|convert_time_spec| definition@>=
+
+       pos = time_spec.find(":");
+
+       if (pos == 0)
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "`pos' == 0.  First character == `:'.  "
+                    << "Setting `temp_val[" << i << "]' to 0UL and continuing."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           time_spec.erase(0, 1);
+
+           temp_val[i] = 0UL;
+
+           continue;
+
+       }  /* |if (pos == 0)|  */
+
+@q ***** (5) @>
+@
+@<|convert_time_spec| definition@>=
+
+       else 
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "`pos' == ";
+
+               if (pos == string::npos)
+                 cerr << "`string::npos'.  ";
+               else
+                 cerr << pos << " (> 0).  ";
+
+               cerr << "First character != `:'.  "
+                    << "Will set `temp_val[" << i << "]'."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           temp_str = "";
+           j = 0;
+
+           while (isdigit(time_spec[j]))
+           {
+              temp_str += time_spec[j++];
+           }
+
+
+           time_spec.erase(0, j + 1);
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "j ==         " << j << endl
+                    << "temp_str ==  " << temp_str << endl
+                    << "time_spec == " << time_spec << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */          
+       
+           temp_val[i] = strtoul(temp_str.c_str(), 0, 10);
+
+           if (temp_val[i] == ULONG_MAX)
+           {
+               lock_cerr_mutex(); 
+               cerr << "ERROR! In `convert_time_spec':  `strtoul' failed, returning `ULONG_MAX'."
+                    << endl 
+                    << "Failed to convert `temp_str' == " << temp_str << " "
+                    << "to an `unsigned long int'."
+                    << endl
+                    << "Exiting function unsuccessfully with return value `ULONG_MAX'."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               return ULONG_MAX;
+
+           }  /* |if (temp_val[i] == ULONG_MAX)|  */
+
+#if DEBUG_COMPILE
+           else if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "In `convert_time_spec':  `strtoul' succeeded, returning " 
+                    << temp_val[i] << "."
+                    << endl 
+                    << "Set `temp_val[" << i << "]' to " << temp_val[i] << "."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       }  /* |else|  */
+
+       if (pos == string::npos)
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "`pos' == `string::npos'.  Breaking."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           break;
+
+       }
+
+@q ***** (5) @>
+
+   }  /* |for|  */
+
+@q **** (4) @>
+@
+@<|convert_time_spec| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       for (int i = 0; i < 4; ++i)
+       {
+          cerr << "`temp_val[" << i << "]' == " << temp_val[i]
+               << endl;
+       }
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+@q **** (4) @>
+@  @:TODO@> !! TODO:  Add error handling to ensure that |ret_val < ULONG_MAX|.
+The multiplication may cause overflow, but only if unreasonable values are used.
+\initials{LDF 2013.08.07.}
+
+@<|convert_time_spec| definition@>=
+
+   temp_val[0] *= 86400UL;  /* days   */
+
+   temp_val[1] *= 3600UL;  /* hours   */
+
+   temp_val[2] *= 60UL;    /* minutes */
+
+   ret_val = temp_val[0];
+
+   for (int i = 1; i < 4; ++i)
+   {
+      if (ULONG_MAX - ret_val > temp_val[i])
+         ret_val += temp_val[i];
+
+      else
+      {
+         lock_cerr_mutex(); 
+         cerr << "ERROR!  In `convert_time_spec':  Time specification >= `ULONG_MAX'."
+              << endl
+              << "This isn't permitted."
+              << endl
+              << "Exiting function unsuccessfully with return value `ULONG_MAX'."
+              << endl;
+         unlock_cerr_mutex(); 
+
+         return ULONG_MAX;
+      }
+
+   }  /* |for|  */
+
+
+@q **** (4) @>
+@
+@<|convert_time_spec| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+
+       time_t plus_spec = time(0) + ret_val;
+       time_t minus_spec = time(0) - ret_val;
+
+       lock_cerr_mutex(); 
+       cerr << "plus_spec ==  " << plus_spec << " " << convert_seconds(plus_spec, true) 
+            << endl
+            << "minus_spec == " << minus_spec << " " << convert_seconds(minus_spec, true) 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q **** (4) @>
+@
+@<|convert_time_spec| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `convert_time_spec' successfully with return value " 
+            << ret_val << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+    return ret_val;
+
+}  /* End of |convert_time_spec| definition  */
+
+
+
+@q ** (2) Convert binary data to hexadecimal string and vice versa.  @>
+
+@ Convert binary data to hexadecimal string and vice versa (|hexl_encode| and |hexl_decode|). 
+\initials{LDF 2013.04.26.}
+
+\LOG
+\initials{LDF 2013.04.26.}
+Added this section.
+\ENDLOG
+
+@q *** (3) |hexl_encode|  @>
+@ |hexl_encode|.
+\initials{LDF 2013.04.26.}
+
+\LOG
+\initials{LDF 2013.04.26.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration @>
+
+@<|hexl_encode| declaration@>=
+int
+hexl_encode(const char *buffer, 
+            unsigned int buffer_size, 
+            string &result, 
+            int delimiter   = -1,
+            int delimiter_1 = -1);
+             
+ 
+
+
+@q **** (4) Definition   @>
+@
+@<|hexl_encode| definition@>=
+
+int
+hexl_encode(const char *buffer, 
+            unsigned int buffer_size, 
+            string &result,
+            int delimiter,
+            int delimiter_1)
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   stringstream temp_strm;
+
+
+   int status;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `hexl_encode'." << endl;
+
+       cerr << "buffer == " 
+            << endl;
+
+       fwrite(buffer, 1, buffer_size, stderr);
+
+       cerr << endl;       
+
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+   if (delimiter > -1)
+   {
+      temp_strm << static_cast<unsigned char>(delimiter);
+   }
+
+   unsigned char c; 
+
+   for (int i = 0; i < buffer_size; ++i)
+   {
+@q ****** (6) @>
+               
+       c = buffer[i];
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "c (hex) == " << setw(2) << setfill('0') 
+                << hex  << static_cast<unsigned int>(c) << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */       
+
+       temp_strm << setw(2) << setfill('0') << hex << static_cast<unsigned int>(c);
+
+@q ****** (6) @>
+
+   }  /* |for|  */ 
+
+   if (delimiter_1 > -1)
+   {
+      temp_strm << static_cast<unsigned char>(delimiter_1);
+   }
+   else if (delimiter > -1)
+   {
+      temp_strm << static_cast<unsigned char>(delimiter);
+   }
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `hexl_encode':  temp_strm.str() == " << temp_strm.str() 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   result = temp_strm.str();
+
+@q ***** (5) @>
+@
+@<|hexl_encode| definition@>=
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `hexl_encode' successfully with return value 0." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |hexl_encode| definition  */
+
+
+@q *** (3) |hexl_decode|  @>
+@ |hexl_decode|.
+\initials{LDF 2013.04.26.}
+
+\LOG
+\initials{LDF 2013.04.26.}
+Added this function.
+
+\initials{LDF 2013.04.28.}
+Replaced arguments |char *buffer| and |unsigned int *buffer_size| with |string &dest| and 
+|unsigned int &dest_length|.
+\ENDLOG
+
+@q **** (4) Declaration @>
+
+@<|hexl_decode| declaration@>=
+int
+hexl_decode(string &source, string &dest, unsigned int &dest_length);
+
+@q **** (4) Definition   @>
+@
+@<|hexl_decode| definition@>=
+int
+hexl_decode(string &source, string &dest, unsigned int &dest_length)
+{
+
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   stringstream temp_strm;
+
+   int status;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `hexl_decode'." << endl;
+
+       cerr << "source == "
+            << endl
+            << source 
+            << endl;       
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|hexl_decode| definition@>=
+
+   unsigned long curr_val;
+
+   char curr_str[3];
+   curr_str[2] = '\0';
+
+   dest = "";
+   dest_length = 0;
+
+   for (int i = 0; i < source.length(); i += 2)
+   {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "`source[" << i << "]' == " << source[i]
+                << endl 
+                << "`source[" << (i + 1) << "]' == " << source[i + 1]
+                << endl
+                << "Current hexadecimal number string:  " << source[i] << source[i+1]
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+       curr_str[0] = source[i];
+       curr_str[1] = source[i + 1];
+
+       errno = 0;
+       curr_val = strtoul(curr_str, 0, 16);
+
+       if (curr_val ==  ULONG_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `hexl_decode':  `strtoul' failed, returning `ULONG_MAX':"
+                << endl 
+                << strerror(errno)
+                << endl
+                << "Failed to convert `curr_str' == \"" << curr_str << "\" to a "
+                << "numerical value."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;
+
+       }  /* |if (curr_val ==  ULONG_MAX)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `hexl_decode':  `strtoul' succeeded, returning " << curr_val
+                << endl; 
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */       
+
+       dest += static_cast<unsigned char>(curr_val); 
+       ++dest_length;
+
+@q ****** (6) @>
+
+   }  /* |for|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "dest == " << endl;
+
+       fwrite(dest.c_str(), 1, dest_length, stderr);
+
+       cerr << endl;
+
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ***** (5) @>
+@
+@<|hexl_decode| definition@>=
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `hexl_decode' successfully with return value 0." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+    
+}  /* |hexl_decode|  */
+
+
+@q ** (2) Initialize signal maps.  @>
+@ Initialize signal maps.
+\initials{LDF 2013.05.02.}
+
+@q *** (3) Declaration  @>
+
+@<|initialize_signal_maps| declaration@>=
+void
+initialize_signal_maps(void);
+
+@q *** (3) Definition  @>
+@
+@<|initialize_signal_maps| definition@>=
+void
+initialize_signal_maps(void)
+{
+
+    signal_name_map[1]  = "SIGHUP";
+    signal_name_map[2]  = "SIGINT";
+    signal_name_map[3]  = "SIGQUIT";
+    signal_name_map[4]  = "SIGILL";
+    signal_name_map[5]  = "SIGTRAP";
+    signal_name_map[6]  = "SIGABRT";
+    signal_name_map[7]  = "SIGBUS";
+    signal_name_map[8]  = "SIGFPE";
+    signal_name_map[9]  = "SIGKILL";
+    signal_name_map[10] = "SIGUSR1";
+    signal_name_map[11] = "SIGSEGV";
+    signal_name_map[12] = "SIGUSR2";
+    signal_name_map[13] = "SIGPIPE";
+    signal_name_map[14] = "SIGALRM";
+    signal_name_map[15] = "SIGTERM";
+    signal_name_map[16] = "SIGSTKFLT";
+    signal_name_map[17] = "SIGCHLD";
+    signal_name_map[18] = "SIGCONT";
+    signal_name_map[19] = "SIGSTOP";
+    signal_name_map[20] = "SIGTSTP";
+    signal_name_map[21] = "SIGTTIN";
+    signal_name_map[22] = "SIGTTOU";
+    signal_name_map[23] = "SIGURG";
+    signal_name_map[24] = "SIGXCPU";
+    signal_name_map[25] = "SIGXFSZ";
+    signal_name_map[26] = "SIGVTALRM";
+    signal_name_map[27] = "SIGPROF";
+    signal_name_map[28] = "SIGWINCH";
+    signal_name_map[29] = "SIGIO";
+    signal_name_map[30] = "SIGPWR";
+    signal_name_map[31] = "SIGSYS";
+    signal_name_map[34] = "SIGRTMIN";
+    signal_name_map[64] = "SIGRTMAX";
+
+    signal_number_map.insert(make_pair("SIGHUP", 1));
+    signal_number_map.insert(make_pair("SIGINT", 2));
+    signal_number_map.insert(make_pair("SIGQUIT", 3));
+    signal_number_map.insert(make_pair("SIGILL", 4));
+    signal_number_map.insert(make_pair("SIGTRAP", 5));
+    signal_number_map.insert(make_pair("SIGABRT", 6));
+    signal_number_map.insert(make_pair("SIGBUS", 7));
+    signal_number_map.insert(make_pair("SIGFPE", 8));
+    signal_number_map.insert(make_pair("SIGKILL", 9));
+    signal_number_map.insert(make_pair("SIGUSR1", 10));
+    signal_number_map.insert(make_pair("SIGSEGV", 11));
+    signal_number_map.insert(make_pair("SIGUSR2", 12));
+    signal_number_map.insert(make_pair("SIGPIPE", 13));
+    signal_number_map.insert(make_pair("SIGALRM", 14));
+    signal_number_map.insert(make_pair("SIGTERM", 15));
+    signal_number_map.insert(make_pair("SIGSTKFLT", 16));
+    signal_number_map.insert(make_pair("SIGCHLD", 17));
+    signal_number_map.insert(make_pair("SIGCONT", 18));
+    signal_number_map.insert(make_pair("SIGSTOP", 19));
+    signal_number_map.insert(make_pair("SIGTSTP", 20));
+    signal_number_map.insert(make_pair("SIGTTIN", 21));
+    signal_number_map.insert(make_pair("SIGTTOU", 22));
+    signal_number_map.insert(make_pair("SIGURG", 23));
+    signal_number_map.insert(make_pair("SIGXCPU", 24));
+    signal_number_map.insert(make_pair("SIGXFSZ", 25));
+    signal_number_map.insert(make_pair("SIGVTALRM", 26));
+    signal_number_map.insert(make_pair("SIGPROF", 27));
+    signal_number_map.insert(make_pair("SIGWINCH", 28));
+    signal_number_map.insert(make_pair("SIGIO", 29));
+    signal_number_map.insert(make_pair("SIGPWR", 30));
+    signal_number_map.insert(make_pair("SIGSYS", 31));
+    signal_number_map.insert(make_pair("SIGRTMIN", 34));
+    signal_number_map.insert(make_pair("SIGRTMAX", 64));
+
+    signal_number_map.insert(make_pair("HUP", 1));
+    signal_number_map.insert(make_pair("INT", 2));
+    signal_number_map.insert(make_pair("QUIT", 3));
+    signal_number_map.insert(make_pair("ILL", 4));
+    signal_number_map.insert(make_pair("TRAP", 5));
+    signal_number_map.insert(make_pair("ABRT", 6));
+    signal_number_map.insert(make_pair("BUS", 7));
+    signal_number_map.insert(make_pair("FPE", 8));
+    signal_number_map.insert(make_pair("KILL", 9));
+    signal_number_map.insert(make_pair("USR1", 10));
+    signal_number_map.insert(make_pair("SEGV", 11));
+    signal_number_map.insert(make_pair("USR2", 12));
+    signal_number_map.insert(make_pair("PIPE", 13));
+    signal_number_map.insert(make_pair("ALRM", 14));
+    signal_number_map.insert(make_pair("TERM", 15));
+    signal_number_map.insert(make_pair("STKFLT", 16));
+    signal_number_map.insert(make_pair("CHLD", 17));
+    signal_number_map.insert(make_pair("CONT", 18));
+    signal_number_map.insert(make_pair("STOP", 19));
+    signal_number_map.insert(make_pair("TSTP", 20));
+    signal_number_map.insert(make_pair("TTIN", 21));
+    signal_number_map.insert(make_pair("TTOU", 22));
+    signal_number_map.insert(make_pair("URG", 23));
+    signal_number_map.insert(make_pair("XCPU", 24));
+    signal_number_map.insert(make_pair("XFSZ", 25));
+    signal_number_map.insert(make_pair("VTALRM", 26));
+    signal_number_map.insert(make_pair("PROF", 27));
+    signal_number_map.insert(make_pair("WINCH", 28));
+    signal_number_map.insert(make_pair("IO", 29));
+    signal_number_map.insert(make_pair("PWR", 30));
+    signal_number_map.insert(make_pair("SYS", 31));
+    signal_number_map.insert(make_pair("RTMIN", 34));
+    signal_number_map.insert(make_pair("RTMAX", 64));
+
+    signal_number_map.insert(make_pair("sighup", 1));
+    signal_number_map.insert(make_pair("sigint", 2));
+    signal_number_map.insert(make_pair("sigquit", 3));
+    signal_number_map.insert(make_pair("sigill", 4));
+    signal_number_map.insert(make_pair("sigtrap", 5));
+    signal_number_map.insert(make_pair("sigabrt", 6));
+    signal_number_map.insert(make_pair("sigbus", 7));
+    signal_number_map.insert(make_pair("sigfpe", 8));
+    signal_number_map.insert(make_pair("sigkill", 9));
+    signal_number_map.insert(make_pair("sigusr1", 10));
+    signal_number_map.insert(make_pair("sigsegv", 11));
+    signal_number_map.insert(make_pair("sigusr2", 12));
+    signal_number_map.insert(make_pair("sigpipe", 13));
+    signal_number_map.insert(make_pair("sigalrm", 14));
+    signal_number_map.insert(make_pair("sigterm", 15));
+    signal_number_map.insert(make_pair("sigstkflt", 16));
+    signal_number_map.insert(make_pair("sigchld", 17));
+    signal_number_map.insert(make_pair("sigcont", 18));
+    signal_number_map.insert(make_pair("sigstop", 19));
+    signal_number_map.insert(make_pair("sigtstp", 20));
+    signal_number_map.insert(make_pair("sigttin", 21));
+    signal_number_map.insert(make_pair("sigttou", 22));
+    signal_number_map.insert(make_pair("sigurg", 23));
+    signal_number_map.insert(make_pair("sigxcpu", 24));
+    signal_number_map.insert(make_pair("sigxfsz", 25));
+    signal_number_map.insert(make_pair("sigvtalrm", 26));
+    signal_number_map.insert(make_pair("sigprof", 27));
+    signal_number_map.insert(make_pair("sigwinch", 28));
+    signal_number_map.insert(make_pair("sigio", 29));
+    signal_number_map.insert(make_pair("sigpwr", 30));
+    signal_number_map.insert(make_pair("sigsys", 31));
+    signal_number_map.insert(make_pair("sigrtmin", 34));
+    signal_number_map.insert(make_pair("sigrtmax", 64));
+
+    signal_number_map.insert(make_pair("hup", 1));
+    signal_number_map.insert(make_pair("int", 2));
+    signal_number_map.insert(make_pair("quit", 3));
+    signal_number_map.insert(make_pair("ill", 4));
+    signal_number_map.insert(make_pair("trap", 5));
+    signal_number_map.insert(make_pair("abrt", 6));
+    signal_number_map.insert(make_pair("bus", 7));
+    signal_number_map.insert(make_pair("fpe", 8));
+    signal_number_map.insert(make_pair("kill", 9));
+    signal_number_map.insert(make_pair("usr1", 10));
+    signal_number_map.insert(make_pair("segv", 11));
+    signal_number_map.insert(make_pair("usr2", 12));
+    signal_number_map.insert(make_pair("pipe", 13));
+    signal_number_map.insert(make_pair("alrm", 14));
+    signal_number_map.insert(make_pair("term", 15));
+    signal_number_map.insert(make_pair("stkflt", 16));
+    signal_number_map.insert(make_pair("chld", 17));
+    signal_number_map.insert(make_pair("cont", 18));
+    signal_number_map.insert(make_pair("stop", 19));
+    signal_number_map.insert(make_pair("tstp", 20));
+    signal_number_map.insert(make_pair("ttin", 21));
+    signal_number_map.insert(make_pair("ttou", 22));
+    signal_number_map.insert(make_pair("urg", 23));
+    signal_number_map.insert(make_pair("xcpu", 24));
+    signal_number_map.insert(make_pair("xfsz", 25));
+    signal_number_map.insert(make_pair("vtalrm", 26));
+    signal_number_map.insert(make_pair("prof", 27));
+    signal_number_map.insert(make_pair("winch", 28));
+    signal_number_map.insert(make_pair("io", 29));
+    signal_number_map.insert(make_pair("pwr", 30));
+    signal_number_map.insert(make_pair("sys", 31));
+    signal_number_map.insert(make_pair("rtmin", 34));
+    signal_number_map.insert(make_pair("rtmax", 64));
+
+   return;
+
+}  /* End of |initialize_signal_maps| definition  */
+
+@q ** (2) Set debug level.  @>
+@ Set debug level.
+\initials{LDF 2013.05.10.}
+
+\LOG
+\initials{LDF 2013.05.10.}
+Added this function.  Copied from \.{dbsrvcli} (OptiNum-Grid).
+
+\initials{LDF 2013.07.25.}
+Now using |int global_debug_level| instead of |int trace_value|.  Both of these
+are global variables, declared in \filename{glblvrbl.web}.  |trace_value| is currently
+not used for anything.
+
+\initials{LDF 2013.07.25.}
+Added the optional arguments |int turn_on_value = 0| and |int turn_off_value = 0|.
+The callers of this function can use them to set when debugging output is enabled and/or 
+disabled.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|set_debug_level| declaration@>=
+
+int
+set_debug_level(bool &DEBUG, int turn_on_value = 0, int turn_off_value = 0);
+
+@q *** (3) Definition  @>
+@
+@<|set_debug_level| definition@>=
+
+int
+set_debug_level(bool &DEBUG, int turn_on_value, int turn_off_value)
+{
+@q **** (4) @>
+
+    bool debug_level;  /* Using this variable prevents the assignment below
+                          from being found by \.{grep}, when I search 
+                          for places in the code where debugging has been turned on.
+                          \initials{LDF 2012.02.07.}  */
+
+@q **** (4) @>
+
+    if (turn_on_value < 0)
+    {
+        lock_cerr_mutex(); 
+        cerr << "ERROR!  In `set_debug_level':  Invalid value for `turn_on_value':  " 
+             << turn_on_value
+             << endl 
+             << "Value must be >= 0."
+             << endl
+             << "Not changing `DEBUG'.  Exiting function unsuccessfully with return value 1."
+             << endl;
+        unlock_cerr_mutex(); 
+
+        return 1;
+
+    }  /* |if (turn_on_value < 0)|  */
+
+
+@q **** (4) @>
+
+    if (turn_off_value > 0)
+    {
+        lock_cerr_mutex(); 
+        cerr << "ERROR!  In `set_debug_level':  Invalid value for `turn_off_value':  " 
+             << turn_off_value
+             << endl 
+             << "Value must be <= 0."
+             << endl
+             << "Not changing `DEBUG'.  Exiting function unsuccessfully with return value 1."
+             << endl;
+        unlock_cerr_mutex(); 
+
+        return 1;
+
+    }  /* |if (turn_off_value < 0)|  */
+
+@q **** (4) @>
+
+    if (global_debug_level == 0)  /* Don't change the value of |DEBUG|  */
+        return 0;
+
+    else if (global_debug_level >= turn_on_value)
+    {
+       debug_level = true;
+       DEBUG = debug_level;
+    }
+    else if (global_debug_level <= turn_off_value)
+    {
+       debug_level = false;
+       DEBUG = debug_level;
+    }
+
+    return 0;
+
+}  /* End of |set_debug_level| definition   */
+
+@q ** (2) Check iRODS server (|check_irods_server|).  Restart, if necessary.  @>
+@ Check iRODS server (|check_irods_server|).  Restart, if necessary.
+\initials{LDF 2013.06.07.}
+
+@:NOTE@> !! PLEASE NOTE: This doesn't seem to be completely fool-proof:  
+It's possible for the iRODS server to be started without the (PostgreSQL) 
+database server being started.  When this happened, the call to |system| 
+still returned 0.
+\initials{LDF 2013.06.07.}
+
+\LOG
+\initials{LDF 2013.06.07.}
+Added this function.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|check_irods_server| declaration@>=
+
+int
+check_irods_server(int &pid, int thread_ctr = -1);
+
+@q *** (3) Definition  @>
+@
+@<|check_irods_server| definition@>=
+
+int
+check_irods_server(int &pid, int thread_ctr)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   string thread_str;
+
+   stringstream temp_strm;
+
+   if (thread_ctr >= 0)
+   {
+      temp_strm << "[Thread " << thread_ctr << "] ";
+
+      thread_str = temp_strm.str();
+
+      temp_strm.str("");
+
+   }  /* |if (thread_ctr >= 0)|  */
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `check_irods_server'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   int status;
+
+@q **** (4) @>
+
+@ If the iRODS server is running, get its PID using \.{ps} via |popen|.
+Otherwise, try to start it  and then get its PID.  
+The loop is for getting back to the call to |popen| after trying to start the iRODS server
+using |system|.  It will only try again once, i.e., the loop will iterate at most two times.
+\initials{LDF 2013.06.07.}
+
+@<|check_irods_server| definition@>=
+
+   char buffer[32];
+
+   int ret_val = -1;
+
+   string temp_str;
+   string temp_str_1;
+
+   FILE *fp = 0;
+
+@q ***** (5) @>
+@
+@<|check_irods_server| definition@>=
+
+   long int temp_val;
+
+   size_t pos;
+
+   for (int i = 0; i < 2; ++i)  
+   {
+
+       temp_val = 0L;
+
+       fp = 0;
+
+       temp_strm.str("");
+
+       temp_strm << "a=`ps -C irodsReServer -o pid=`; r=$?; echo \"$r:$a\"";
+
+#if 0 
+       cerr << "temp_strm.str() == " << temp_strm.str() << endl;
+#endif 
+
+       fp = popen(temp_strm.str().c_str(), "r");
+
+       if (fp == 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `check_irods_server':  "
+                << "`popen' failed, returning NULL."
+                << endl
+                << "Failed to execute `ps' in shell to find iRODS server PID."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;       
+
+       }  /* |if (fp == 0)|  */
+
+@q **** (4) @>
+@
+@<|check_irods_server| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `check_irods_server':  `popen' succeeded."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+       memset(buffer, 0, 32);
+
+       status = fread(buffer, 1, 32, fp);
+
+       if (status == 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `check_irods_server':  `fread' failed, returning 0."
+                << endl
+                << "Failed to read shell output."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           pclose(fp);
+
+           return 1;       
+
+       }  /* |if (status == 0)|  */
+
+       else if (status == 32)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `check_irods_server':  `fread' returned 32."
+                << endl
+                << "Too many bytes in shell output.  This isn't permitted."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           pclose(fp);
+
+           return 1;       
+
+       }  /* |if (status == 32)|  */
+
+@q ***** (5) @>
+@
+@<|check_irods_server| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `check_irods_server':  "
+                << "`fread' succeeded, returning " << status << "."
+                << endl
+                << "Read read shell output successfully."
+                << endl
+                << "`buffer' == " << buffer
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       pclose(fp);
+       fp = 0;
+
+@q ***** (5) @>
+@
+@<|check_irods_server| definition@>=
+
+       temp_strm.str("");
+
+       temp_str   = "";
+       temp_str_1 = "";
+
+       temp_str   = buffer;
+       temp_str_1 = buffer;
+
+       pos = temp_str.find(':');
+
+       if (pos == string::npos)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `check_irods_server':  `string::find' failed, "
+                << "returning `string::npos'."
+                << endl
+                << "Failed to find `:' character in `popen' output."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;       
+
+
+       }  /* |if (pos == string::npos)|  */
+
+       temp_str.erase(pos);
+       temp_str_1.erase(0, pos + 1);
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "temp_str == " << temp_str << endl
+                << "temp_str_1 == " << temp_str_1 << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       errno = 0;
+       temp_val = strtol(temp_str.c_str(), 0, 10);
+
+       if (temp_val == LONG_MIN || temp_val == LONG_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `check_irods_server':  `strtol' failed, "
+                << "returning ";
+           
+           cerr << ((temp_val == LONG_MIN) ? "LONG_MIN" : "LONG_MAX") << ":" << endl;
+
+           cerr << strerror(errno)
+                << endl
+                << "Failed to get return value of `ps' command."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;       
+
+       }  /* |if (temp_val == LONG_MIN || temp_val == LONG_MAX)|  */
+       
+       ret_val = temp_val;       
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "ret_val == " << ret_val << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+   
+@q ***** (5) @>
+
+       if (ret_val == 0)
+       {
+@q ****** (6) @>
+
+           temp_val = 0L;
+
+           errno = 0;
+           temp_val = strtol(temp_str_1.c_str(), 0, 10);
+
+           if (temp_val == LONG_MIN || temp_val == LONG_MAX)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "ERROR!  In `check_irods_server':  `strtol' failed, "
+                    << "returning ";
+               
+               cerr << ((temp_val == LONG_MIN) ? "LONG_MIN" : "LONG_MAX") << ":" << endl;
+
+               cerr << strerror(errno)
+                    << endl
+                    << "Failed to get iRODS server PID from `popen' output."
+                    << endl
+                    << "Exiting function unsuccessfully with return value 1."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               return 1;       
+
+           }  /* |if (temp_val == LONG_MIN || temp_val == LONG_MAX)|  */
+       
+           pid = temp_val;       
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "pid == " << pid << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+          if (DEBUG)
+          {
+              lock_cerr_mutex(); 
+              cerr << thread_str << "In `check_irods_server':"
+                   << endl 
+                   << "ret_val == " << ret_val 
+                   << endl
+                   << "pid == " << pid 
+                   << endl;
+              unlock_cerr_mutex(); 
+
+          }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+   
+          if (pid < 2)
+          {
+              lock_cerr_mutex(); 
+              cerr << thread_str << "ERROR!  In `check_irods_server':  `pid' has invalid value:  "
+                   << pid
+                   << endl
+                   << "Exiting function unsuccessfully with return value 1."
+                   << endl;
+              unlock_cerr_mutex(); 
+
+              return 1;       
+          }
+          else
+             break;
+
+       }  /* |if (ret_val == 0)|  */
+
+@q ***** (5) @>
+
+       else /* |ret_val != 0|  */
+       {
+@q ****** (6) @>
+
+           temp_strm.str("");
+
+           temp_strm << irods_server_dir << "/irodsctl start";
+
+#if 0 
+           cerr << "temp_strm.str() == " << temp_strm.str() << endl;
+#endif 
+
+
+           status = system(temp_strm.str().c_str());
+
+@q ****** (6) @>
+
+           if (status == -1 || !WIFEXITED(status))
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "ERROR!  In `check_irods_server ':"
+                    << endl 
+                    << "`system' failed, returning " << status << "."
+                    << endl;
+
+               if (WIFEXITED(status))
+                  cerr << "WEXITSTATUS(status) == " << WEXITSTATUS(status) 
+                       << endl;
+               else
+                  cerr << "Process failed to exit."
+                       << endl;
+ 
+               cerr << "Exiting function unsuccessfully with return value 1."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               return 1; 
+
+
+           }   /* |(status == -1 || !WIFEXITED(status))|  */
+
+@q ****** (6) @>
+
+           else if (WEXITSTATUS(status) != 0)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "ERROR!  In `check_irods_server':"
+                    << endl 
+                    << "`irodsctl start' failed, returning " << WEXITSTATUS(status) << "."
+                    << endl
+                    << "Failed to start iRODS server."
+                    << endl 
+                    << "Exiting function unsuccessfully with return value 1."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               return 1;
+
+
+           }       /* |else if (WEXITSTATUS(status) != 0)|  */
+
+@q ****** (6) @>
+
+           else 
+           {
+
+               temp_strm.str("");
+
+#if DEBUG_COMPILE
+               if (DEBUG)
+               {
+                   lock_cerr_mutex(); 
+                   cerr << thread_str << "In `check_irods_server':  "
+                        << "`system' succeeded, returning 0."
+                        << endl
+                        << "Started iRODS server successfully "
+                        << endl
+                        << "Iterating again, to try to get PID."
+                        << endl; 
+                   unlock_cerr_mutex(); 
+
+               }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+               continue;
+
+           }  /* |else|  */
+
+@q ****** (6) @>
+
+       }  /* |else| (|ret_val != 0|)  */
+
+@q ***** (5) @>
+
+   }  /* |for|  */
+
+@q **** (4) @>
+@
+@<|check_irods_server| definition@>=  
+
+   if (ret_val != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR! In `check_irods_server':"
+            << endl 
+            << "`ret_val' == " << ret_val << " (!= 0)"
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (ret_val != 0)|  */
+
+@q **** (4) @>
+@
+@<|check_irods_server| definition@>=  
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `check_irods_server' successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+@q **** (4) @>
+
+}  /* End of |check_irods_server| definition   */
+
+@q *** (3) @>
+
+@q ** (2) Decrypt (|decrypt|).  @>
+
+@ Decrypt (|decrypt|).
+\initials{LDF 2013.09.24.}
+
+This function can be used to decrypt files that have encrypted with GPG 
+public keys.  It could be adapted to decrypt text from strings, as well.
+\par
+It's needed in order to avoid making the passphrase visible in the 
+\filename{/proc/\<PID>/cmdline} entry for the process in which \.{gpg} runs.
+\par
+In order to accomplish this, this function writes the passphrase to a FIFO and 
+\.{gpg} reads it out of the FIFO.  The name of the FIFO is passed to \.{gpg} 
+as the argument to its \.{--passphrase-file} option.
+\initials{LDF 2013.09.25.}
+
+\LOG
+\initials{LDF 2013.09.24.}
+Added this function.
+
+\initials{LDF 2013.09.26.}
+Added code for decrypting using a secret key without a passphrase.  Added optional argument
+|char end_char = '\n'|.  This makes it possible to decrypt texts that contain newlines.
+@:TODO@> !! TODO:  Test this!
+
+\initials{LDF 2013.09.27.}
+Added |bool is_file| argument.  Removed code for creating and opening FIFO.  This is now done 
+in |main| for \.{gwirdsif}.  I will probably do the same for \.{gwirdcli}, too.
+Added required argument |size_t plain_text_length|.
+
+\initials{LDF 2014.01.21.}
+Added optional argument |string output_filename = ""|.  
+Added code for writing decrypted text to a file.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|decrypt| declaration@>=
+
+int
+decrypt(string encrypted_text,
+        bool is_file, 
+        char *plain_text, 
+        size_t plain_text_length,
+        string output_filename = "",
+        char *passphrase = 0, 
+        char end_char = '\n',
+        string thread_str = "");
+
+@q *** (3) Definition  @>
+@
+@<|decrypt| definition@>=
+
+int
+decrypt(string encrypted_text,
+        bool is_file, 
+        char *plain_text, 
+        size_t plain_text_length,
+        string output_filename,
+        char *passphrase, 
+        char end_char, 
+        string thread_str)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   /* WARNING!  Turning on debugging may cause the passphrase and the decrypted 
+      text to be written to standard error!
+
+      In most places it's commented-out, but there's no guarantee for this.
+
+      \initials{LDF 2013.09.27.}  */
+
+   stringstream temp_strm;
+
+   int status = 0;
+
+   size_t buffer_size = (plain_text_length > 1024) ? (plain_text_length + 512) : 1024;
+
+   char temp_buffer[buffer_size];
+   memset(temp_buffer, 0, buffer_size);
+
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+
+   /* WARNING!  Turning on debugging will cause the passphrase and the decrypted 
+      text to be written to standard error!
+
+      \initials{LDF 2013.09.27.}  */
+
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "Entering `decrypt'."
+            << endl;
+
+       if (passphrase == 0)
+          cerr << "passphrase == 0" << endl;
+       else
+          cerr << "passphrase != 0" << endl;
+
+       if (passphrase == 0)
+           cerr << "`passphrase' is NULL." << endl;
+
+       else if (strlen(passphrase) == 0)
+           cerr << "`passphrase' is non-null, but empty."
+                << endl;
+       else 
+           cerr << "passphrase == " << passphrase << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|decrypt| definition@>=
+
+   char buffer[buffer_size];
+   memset(buffer, 0, buffer_size);
+   size_t buffer_contents_length = 0;
+
+   errno = 0;
+   status = mlock(buffer, buffer_size);  
+
+   if (status == -1)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `decrypt':  `mlock' failed, returning -1:"
+            << endl        
+            << strerror(errno)
+            << endl
+            << "Failed to lock memory for  `buffer'."
+            << endl 
+            << "Exiting `decrypt' unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (status == -1)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `decrypt':  `mlock' succeeded, returning 0."
+            << endl        
+            << "Locked memory for  `buffer' successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+
+@ If |passphrase| doesn't end in a newline (and it shouldn't), a newline character 
+must be appended to it.  Otherwise, \.{gw\_gpg\_decrypt.sh} will block, presumably because
+of the way \.{gpg} reads from the file specified as the argument to its \.{--passphrase-file} 
+option.
+\initials{LDF 2013.09.25.}
+
+\LOG
+\initials{LDF 2013.09.26.}
+@:BUG FIX@> BUG FIX:  Now copying |passphrase| to |buffer|, which has been locked into 
+memory with |mlock|.  Previously, it was stored in |temp_strm.str()|, which could 
+have been swapped out to disk.
+\ENDLOG 
+
+@<|decrypt| definition@>=
+
+   if (gpg_passphrase != 0 && strlen(gpg_passphrase) > 0)
+   {
+@q ***** (5) @>
+
+       pthread_mutex_lock(&gpg_passphrase_fifo_mutex);
+
+       temp_strm.str("");
+
+       strncpy(buffer, passphrase, strlen(passphrase));  
+
+       buffer[strlen(passphrase)] = '\n';
+
+       errno = 0;
+       status = write(gpg_passphrase_fifo_fd, buffer, strlen(buffer));
+
+       if (status == -1)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `decrypt':  `write' failed, returning -1:"
+                << endl        
+                << strerror(errno)
+                << endl
+                << "Failed to write passphrase to FIFO `" << gpg_passphrase_fifo_name << "'."
+                << endl 
+                << "Exiting `decrypt' unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;
+       }
+
+@q ***** (5) @>
+@
+@<|decrypt| definition@>=
+
+       else if (status != strlen(buffer))
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `decrypt':  `write' returned " << status << " "
+                << "(!= `strlen(buffer)' == " << strlen(buffer) << ")"
+                << endl        
+                << "Failed to write passphrase to FIFO `" << gpg_passphrase_fifo_name << "'."
+                << endl 
+                << "Exiting `decrypt' unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;
+       }
+
+@q ***** (5) @>
+@
+@<|decrypt| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `decrypt':  `write' succeeded, returning " << status << "."
+                << endl        
+                << "Wrote passphrase to FIFO `" << gpg_passphrase_fifo_name << "' successfully."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+   }  /* |if (gpg_passphrase != 0 && strlen(gpg_passphrase) > 0)|  */
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2014.01.07.}
+Now using |gpg_homedir| in GPG command.
+\ENDLOG 
+
+@<|decrypt| definition@>=
+
+   memset(buffer, 0, buffer_size);
+
+   temp_strm.str("");
+
+   if (!is_file)
+      temp_strm << "a=`echo \"" << encrypted_text << "\" | ";
+   else 
+      temp_strm << "a=`";
+
+   temp_strm << "gpg --homedir " << gpg_homedir << " --batch --yes --decrypt ";
+
+   if (!(gpg_passphrase == 0 || gpg_passphrase_fifo_name.empty()))
+      temp_strm << " --passphrase-file '" << gpg_passphrase_fifo_name << "' ";
+
+   if (!output_filename.empty())
+      temp_strm << "-o " << output_filename << " ";
+
+   if (is_file)
+      temp_strm << "'" << encrypted_text << "' ";
+
+   temp_strm << "2>/dev/null`; r=$?; echo $r; echo \"$a\""; 
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+        cerr << "In `decrypt':" 
+             << endl
+             << "`temp_strm.str()' == " << temp_strm.str()
+             << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   errno = 0;
+   FILE *fp = popen(temp_strm.str().c_str(), "r");
+
+   if (fp == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `decrypt':  `popen' failed, returning NULL:"
+            << endl
+            << strerror(errno)
+            << endl 
+            << "Call to `gpg' in shell failed."
+            << endl;
+
+       if (is_file)
+           cerr << "Failed to decrypt file `" << encrypted_text << "'." << endl;
+       else
+           cerr << "Failed to decrypt `encrypted_text'." << endl;
+         
+       cerr << "Exiting `decrypt' unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       memset(buffer, 0, buffer_size);
+       munlock(buffer, buffer_size);
+
+       if (gpg_passphrase != 0 && strlen(gpg_passphrase) > 0)   
+          pthread_mutex_unlock(&gpg_passphrase_fifo_mutex);
+
+       return 1;
+
+   } 
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `decrypt':  `popen' succeeded."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */     
+
+   if (gpg_passphrase != 0 && strlen(gpg_passphrase) > 0)
+      pthread_mutex_unlock(&gpg_passphrase_fifo_mutex);
+
+@q ***** (5) @>
+@
+@<|decrypt| definition@>=
+
+   status = fread(buffer, 1, buffer_size - 1, fp);
+
+   if (status == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `decrypt':  `fread' failed, returning 0:"
+            << endl 
+            << "Failed to read output of the call to `gpg' in shell."
+            << endl;
+
+       if (is_file)
+           cerr << "Failed to decrypt file `" << encrypted_text << "'." << endl;
+       else
+           cerr << "Failed to decrypt `encrypted_text'." << endl;
+         
+       cerr << "Exiting `decrypt' unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       pclose(fp);
+
+       memset(buffer, 0, buffer_size);
+       munlock(buffer, buffer_size);
+
+       return 1;
+
+   }  /* |if (status == 0)|  */
+
+   else if (status == (buffer_size - 1))
+   {
+
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `decrypt':  `fread' returned " << status << " "
+            << "(> " << (buffer_size - 2) << "):"
+            << endl 
+            << "Output of the call to `gpg' in shell exceeds the maximum size, "
+            << "i.e., " << (buffer_size - 2) << " characters."
+            << endl;
+
+       /* WARNING!  If enabled, this  will cause the decrypted 
+          text to be written to standard error!
+          \initials{LDF 2013.09.27.}  */
+
+#if 0 
+       cerr << "`buffer' == " 
+            << endl
+            << buffer
+            << endl;
+#endif 
+
+       cerr << "Exiting `decrypt' unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       pclose(fp);
+
+       memset(buffer, 0, buffer_size);
+       munlock(buffer, buffer_size);
+
+       return 1;
+
+   }  /* |if (status == (buffer_size - 1))|  */
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `decrypt':  `fread' succeeded, returning " << status << "."
+            << endl 
+            << "Read output of the call to `gpg' in shell successfully."
+            << endl;
+
+
+       /* WARNING!  If enabled, this  will cause the decrypted 
+          text to be written to standard error!
+          \initials{LDF 2013.09.27.}  */
+
+#if 0 
+
+       cerr << "`buffer' == "
+            << endl
+            << buffer
+            << endl;
+
+#endif 
+
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+    
+   buffer_contents_length = status;
+   
+   pclose(fp);
+   fp = 0;
+
+@q **** (4) Process the output from `gpg'.  @>
+
+@ Process the output from \.{gpg}.
+\initials{LDF 2013.09.25.}
+
+\LOG
+\initials{LDF 2013.09.25.}
+Added this section.
+\ENDLOG
+
+@<|decrypt| definition@>=
+
+   int i = 0;
+
+   temp_strm.str("");
+
+   while (isspace(buffer[i]))  /* Skip over leading whitespace  */
+      ++i;
+
+   if (!isdigit(buffer[i]))
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `decrypt':  First non-whitespace character in `buffer' is not a digit:"
+            << endl 
+            << "`buffer[" << i << "]' == " << buffer[i]
+            << endl 
+            << "Failed to read return value of `gpg'."
+            << endl 
+            << "Exiting `decrypt' unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       memset(buffer, 0, buffer_size);
+       munlock(buffer, buffer_size);
+
+       return 1;
+
+   }  /* |if|  */
+
+@q **** (4) @>
+
+   while (isdigit(buffer[i]))
+      temp_strm << buffer[i++];
+   
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "temp_strm.str() == " << temp_strm.str() << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+@q **** (4) @>
+
+   unsigned long int temp_val = strtoul(temp_strm.str().c_str(), 0, 10);
+
+   if (temp_val == ULONG_MAX)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `decrypt':  First non-whitespace character in `buffer' is not a digit:"
+            << endl 
+            << "`buffer[" << i << "]' == " << buffer[i]
+            << endl 
+            << "Failed to read return value of `gpg'."
+            << endl 
+            << "Exiting `decrypt' unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       memset(buffer, 0, buffer_size);
+       munlock(buffer, buffer_size);
+
+       return 1;
+
+   }
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "temp_val == " << temp_val << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|decrypt| definition@>=
+
+   if (temp_val != 0UL)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `decrypt':"
+            << endl 
+            << "`gpg' failed, returning `temp_val' == " << temp_val << "."
+            << endl;
+
+       if (is_file)
+           cerr << "Failed to decrypt file `" << encrypted_text << "'." << endl;
+       else
+           cerr << "Failed to decrypt `encrypted_text'." << endl;
+       
+       /* WARNING!  If enabled, this  will cause the decrypted 
+          text to be written to standard error!
+          \initials{LDF 2013.09.27.}  */
+
+#if 0   
+       cerr << "`buffer' == " 
+            << endl
+            << buffer
+            << endl;
+#endif 
+
+       cerr << "Exiting `decrypt' unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       memset(buffer, 0, buffer_size);
+       munlock(buffer, buffer_size);
+
+       return 1;
+
+   }  /* |if (temp_val != 0UL)|  */
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `decrypt':"
+            << endl 
+            << "`gpg' succeeded, returning 0."
+            << endl;
+
+       if (is_file)
+           cerr << "Decrypted file `" << encrypted_text << "' successfully." << endl;
+       else
+           cerr << "Decrypted `encrypted_text' successfully." << endl;
+
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|decrypt| definition@>=
+
+   if (output_filename.empty() && plain_text && plain_text_length > 0)
+   {
+@q ***** (5) @>
+
+       while (i < buffer_contents_length && buffer[i] != '\n')  /* Skip to next newline  */
+          ++i;
+
+       if (i < buffer_contents_length - 1)  /* Skip over the newline  */
+          ++i;
+
+       temp_strm.str("");
+
+       int j = 0;
+
+@q ***** (5) @>
+
+       memset(plain_text, 0, plain_text_length);
+
+       while(i < buffer_contents_length && buffer[i] != end_char)
+       {
+          if (j > plain_text_length - 2)
+          {
+               lock_cerr_mutex(); 
+               cerr << thread_str 
+                    << "ERROR!  In `decrypt':"
+                    << endl 
+                    << "Length of decrypted text exceeds `plain_text_length' - 1:"
+                    << endl
+                    << "`j'                     == " << j
+                    << endl
+                    << "`plain_text_length'     == " << plain_text_length
+                    << endl 
+                    << "`plain_text_length - 2' == " << (plain_text_length - 2)
+                    << endl
+                    << "Failed to set `plain_text'."
+                    << endl 
+                    << "Exiting `decrypt' unsuccessfully with return value 1."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               memset(plain_text, 0, plain_text_length);
+               memset(buffer, 0, buffer_size);
+
+               munlock(buffer, buffer_size);
+
+               return 1;         
+
+          }
+          else 
+             plain_text[j++] = buffer[i++];
+       }
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+       /* WARNING!  This writes the decrypted text to standard error!
+          \initials{LDF 2013.09.27.}  */
+
+#if 0 
+           lock_cerr_mutex(); 
+           cerr << "plain_text == " << plain_text << endl;
+           unlock_cerr_mutex(); 
+#endif 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+  
+@q ***** (5) @>
+
+   }  /* |if (output_filename.empty() && plain_text && plain_text_length > 0)|  */
+
+@q **** (4) @>
+@
+@<|decrypt| definition@>=
+
+   memset(buffer, 0, buffer_size);
+   munlock(buffer, buffer_size);
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "Exiting `decrypt' successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+     return 0;
+
+@q **** (4) @>
+
+}  /* End of |decrypt| definition  */
+
+@q ** (2) Set password.  @>
+@ Set password.
+\initials{LDF 2013.09.26.}
+
+\LOG
+\initials{LDF 2013.09.26.}
+Added this function.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|set_password| declaration@>=
+
+int
+set_password(string filename, 
+             char *&password, 
+             size_t password_length,
+             string default_filename, 
+             char *passphrase = 0, 
+             string directory = "", 
+             string thread_str = "");
+
+
+@q *** (3) Definition  @>
+@
+@<|set_password| definition@>=
+
+int
+set_password(string filename, 
+             char *&password,              
+             size_t password_length, 
+             string default_filename, 
+             char *passphrase, 
+             string directory, 
+             string thread_str)
+{
+@q **** (4) @>
+
+    bool DEBUG = false;  /* |true|  */
+    set_debug_level(DEBUG, 0, 0); 
+
+    int status = 0;
+
+    stringstream temp_strm;
+
+    bool first_time = true;
+    bool start_empty = (filename.empty()) ? true : false;
+
+#if DEBUG_COMPILE
+    if (DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "Entering `set_password'." << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+CHECK_FILENAME:
+
+@q **** (4) @>
+   
+    if (!filename.empty())
+    {
+@q ***** (5) @>
+
+         if (directory == config_dir)
+         {
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "`directory' == `config_dir' == " << directory
+                     << endl
+                     << "Setting `first_time' == `false'."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            first_time = false;
+         }
+
+#if DEBUG_COMPILE
+         if (DEBUG)
+         {
+             lock_cerr_mutex(); 
+             cerr << "filename is not empty."
+                  << endl 
+                  << "filename == " << filename 
+                  << endl;
+              unlock_cerr_mutex(); 
+
+         }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+         string temp_filename;
+
+         size_t pos = filename.find("/");
+
+         if (pos == string::npos)
+         {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "filename does not contain a slash:"
+                      << endl 
+                      << "filename == " << filename 
+                      << endl
+                      << "Will prepend directory:  `directory' == " 
+                      << directory << "."
+                      << endl;
+                  unlock_cerr_mutex(); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+            temp_filename += directory;
+            temp_filename += "/";
+            temp_filename += filename;
+
+@q ****** (6) @>
+
+         }
+
+@q ***** (5) @>
+
+         else 
+         {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "filename contains a slash:"
+                      << endl 
+                      << "filename == " << filename 
+                      << endl
+                      << "Not prepending `directory' == `" << directory << "'."
+                      << endl;
+                  unlock_cerr_mutex(); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+            temp_filename = filename;  
+
+@q ****** (6) @>
+
+         }  /* |else|  */
+
+@q ***** (5) @>
+
+         errno = 0;
+         status = access(temp_filename.c_str(), F_OK); 
+
+#if DEBUG_COMPILE
+         if (DEBUG)
+         {
+             lock_cerr_mutex(); 
+             cerr << "access returned status == " << status << endl
+                  << strerror(errno)
+                  << endl;
+
+             if (errno == ENOENT)
+                 cerr << "ENOENT" << endl;
+             else 
+                 cerr << "Not ENOENT" << endl;
+
+             cerr << "start_empty == " << start_empty << endl;
+
+
+
+             unlock_cerr_mutex(); 
+
+         }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+
+@q ***** (5) @>
+
+         if (status == 0)  /* File exists  */
+         {
+            filename = temp_filename;
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `set_password':  "
+                     << "`filename' == "
+                     << "`" << filename << "' exists."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+         }  /* |if (status == 0)|  */
+
+@q ***** (5) @>
+
+         else if (start_empty == true && first_time == false)
+         {
+             lock_cerr_mutex(); 
+             cerr << thread_str << "NOTICE:  In `set_password':  "
+                  << "Default password file `" << default_filename << "' "
+                  << "doesn't exist."
+                  << endl
+                  << "Not using password."
+                  << endl
+                  << "PLEASE NOTE:  This is only for testing purposes.  Do not do this "
+                  << "unless you understand the risks (see documentation)."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+             filename = "";
+
+             goto END_DECRYPT_PASSWORD;
+
+         }
+
+@q ***** (5) @>
+
+         else if (status == -1 && errno != ENOENT)
+         {
+             lock_cerr_mutex(); 
+             cerr << thread_str << "ERROR!  In `set_password':  `access' failed, "
+                  << "returning -1:"
+                  << endl 
+                  << strerror(errno)
+                  << endl 
+                  << "Failed to check for `temp_filename' == " << temp_filename << "."
+                  << endl
+                  << "Can't set `filename'."
+                  << endl
+                  << "Exiting `set_password' unsuccessfully with return value 1."
+                  << endl;
+             unlock_cerr_mutex(); 
+           
+             return 1;
+
+         }  /* |else if (status == -1 && errno != ENOENT)|  */
+
+
+@q ***** (5) @>
+
+         else if (   status == -1 
+                  && errno == ENOENT 
+                  && directory != config_dir
+                  && pos == string::npos
+                  && first_time == true)
+         {
+             lock_cerr_mutex(); 
+             cerr << thread_str << "In `set_password':  "
+                  << "File `" << temp_filename << "' "
+                  << "doesn't exist (in directory `" << directory << "')."
+                  << endl 
+                  << strerror(errno)
+                  << endl 
+                  << "Will check for it in `config_dir' == `" << config_dir << "'."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+             temp_filename = filename;
+
+             filename = config_dir;
+             filename += "/";
+             filename += temp_filename;
+             
+             first_time = false;
+
+             goto CHECK_FILENAME;
+
+
+         }  /* |else if|  */
+
+@q ***** (5) @>
+
+         else if (start_empty == false)
+         {
+             lock_cerr_mutex(); 
+             cerr << thread_str << "ERROR!  In `set_password':  "
+                  << "File `" << temp_filename << "' "
+                  << "doesn't exist."
+                  << endl 
+                  << strerror(errno)
+                  << endl 
+                  << "Failed to check for `temp_filename' == " << temp_filename << "."
+                  << endl
+                  << "Can't set `filename'."
+                  << endl
+                  << "Exiting `set_password' unsuccessfully with return value 1."
+                  << endl;
+             unlock_cerr_mutex(); 
+           
+             return 1;
+
+         }  /* |else|  */
+
+
+@q ***** (5) @>
+
+    }  /* |if (!filename.empty())|  */
+
+@q **** (4) @>
+
+    if (filename.empty())
+    {
+@q ***** (5) @>
+
+        filename = default_filename;
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "filename was empty."
+                 << endl 
+                 << "Will check for default `filename' == " 
+                 << "`" << filename << "'."
+                 << endl;
+             unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        goto CHECK_FILENAME;
+
+@q ***** (5) @>
+
+    }  /* |if|  */
+
+
+@q **** (4) Decrypt password.  @>
+
+@ Decrypt password.
+\initials{LDF 2013.09.25.}
+
+@<|set_password| definition@>=
+
+@q ***** (5) @>
+
+   if (gpg_passphrase == 0)
+   {
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "gpg_passphrase == 0" << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   }
+
+@q ***** (5) @>
+
+   else if (gpg_passphrase != 0 && strlen(gpg_passphrase) < 2)
+   {
+         cerr << thread_str << "ERROR!  In `set_password':"
+              << endl 
+              << "`gpg_passphrase' != 0 and `strlen(gpg_passphrase)' < 2."
+              << endl
+              << "This isn't permitted."
+              << endl
+              << "Exiting `set_password' unsuccessfully with return value 1." 
+              << endl;
+
+         return 1;
+
+   }  /* |else if|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "gpg_passphrase != 0" << endl
+            << "gpg_passphrase == " << gpg_passphrase << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+   if (password == 0)  /* It should be 0 at this point.  \initials{LDF 2013.09.25.}  */
+   {
+@q ****** (6) @>
+
+       password = new char[password_length];
+       memset(password, 0, password_length);
+
+       mlock(password, password_length);  /* Unlocked in |finish|.  
+                                             \initials{LDF 2013.09.27.}   */
+
+
+
+@q ****** (6) @>
+
+   }  /* |if (password == 0)|  */
+
+@q ***** (5) @>
+
+   status = decrypt(filename, 
+                    true, 
+                    password, 
+                    password_length, 
+                    "",
+                    gpg_passphrase, 
+                    '\n', 
+                    temp_strm.str());
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `set_password':" 
+            << endl
+            << "`decrypt' failed, returning " << status << "."
+            << endl 
+            << "Failed to decrypt password."
+            << endl 
+            << "Exiting `set_password' unsuccessfully with return value 1." 
+            << endl;
+       unlock_cerr_mutex();
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `set_password':" 
+            << endl
+            << "`decrypt' succeeded, returning 0."
+            << endl
+            << "Decrypted password successfully."
+            << endl
+            << "`password' == " << password 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+
+END_DECRYPT_PASSWORD:
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `set_password' successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+@q **** (4) @>
+
+}  /* End of |set_password| definition  */
+
+@q *** (3) @>
+
+
+@q ** (2) Write to FIFO (|write_to_fifo|).  @>
+
+@ Write to FIFO (|write_to_fifo|).  
+\initials{LDF 2013.09.27.}
+
+@q *** (3) @>
+
+@<|write_to_fifo| declaration@>=
+
+int
+write_to_fifo(char *buffer,
+              size_t buffer_length,
+              int fd,
+              bool write_string_length = true,
+              bool append_newline = true,
+              string thread_str = "");
+
+
+@q *** (3) @>
+@
+@<|write_to_fifo| definition@>=
+
+int
+write_to_fifo(char *buffer,
+              size_t buffer_length,
+              int fd,
+              bool write_string_length,
+              bool append_newline,
+              string thread_str)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status = 0;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `write_to_fifo'."
+            << endl;
+
+       cerr << "fd == " << fd << endl;
+       cerr << "buffer == " << buffer << endl;
+       cerr << "buffer_length == " << buffer_length << endl;
+
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+
+   errno = 0;
+
+   if (write_string_length == true)
+   {
+      status = write(fd, buffer, strlen(buffer));
+   }
+   else
+   {
+      status = write(fd, buffer, buffer_length);
+   }
+
+   if (append_newline == true)
+      write(fd, "\n", 1);  /* GPG will block until it reads a newline  */
+
+@q **** (4) @>
+ 
+   if (status == -1)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `write_to_fifo':  "
+            << "`write' failed, returning -1:"
+            << endl
+            << strerror(errno)
+            << endl
+            << "Failed to write to FIFO."
+            << endl
+            << "Exiting `write_to_fifo' unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (status == -1)|  */
+
+@q **** (4) @>
+
+   else if (status == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `write_to_fifo':  "
+            << "`write' failed, returning 0:"
+            << endl
+            << strerror(errno)
+            << endl
+            << "Failed to write to FIFO."
+            << endl
+            << "Exiting `write_to_fifo' unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (status == 0)|  */
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `write_to_fifo':  "
+            << "`write' succeeded, returning " << status << "."
+            << endl
+            << "Wrote " << status << " bytes plus one newline character to FIFO successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `write_to_fifo' successfully with return value 0."     
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+
+   return 0;
+
+@q **** (4) @>
+
+}  /* End of |write_to_fifo| definition   */
+
+@q ** (2) Verify GPG signature (|verify_gpg_signature|).  @>
+@ Verify GPG signature (|verify_gpg_signature|).
+\initials{LDF 2014.01.16.}
+
+\LOG
+\initials{LDF 2014.01.16.}
+Added this function.
+
+\initials{LDF 2014.01.21.}
+Added optional arguments |bool store_signature = false| 
+and |string *store_signature_filename= 0|.  
+Added code for writing detached signature to a file.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|verify_gpg_signature| declaration@>=
+int 
+verify_gpg_signature(MYSQL *mysql_ptr,
+                     string base_str, 
+                     string base_filename                   = "", 
+                     string detached_signature_str          = "", 
+                     string detached_signature_filename     = "", 
+                     string gpg_key_fingerprint             = "",
+                     GPG_Key_Pair_Type *return_gpg_key_pair = 0,
+                     bool store_signature                   = false,
+                     string *store_signature_filename       = 0,
+                     bool overwrite                         = false,
+                     string thread_str                      = "");
+
+@q *** (3) Definition  @>
+@
+@<|verify_gpg_signature| definition@>=
+
+int 
+verify_gpg_signature(MYSQL *mysql_ptr,
+                     string base_str, 
+                     string base_filename, 
+                     string detached_signature_str,
+                     string detached_signature_filename,
+                     string gpg_key_fingerprint,
+                     GPG_Key_Pair_Type *return_gpg_key_pair,
+                     bool store_signature,
+                     string *store_signature_filename,
+                     bool overwrite,
+                     string thread_str)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status = 0;
+   FILE *fp   = 0;
+
+   stringstream temp_strm;
+
+   char buffer[2048];
+
+   memset(buffer, 0, 2048);
+
+   string curr_key_id;
+
+   size_t pos = 0;
+
+   GPG_Key_Pair_Type gpg_key_pair;
+
+   bool create_temp_file = false;
+
+   int fd = 0;
+ 
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `verify_gpg_signature'."
+            << endl
+            << "`gpg_homedir'                 == " << gpg_homedir
+            << endl
+            << "`base_str'                    == " << base_str
+            << endl 
+            << "`base_filename'               == " << base_filename
+            << endl 
+            << "`detached_signature_str'      == " << detached_signature_str
+            << endl 
+            << "`detached_signature_filename' == " << detached_signature_filename
+            << endl 
+            << "`gpg_key_fingerprint'         == " << gpg_key_fingerprint
+            << endl 
+            << "`store_signature'             == " << store_signature
+            << endl 
+            << "`overwrite'             == " << overwrite
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+   if (   gpg_homedir.empty()
+       || (base_str.empty() && base_filename.empty()))
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `verify_gpg_signature':"
+            << endl
+            << "Either `gpg_homedir' is empty or not enough (non-empty) arguments provided:"
+            << endl 
+            << "`gpg_homedir'                 == " << gpg_homedir
+            << endl
+            << "`base_str'                    == " << base_str
+            << endl 
+            << "`base_filename'               == " << base_filename
+            << endl 
+            << "`detached_signature_str'      == " << detached_signature_str
+            << endl 
+            << "`detached_signature_filename' == " << detached_signature_filename
+            << endl 
+            << "`gpg_key_fingerprint'         == " << gpg_key_fingerprint
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if|  */
+
+@q **** (4) @>
+@
+@<|verify_gpg_signature| definition@>=
+   
+   if (!base_str.empty() && !base_filename.empty())
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "WARNING!  In `verify_gpg_signature':"
+            << endl
+            << "`base_str' and `base_filename' are both non-empty:"
+            << endl 
+            << "`base_str'      == " << base_str
+            << endl 
+            << "`base_filename' == " << base_filename
+            << endl
+            << "Setting `base_str' to the empty string.  Will use `base_filename'."
+            << endl 
+            << "Continuing."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       base_str = "";
+
+   }  /* |if|  */
+
+@q **** (4) @>
+@
+@<|verify_gpg_signature| definition@>=
+   
+   if (!detached_signature_str.empty() && !detached_signature_filename.empty())
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "WARNING!  In `verify_gpg_signature':"
+            << endl
+            << "`detached_signature_str' and `detached_signature_filename' are both non-empty:"
+            << endl 
+            << "`detached_signature_str'      == " << detached_signature_str
+            << endl 
+            << "`detached_signature_filename' == " << detached_signature_filename
+            << endl
+            << "Setting `detached_signature_str' to the empty string."
+            << endl 
+            << "Will use `detached_signature_filename'."
+            << endl 
+            << "Continuing."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       detached_signature_str = "";
+
+   }  /* |if|  */
+
+@q **** (4) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+   if (!detached_signature_str.empty() && !base_str.empty())
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "WARNING!  In `verify_gpg_signature':"
+            << endl
+            << "`detached_signature_str' and `base_str' are both non-empty:"
+            << endl 
+            << "`detached_signature_str'      == " << detached_signature_str
+            << endl 
+            << "`base_str' == " << base_str
+            << endl
+            << "GPG can't handle this case.  Must store one string in a temporary file."
+            << endl 
+            << "This case hasn't been programmed yet."
+            << endl 
+            << "Exiting function unsuccessfully with return value 2."
+            << endl;
+       unlock_cerr_mutex(); 
+   
+       return 2;
+
+   }  /* |if|  */
+
+@q **** (4) @>
+@
+@<|verify_gpg_signature| definition@>=
+ 
+   if (!detached_signature_str.empty() && !base_filename.empty())
+   {
+       temp_strm << "a=`env LANG=en_US.UTF-8 gpg --verify -vv --homedir " << gpg_homedir << " "
+                 << "- " << base_filename << " 2>&1 <<END_PGP_SIGNATURE" << endl 
+                 << detached_signature_str 
+                 << endl 
+                 << "END_PGP_SIGNATURE"
+                 << endl
+                 << "`; echo $?; echo \"$a\" | grep -e \"signature packet.*keyid\"";
+   }
+
+
+@q **** (4) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+   else if (   detached_signature_str.empty() 
+            && detached_signature_filename.empty()
+            && !base_filename.empty())
+   {
+@q ***** (5) @>
+
+       if (gpg_passphrase != 0 && strlen(gpg_passphrase) > 0)
+       {
+@q ****** (6) @>
+
+           pthread_mutex_lock(&gpg_passphrase_fifo_mutex);
+
+           status = write_to_fifo(gpg_passphrase, 
+                                  gpg_passphrase_length,
+                                  gpg_passphrase_fifo_fd);
+
+           if (status != 0)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str 
+                    << "ERROR!  In `verify_gpg_signature':  "
+                    << "`write_to_fifo' failed, returning " << status << "."
+                    << endl
+                    << "Failed to write `gpg_passphrase' to FIFO " 
+                    << "`" << gpg_passphrase_fifo_name << "'."
+                    << endl 
+                    << "Exiting function unsuccessfully with return value 1."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               pthread_mutex_unlock(&gpg_passphrase_fifo_mutex);
+
+               return 1;
+           
+
+           }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+           else if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str 
+                    << "In `verify_gpg_signature':  "
+                    << "`write_to_fifo' succeeded, returning 0."
+                    << endl
+                    << "Wrote `gpg_passphrase' to FIFO " 
+                    << "`" << gpg_passphrase_fifo_name << "' successfully."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+       }  /* |if (gpg_passphrase != 0 && strlen(gpg_passphrase) > 0)|  */
+
+@q ***** (5) @>
+
+       temp_strm << "a=`env LANG=en_US.UTF-8 gpg --batch --decrypt -vv "
+                 << "--homedir " << gpg_homedir << " ";
+
+       if (gpg_passphrase != 0 && strlen(gpg_passphrase) > 0)
+           temp_strm << "--passphrase-file '" << gpg_passphrase_fifo_name << "' ";
+
+       temp_strm << base_filename << " 2>&1 | grep -e \"signature packet.*keyid\"`;"
+                 << "echo $?; echo \"$a\"";
+
+@q ***** (5) @>
+   }
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `verify_gpg_signature':"
+            << endl
+            << "`temp_strm.str()' == " << temp_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+   errno = 0;
+   fp = popen(temp_strm.str().c_str(), "r");
+
+   if (fp == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `verify_gpg_signature':"
+            << endl
+            << "`popen' failed, returning NULL:"
+            << endl 
+            << "Failed to execute `gpg --verify' command in shell."
+            << endl;
+
+       if (errno != 0)
+          cerr << strerror(errno) << endl;
+
+       cerr << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (fp == 0)|  */
+
+
+@q **** (4) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+   status = fread(buffer, 1, 2047, fp);
+
+   if (status == 0) 
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `verify_gpg_signature':"
+            << endl
+            << "`fread' failed, returning 0:"
+            << endl 
+            << "Failed to read output of `gpg --verify' command, executed in shell."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       pclose(fp);
+
+       return 1;
+   }
+
+@q **** (4) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+   else if (status == 2047) 
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `verify_gpg_signature':"
+            << endl
+            << "`fread' returned 2047:"
+            << endl 
+            << "Output of `gpg --verify' command, executed in shell, exceeds maximum amount "
+            << "(2046 characters):"
+            << endl
+            << "`buffer' ==" 
+            << endl
+            << buffer
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       pclose(fp);
+
+       return 1;
+   }
+
+@q **** (4) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+   pclose(fp);
+   fp = 0;
+
+   temp_strm.str("");
+   temp_strm << buffer;
+
+   temp_strm.clear();
+
+   status = -1;
+
+   temp_strm >> status;
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `verify_gpg_signature':"
+            << endl
+            << "`gpg --verify' command, executed in shell, failed, returning " << status 
+            << ","
+            << endl
+            << "(or failed to store return value in `status'):"
+            << endl
+            << "`buffer' ==" 
+            << endl
+            << buffer
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `verify_gpg_signature':"
+            << endl
+            << "`gpg --verify' command, executed in shell, succeeded, returning 0:"
+            << endl
+            << "`buffer' ==" 
+            << endl
+            << buffer
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+   curr_key_id = temp_strm.str();
+
+   pos = curr_key_id.find("keyid");
+
+   if (pos == string::npos)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `verify_gpg_signature':"
+            << endl
+            << "Failed to find \"keyid\" in output of `gpg --verify' command, "
+            << "executed in shell."
+            << endl
+            << "This is not permitted."
+            << endl 
+            << "`buffer' =="
+            << endl 
+            << buffer
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }
+
+   curr_key_id.erase(0, pos + 6);
+
+   pos = curr_key_id.find("\n");
+
+   if (pos == string::npos)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `verify_gpg_signature':"
+            << endl
+            << "Failed to find newline following key id in output of `gpg --verify' command, "
+            << "executed in shell."
+            << endl
+            << "This is not permitted."
+            << endl 
+            << "`buffer' =="
+            << endl 
+            << buffer
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }
+
+   curr_key_id.erase(pos);
+
+@q **** (4) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `verify_gpg_signature':"
+            << endl 
+            << "`curr_key_id' == " << curr_key_id
+            << endl; 
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   status = gpg_key_pair.get_gpg_key_pair_from_database(mysql_ptr, 
+                                                        curr_key_id, 
+                                                        false, 
+                                                        thread_str);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `verify_gpg_signature':"
+            << endl
+            << "`GPG_Key_Pair_Type::get_gpg_key_pair_from_database' failed, returning "
+            << status << "."
+            << endl 
+            << "`curr_key_id' == " << curr_key_id
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+@q **** (4) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `verify_gpg_signature':"
+            << endl
+            << "`GPG_Key_Pair_Type::get_gpg_key_pair_from_database' succeeded, returning 0."
+            << endl;
+
+       gpg_key_pair.show("gpg_key_pair:");
+
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+   if (!gpg_key_fingerprint.empty())
+   {
+       if (gpg_key_fingerprint != gpg_key_pair.fingerprint)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `verify_gpg_signature':"
+                << endl
+                << "`gpg_key_fingerprint' is non-empty, but doesn't match "
+                << "`gpg_key_pair.fingerprint':"
+                << endl 
+                << "`gpg_key_fingerprint' == " << gpg_key_fingerprint
+                << endl 
+                << "`gpg_key_pair.fingerprint' == " << gpg_key_pair.fingerprint
+                << endl 
+                << "This is not permitted."
+                << endl 
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;
+       }
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `verify_gpg_signature':"
+                << endl
+                << "`gpg_key_fingerprint' is non-empty and matches "
+                << "`gpg_key_pair.fingerprint':"
+                << endl 
+                << "`gpg_key_fingerprint'      == " << gpg_key_fingerprint
+                << endl 
+                << "`gpg_key_pair.fingerprint' == " << gpg_key_pair.fingerprint
+                << endl
+                << "This is as it should be."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   }  /* |if (!gpg_key_fingerprint.empty())|  */
+
+@q **** (4) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `verify_gpg_signature':"
+            << endl
+            << "`gpg_key_fingerprint' is empty."
+            << endl
+            << "Not testing whether it matches "
+            << "`gpg_key_pair.fingerprint'."
+            << endl 
+            << "`gpg_key_pair.fingerprint' == " << gpg_key_pair.fingerprint
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+    if (store_signature && !detached_signature_filename.empty())
+    {
+        lock_cerr_mutex(); 
+        cerr << thread_str << "WARNING!  In `verify_gpg_signature':"
+             << endl
+             << "`store_signature' == `true', but `detached_signature_filename' is non-empty:"
+             << endl
+             << "`detached_signature_filename' == `" << detached_signature_filename << "'."
+             << endl
+             << "Detached signature already stored in file."
+             << endl;
+
+        if (store_signature_filename != 0)
+        {
+            cerr << "Setting `*store_signature_filename' to "
+                 << "`detached_signature_filename' == `" << detached_signature_filename << "'."
+                 << endl;
+        }
+
+        cerr << "Continuing."
+             << endl;
+        unlock_cerr_mutex();          
+
+        if (store_signature_filename != 0)
+            *store_signature_filename = detached_signature_filename;
+
+    }  /* |if (store_signature && !detached_signature_filename.empty())|  */
+
+@q **** (4) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+    else if (store_signature && detached_signature_str.empty())
+    {
+        lock_cerr_mutex(); 
+        cerr << thread_str << "WARNING!  In `verify_gpg_signature':"
+             << endl
+             << "`store_signature' == `true', but `detached_signature_str' is empty:"
+             << endl
+             << "No detached signature.  Can't store in file."
+             << endl;
+
+        if (store_signature_filename != 0)
+        {
+            cerr << "Setting `*store_signature_filename' to the empty string."
+                 << endl;
+        }
+
+        cerr << "Continuing."
+             << endl;
+        unlock_cerr_mutex();          
+
+        if (store_signature_filename != 0)
+            *store_signature_filename = "";
+
+    }  /* |else if (store_signature && detached_signature_str.empty())|  */
+
+@q **** (4) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+    else if (store_signature)
+    {
+@q ***** (5) @>
+
+        temp_strm.str("");
+
+        if (!base_filename.empty())
+        {
+@q ****** (6) @>
+
+           temp_strm << base_filename << ".asc";
+
+           if (overwrite == false)
+           {
+@q ******* (7) @>
+
+               errno = 0;
+               status = access(temp_strm.str().c_str(), F_OK);
+
+@q ******* (7) @>
+
+               if (status == -1 && errno == ENOENT)
+               {
+#if DEBUG_COMPILE
+                   if (DEBUG)      
+                   {
+                       lock_cerr_mutex(); 
+                       cerr << thread_str << "In `verify_gpg_signature':"
+                            << endl
+                            << "`" << temp_strm.str() << "' doesn't exist."
+                            << endl 
+                            << "Will store detached signature in file "
+                            << "`" << temp_strm.str() << "'."
+                            << endl;
+                       unlock_cerr_mutex(); 
+
+                   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+               }
+
+@q ******* (7) @>
+
+               else if (status == -1)
+               {
+
+                   lock_cerr_mutex(); 
+                   cerr << thread_str << "ERROR!  In `verify_gpg_signature':"
+                        << endl
+                        << "`access' failed, returning -1:"
+                        << endl 
+                        << strerror(errno)
+                        << endl 
+                        << "Failed to check existence of file `" << temp_strm.str() << "'."
+                        << endl 
+                        << "Exiting function unsuccessfully with return value 1."
+                        << endl;
+                   unlock_cerr_mutex(); 
+
+                   return 1;
+
+               }
+
+@q ******* (7) @>
+
+               else if (status == 0)
+               {
+                   lock_cerr_mutex(); 
+                   cerr << thread_str << "WARNING!  In `verify_gpg_signature':"
+                        << endl
+                        << "`overwrite' == `false', but `" << temp_strm.str() << "' "
+                        << "already exists."
+                        << endl 
+                        << "Will create file to store detached signature."
+                        << endl;
+                   unlock_cerr_mutex(); 
+
+                   create_temp_file = true;
+
+               }
+
+@q ******* (7) @>
+
+           }  /* |if (overwrite == false)|  */
+
+@q ****** (6) @>
+
+        }
+
+@q ***** (5) @>
+
+        else
+           create_temp_file = true;
+
+@q ***** (5) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+        if (create_temp_file)
+        {
+@q ****** (6) @>
+
+             temp_strm.str("");
+
+             if (!base_filename.empty())
+             {
+                 temp_strm << base_filename << ".XXXXXX";
+             }
+             else
+                 temp_strm << "gwirdcli.asc.XXXXXX";
+
+             char temp_filename[temp_strm.str().length() + 1];
+
+             strncpy(temp_filename, temp_strm.str().c_str(), temp_strm.str().length());
+
+             errno = 0;
+             fd = mkstemp(temp_filename);
+
+@q ****** (6) @>
+
+             if (fd == -1)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << thread_str << "ERROR!  In `verify_gpg_signature':"
+                      << endl
+                      << "`mkstemp' failed, returning -1:"
+                      << endl 
+                      << strerror(errno)
+                      << endl 
+                      << "Failed to create temporary file `" << temp_filename << "'."
+                      << endl 
+                      << "Exiting function unsuccessfully with return value 1."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+                 return 1;
+
+             }  /* |if (fd == -1)|  */
+
+#if DEBUG_COMPILE
+             else if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << thread_str << "In `verify_gpg_signature':"
+                      << endl
+                      << "`mkstemp' succeeded:"
+                      << endl 
+                      << "Created temporary file `" << temp_filename << "' successfully."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */              
+
+             temp_strm.str("");
+             temp_strm << temp_filename;
+
+             if (store_signature_filename != 0)
+                 *store_signature_filename = temp_strm.str();
+
+@q ****** (6) @>
+
+        }  /* |if (create_temp_file)|  */
+
+@q ***** (5) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+        else 
+        {
+@q ****** (6) @>
+
+
+            errno = 0;
+            fd = open(temp_strm.str().c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+
+@q ****** (6) @>
+
+            if (fd == -1)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `verify_gpg_signature':"
+                     << endl
+                     << "`open' failed, returning -1:"
+                     << endl 
+                     << strerror(errno)
+                     << endl 
+                     << "Failed to open file `" << temp_strm.str() << "' for writing."
+                     << endl 
+                     << "Exiting function unsuccessfully with return value 1."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                return 1;
+
+            }  /* |if (fd == -1)|  */
+
+@q ****** (6) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `verify_gpg_signature':"
+                     << endl
+                     << "`open' succeeded:"
+                     << endl 
+                     << "Opened file `" << temp_strm.str() << "' for writing "
+                     << "successfully."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */              
+
+@q ****** (6) @>           
+
+            if (store_signature_filename != 0)
+                *store_signature_filename = temp_strm.str();
+
+@q ****** (6) @>
+
+        }  /* |else|  */
+    
+@q ***** (5) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+        errno = 0;
+        status = write(fd, 
+                       detached_signature_str.c_str(), 
+                       detached_signature_str.length());
+
+   
+
+@q ***** (5) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+        if (status == -1)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  In `verify_gpg_signature':"
+                 << endl
+                 << "`write' failed, returning -1:"
+                 << endl 
+                 << strerror(errno)
+                 << endl 
+                 << "Failed to write to file `" << temp_strm.str() << "'."
+                 << endl 
+                 << "Exiting function unsuccessfully with return value 1."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            close(fd);
+
+            return 1;
+
+        }  /* |if (status == -1)|  */
+
+
+@q ***** (5) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+        else if (status < detached_signature_str.length())
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  In `verify_gpg_signature':"
+                 << endl
+                 << "`write' returned `status' == " << status << " "
+                 << "(< `detached_signature_str.length()' == " 
+                 << detached_signature_str.length() << ")"
+                 << endl 
+                 << "Failed to write to file `" << temp_strm.str() << "'."
+                 << endl 
+                 << "Exiting function unsuccessfully with return value 1."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            close(fd);
+
+            return 1;
+
+        }  /* |if (status < detached_signature_str.length())|  */
+
+@q ***** (5) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `verify_gpg_signature':"
+                 << endl
+                 << "`write' succeeded, returning `status' == " << status << ":"
+                 << endl 
+                 << "Wrote detached signature to temporary file `" << temp_strm.str() << "' "
+                 << "successfully."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */              
+            
+        close(fd);
+        fd = 0;
+
+@q ***** (5) @>
+
+
+    }  /* |else if (store_signature)|  */
+
+@q **** (4) @>
+@
+@<|verify_gpg_signature| definition@>=
+
+   if (return_gpg_key_pair)
+      *return_gpg_key_pair = gpg_key_pair;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `verify_gpg_signature' successfully "
+            << "with return value 0."
+            << endl; 
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |verify_gpg_signature| definition   */
+
+@q ** (2) Get Distinguished Name (|get_distinguished_name|).  @>
+
+@ Get Distinguished Name (|get_distinguished_name|).
+\initials{LDF 2014.02.26.}
+
+\LOG
+\initials{LDF 2014.02.26.}
+Added this function.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|get_distinguished_name| declaration@>=
+
+int
+get_distinguished_name(string cert_filename, 
+                       string &distinguished_name_str,
+                       string thread_str = "");
+
+@q *** (3) Definition  @>
+@
+@<|get_distinguished_name| definition@>=
+
+int
+get_distinguished_name(string cert_filename, 
+                       string &distinguished_name_str,
+                       string thread_str)
+{
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status = 0;
+
+   stringstream temp_strm;
+
+   char buffer[BUFFER_SIZE];
+   memset(buffer, 0, BUFFER_SIZE);
+
+@q **** (4) @>
+
+@ @:Kludge@> !! Kludge:  @:TODO@> !! TODO: 
+Using call to \.{certtool} via |popen| to extract information 
+from the user's X.509 certificate, if present.  It would probably be better to use the 
+GnuTLS functions for this, but I would have to look up how to do this.  I didn't find 
+what I was looking for immediately in the manual.  In addition, this package is still 
+using GnuTLS 2.4.1!  If it is ever put into production, it should be ported to the most
+recent version.
+\par
+On the other hand, using \.{certtool} may not be a bad way of extracting 
+this information, so changing this is not really urgent.
+\initials{LDF 2014.01.08.}
+
+\LOG
+\initials{LDF 2014.01.08.}
+Added this section.
+
+\initials{LDF 2014.02.21.}
+Moved this section from |client_func| to |main|.
+
+\initials{LDF 2014.02.26.}
+Moved this section from |main| (\.{gwirdcli}) to |get_distinguished_name|.
+\ENDLOG
+
+@<|get_distinguished_name| definition@>=
+
+   temp_strm << "a=`certtool --certificate-info --infile " << cert_filename
+             << " | grep -e \"^\\s-*Subject:\" | cut -f2 -d\":\" "
+             << "| tr \",\" \"/\" "
+             << "| cut -f1-6 -d\"/\"`; echo $?; echo $a";
+
+
+#if DEBUG_COMPILE
+    if (DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << thread_str << "In `get_distinguished_name':"
+             << endl
+             << "`temp_strm.str()' == " << temp_strm.str()
+             << endl;
+        unlock_cerr_mutex(); 
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|get_distinguished_name| definition@>=
+
+   errno = 0;
+   FILE *fp = popen(temp_strm.str().c_str(), "r");
+
+   if (fp == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `get_distinguished_name':"
+            << endl
+            << "`popen' failed, returning 0";
+
+       if (errno != 0)
+          cerr << ":"
+               << endl
+               << strerror(errno)
+               << endl;
+
+       cerr << "Call to `certtool' via `popen' failed."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (fp == 0)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `get_distinguished_name':"
+            << endl
+            << "`popen' succeeded."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|get_distinguished_name| definition@>=
+
+   status = fread(buffer, 1, 255, fp);
+
+   if (status == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `get_distinguished_name':"
+            << endl
+            << "`fread' failed, returning 0"
+            << "Failed to read output of call to `certtool', executed via `popen'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       pclose(fp);
+
+       return 1;
+
+   }  /* |if (fp == 0)|  */           
+
+@q ***** (5) @>
+@
+@<|get_distinguished_name| definition@>=
+
+   else if (status == 255)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `get_distinguished_name':"
+            << endl
+            << "`fread' returned 255:"
+            << endl 
+            << "Output of call to `certtool', executed via `popen', "
+            << "exceeds maximum amount (254 characters):"
+            << endl
+            << "`buffer' =="
+            << endl
+            << buffer
+            << endl 
+            << "This is not permitted.  "
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       pclose(fp);
+
+       return 1;
+
+   }  /* |if (fp == 0)|  */           
+
+@q ***** (5) @>
+@
+@<|get_distinguished_name| definition@>=
+
+#if DEBUG_COMPILE
+    else if (DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << thread_str << "In `get_distinguished_name':"
+             << endl
+             << "`fread' succeeded, returning " << status << ":"
+             << endl
+             << "`buffer' =="
+             << endl
+             << buffer
+             << endl;
+         unlock_cerr_mutex(); 
+
+    }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|get_distinguished_name| definition@>=
+
+    pclose(fp);
+    fp = 0;
+
+    temp_strm.str("");
+
+    temp_strm << buffer;
+
+    status = -1;
+
+    temp_strm >> status;
+
+    size_t pos = temp_strm.str().find("\n");
+
+    distinguished_name_str = temp_strm.str().substr(pos + 1);
+
+    distinguished_name_str.insert(0, "/");
+
+    pos = distinguished_name_str.find("\n");
+
+    if (pos != string::npos)
+       distinguished_name_str.erase(pos);
+
+#if DEBUG_COMPILE
+    if (DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread 0] " << "In `get_distinguished_name':"
+             << endl
+             << "Return value of `certtool' command, executed via `popen':"
+             << endl 
+             << "`status' == " << status
+             << endl
+             << "`distinguished_name_str' == '" << distinguished_name_str << "'"
+             << endl;
+         unlock_cerr_mutex(); 
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|get_distinguished_name| definition@>=
+
+    if (status != 0 || distinguished_name_str.empty())
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread 0] " << "ERROR!  In `get_distinguished_name':"
+             << endl
+             << "`status'   == " << status
+             << endl 
+             << "`distinguished_name_str' == " << distinguished_name_str
+             << endl 
+             << "`status' != 0 and/or `distinguished_name_str' is empty:"
+             << endl 
+             << "Call to `certtool', executed via `popen', either failed, or "
+             << "this function failed to read its output."
+             << endl
+             << "Failed to extract Distinguished Name from user certificate "
+             << "`" << cert_filenames.front() << "'."
+             << endl 
+             << "Exiting function unsuccessfully with return value 1."
+             << endl;
+        unlock_cerr_mutex(); 
+
+        distinguished_name_str = "";
+ 
+        return 1;
+ 
+
+    }  /* |if (status != 0 || distinguished_name_str.empty())|  */
+
+@q ***** (5) @>
+@
+@<|get_distinguished_name| definition@>=
+
+#if DEBUG_COMPILE
+    else if (DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << "[Thread 0] " << "In `get_distinguished_name':"
+             << endl
+             << "`status'   == 0"
+             << endl 
+             << "`distinguished_name_str' == " << distinguished_name_str
+             << endl; 
+        unlock_cerr_mutex(); 
+
+    }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|get_distinguished_name| definition@>=
+
+    return 0;
+
+}  /* |get_distinguished_name|  */
+
+
+
+
+@q ** (2) @>
+
+@q ** (2) Putting utility functions together.@>
+
+@ Putting utility functions  together.
+\initials{LDF 2008.12.05.}
+
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+@<Mutex function declarations@>@;@/
+@<|submit_mysql_query| declaration@>@;@/
+@<|submit_mysql_queries| declaration@>@;@/
+@<|get_datestamp| declaration@>@;@/
+@<|convert_seconds| declaration@>@;@/
+@<|get_seconds_since_epoch| declaration@>@;@/
+@<|convert_time_spec| declaration@>@;@/
+@<|hexl_encode| declaration@>@;@/
+@<|hexl_decode| declaration@>@;@/
+@<|initialize_signal_maps| declaration@>@;@/
+@<|set_debug_level| declaration@>@;@/
+@<|check_irods_server| declaration@>@;@/
+@<|decrypt| declaration@>@;@/
+@<|set_password| declaration@>@;@/
+@<|write_to_fifo| declaration@>@;@/
+@<|verify_gpg_signature| declaration@>@;@/
+@<|get_distinguished_name| declaration@>@;@/
+
+@<|submit_mysql_query| definition@>@;@/
+@<|submit_mysql_queries| definition@>@;@/
+@<|get_datestamp| definition@>@;@/
+@<|convert_seconds| definition@>@;@/
+@<|get_seconds_since_epoch| definition@>@;@/
+@<|convert_time_spec| definition@>@;@/
+@<|hexl_encode| definition@>@;@/
+@<|hexl_decode| definition@>@;@/
+@<|initialize_signal_maps| definition@>@;@/
+@<|set_debug_level| definition@>@;@/
+@<|check_irods_server| definition@>@;@/
+@<|decrypt| definition@>@;@/
+@<|set_password| definition@>@;@/
+@<|write_to_fifo| definition@>@;@/
+@<|verify_gpg_signature| definition@>@;@/
+@<|get_distinguished_name| definition@>@;@/
+
+
+@q *** (3) This is what's written to the header file `utilfncs.h'.  @>
+
+@ This is what's written to the header file \filename{utilfncs.h}.  
+\initials{LDF 2008.12.05.}
+
+@(utilfncs.h@>=
+#ifndef UTILFNCS_H
+#define UTILFNCS_H 1
+using namespace std;
+using namespace gwrdifpk;
+class GPG_Key_Pair_Type;
+@<Mutex function declarations@>@;@/
+@<|submit_mysql_query| declaration@>@;@/
+@<|submit_mysql_queries| declaration@>@;@/
+@<|get_datestamp| declaration@>@;@/
+@<|convert_seconds| declaration@>@;@/
+@<|get_seconds_since_epoch| declaration@>@;@/
+@<|convert_time_spec| declaration@>@;@/
+@<|hexl_encode| declaration@>@;@/
+@<|hexl_decode| declaration@>@;@/
+@<|initialize_signal_maps| declaration@>@;@/
+@<|set_debug_level| declaration@>@;@/
+@<|check_irods_server| declaration@>@;@/
+@<|decrypt| declaration@>@;@/
+@<|set_password| declaration@>@;@/
+@<|write_to_fifo| declaration@>@;@/
+@<|verify_gpg_signature| declaration@>@;@/
+@<|get_distinguished_name| declaration@>@;@/
+#endif 
+
+
+
+@q (progn (cweb-mode) (outline-minor-mode))                           @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

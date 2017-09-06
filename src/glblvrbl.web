@@ -1,0 +1,798 @@
+@q glblvrbl.web  @>
+@q Created by Laurence D. Finston (LDF) Mon Jul  2 10:44:48 CEST 2012  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q ** (2)  glblvrbl.web  @>
+@* Global variables.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this file.
+\ENDLOG
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+#include <stdlib.h>
+#include <stdio.h>
+#include <fstream>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <limits.h>
+#include <map>
+#include <string>
+#include <time.h>
+#include <math.h>
+#include <sstream>   
+#include <pthread.h>
+#include <signal.h>
+
+#if 0
+#include "glblcnst.h++"
+#endif 
+
+#include <map>
+#include <vector>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+@q * (1) Global Variables.  @>
+@ Global Variables.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this section.
+
+\initials{LDF 2012.07.02.}
+Added declarations of |pthread_mutex_t jvm_mutex|
+and |bool icommands|.  The default of the latter is |false|.
+
+\initials{LDF 2012.07.04.}
+Added declarations of |bool jargon_trunk = true| and |bool jargon_core = false|.
+
+\initials{LDF 2012.07.09.}
+Added declarations of |jclass MainTest|, |jmethodID MainTestSubMain| and
+|jmethodID MainTest_get_directory|.  They are all initialized to 0.
+
+\initials{LDF 2012.07.10.}
+Removed declarations of |jclass MainTest|, |jmethodID MainTestSubMain| and
+|jmethodID MainTest_get_directory|.
+
+\initials{LDF 2012.07.13.}
+Renamed |thread_ctr| to |global_thread_ctr|.
+
+\initials{LDF 2012.07.13.}
+Added |jmethodID IA_list_directory_contents|.
+
+\initials{LDF 2012.09.18.}
+Now initializing |bool jargon_trunk| to |false| instead of |true|.  Now using
+functions based on the i-commands per default.
+
+\initials{LDF 2012.09.19.}
+Added |string gwirdsif_hostname|.
+
+\initials{LDF 2012.09.20.}
+Added |pthread_mutex_t sql_mutex|.
+
+\initials{LDF 2012.09.21.}
+Renamed |string port_str| and |int port_num|
+to |string port_str_anon| and |int port_num_anon|, respectively.
+Added |port_str_x_509| and |port_num_x_509|.
+
+\initials{LDF 2012.11.28.}
+Added |bool irods_functions| with the default value |true|.
+
+\initials{LDF 2013.01.11.}
+Added |char admin_data[64]| and |unsigned int admin_data_length|. 
+
+\initials{LDF 2013.04.03.}
+Added |bool end_server_enabled|.  It's only used by the server program \.{gwirdsif} and
+set by the command-line option \.{--end-server-enable}.
+
+\initials{LDF 2013.04.09.}
+Added |unsigned int purge_sleep_value| with the default 86400U, i.e., 24 hours in seconds.
+
+\initials{LDF 2013.04.10.}
+Added |string socket_dir|, |string log_dir| and |string socket_path|.
+
+\initials{LDF 2013.04.18.}
+Removed |pthread_mutex_t global_variable_mutex|.  It's not needed anywhere.
+Added |pthread_mutex_t cout_mutex|.  It's needed in |rotate_log_files|.
+
+\initials{LDF 2013.04.18.}
+Added |pthread_t purge_server_thread_id|.  Formerly, it was a local variable in |main|.
+I've made it a global variable in order to be able to cancel the corresponding thread.
+
+\initials{LDF 2013.04.18.}
+Added |vector<pthread_t> id_set|.  Formerly, it was declared as a local variable
+in |listen_local|, |listen_remote_anon| and |listen_remote_X_509|.  It now needs to 
+global so that the threads referred to by its elements can be cancelled in |connect_func|.
+Added |pthread_mutex_t id_set_mutex| to protect it.
+
+\initials{LDF 2013.04.19.}
+Added |bool sleep_server_enabled| with default value |false|.
+
+\initials{LDF 2013.04.19.}
+Added |struct sigaction| variables |default_sigint_action|
+and |default_sigterm_action|.
+
+\initials{LDF 2013.04.19.}
+Changed name of |unsigned int purge_sleep_value| to |purge_interval|.
+
+\initials{LDF 2013.04.19.}
+Added |unsigned int purge_limit|.
+
+\initials{LDF 2013.04.23.}
+Replaced |set<pthread_t> id_set| with |map<unsigned int, pthread_t> thread_ctr_id_map|
+and |map<pthread_t, unsigned int> thread_id_ctr_map|.
+Renamed |pthread_mutex_t id_set_mutex| to |thread_ctr_id_map_mutex|.
+Added the following |unsigned int| variables:
+|purge_server_thread_ctr|,
+|listen_local_thread_ctr|,
+|listen_remote_anon_thread_ctr|,
+|listen_remote_X_509_thread_ctr|.  They were formerly local to |main|, but now they 
+must be global so that they may be used in signal handlers.
+
+\initials{LDF 2013.05.02.}
+Added the |bool| variables |signal_server_enabled|, |signal_client_enabled|
+and |sleep_client_enabled|.  The default for all of them is |false|.
+
+\initials{LDF 2013.05.23.}
+Added |unsigned int save_global_thread_ctr| and |bool global_thread_ctr_wrapped_around|.
+They're used for resetting |global_thread_ctr| 
+when the latter wraps around, which will never happen, unless \.{gwirdsif} runs for 
+a {\it long\/} time without being stopped.
+
+\initials{LDF 2013.06.07.}
+Added |int irods_server_pid = 0|.
+
+\initials{LDF 2013.07.04.}
+Added |string config_dir|.
+
+\initials{LDF 2013.07.10.}
+Added |bool terminate_on_end_input = true|.  It's used by \.{gwirdcli} only and
+set to |false| with the \.{--no-terminate-on-end-input} option.
+
+\initials{LDF 2013.07.11.}
+Added |string command_str|.
+
+\initials{LDF 2013.07.14.}
+Added |pthread_t purge_server_database_thread_id| 
+and |unsigned int purge_server_database_thread_ctr|.
+
+\initials{LDF 2013.07.14.}
+Added |unsigned int purge_server_database_interval = 3600U|.  3600 seconds $=$ one hour.
+Added |unsigned int purge_server_database_limit = 172800U|. 172800 seconds $=$ two days.
+
+
+\initials{LDF 2013.07.17.}
+Removed ``|_server|'' from the names of 
+|pthread_t purge_server_database_thread_id|,
+|unsigned int purge_server_database_thread_ctr|, 
+|unsigned int purge_server_database_interval|, and 
+|unsigned int purge_server_database_limit|.
+Now using these variables for the client as well.
+
+\initials{LDF 2013.07.18.}
+Added |pthread_mutex_t purge_server_database_mutex| and 
+|pthread_cond_t purge_server_database_cond|.
+
+\initials{LDF 2013.07.25.}
+Added |int global_debug_level = 0|.
+
+\initials{LDF 2013.08.08.}
+Added |unsigned int purge_irods_archive_interval|, |unsigned int purge_irods_archive_limit|,
+|unsigned int purge_irods_archive_thread_ctr| and |pthread_t purge_irods_archive_thread_id|.
+
+\initials{LDF 2013.08.12.}
+Added |pthread_mutex_t purge_irods_archive_mutex| and 
+|pthread_cond_t purge_irods_archive_cond|.
+
+\initials{LDF 2013.08.29.}
+Added |unsigned int suppress_prompt = 0U|.
+
+\initials{LDF 2013.09.24.}
+Added |string mysql_username|, |string mysql_password_filename| and
+|char *mysql_password = 0|.
+
+\initials{LDF 2013.11.21.}
+Added the following variables:
+|unsigned int purge_dc_metadata_thread_ctr|,
+|pthread_t purge_dc_metadata_thread_id|,
+|pthread_mutex_t purge_dc_metadata_mutex|,
+|pthread_cond_t  purge_dc_metadata_cond|,
+|unsigned int purge_dc_metadata_interval|
+and
+|unsigned int purge_dc_metadata_limit|.
+
+\initials{LDF 2013.11.28.}
+Added |pthread_mutex_t sql_lock_tables_mutex|.
+
+\initials{LDF 2014.01.27.}
+Added |int listen_client_port|, |string listen_client_port_str| 
+and |bool listen_client|.
+
+\initials{LDF 2014.01.30.}
+Added |unsigned int pull_request_thread_ctr|.
+
+\initials{LDF 2014.01.31.}
+Added |int pull_request_interval|.
+
+\initials{LDF 2014.02.01.}
+Added |string client_command_filename|.
+
+\initials{LDF 2014.02.14.}
+Added |string gwirdsif_ip_address|.
+
+\initials{LDF 2014.02.18.}
+Added |string gwirdcli_hostname| and |string gwirdcli_ip_address|.
+\ENDLOG 
+
+@q ** (2) Code.  @>
+
+@<Global Variables@>=
+
+    unsigned int purge_server_logs_thread_ctr     = 1;
+    unsigned int purge_database_thread_ctr        = 2;
+    unsigned int purge_irods_archive_thread_ctr   = 3;
+    unsigned int purge_dc_metadata_thread_ctr     = 4;
+
+
+    unsigned int listen_local_thread_ctr          = 4;
+    unsigned int listen_remote_anon_thread_ctr    = 5;
+    unsigned int listen_remote_X_509_thread_ctr   = 6;
+
+    unsigned int pull_request_thread_ctr          = 7;
+
+    unsigned int save_global_thread_ctr           = 8;
+
+    unsigned int global_thread_ctr                = 7; /* One less than the first 
+                                                          value used by a thread other
+                                                          than the ones named in this
+                                                          section.
+                                                          \initials{LDF 2013.05.23.}  */
+
+    bool global_thread_ctr_wrapped_around       = false;
+
+
+    pthread_mutex_t thread_ctr_id_map_mutex;
+
+    pthread_t purge_server_logs_thread_id   = static_cast<pthread_t>(0);
+    pthread_t purge_database_thread_id      = static_cast<pthread_t>(0);
+    pthread_t purge_irods_archive_thread_id = static_cast<pthread_t>(0);
+    pthread_t purge_dc_metadata_thread_id   = static_cast<pthread_t>(0);
+
+    pthread_mutex_t thread_ctr_mutex;
+    pthread_mutex_t cerr_mutex;
+    pthread_mutex_t cout_mutex;
+
+    map<unsigned int, pthread_t> thread_ctr_id_map;
+    map<pthread_t, unsigned int> thread_id_ctr_map;
+
+
+    pthread_mutex_t sql_mutex;
+    pthread_mutex_t sql_lock_tables_mutex;
+
+    pthread_mutex_t session_data_mutex;
+
+    ofstream output_file_strm;
+    ofstream log_strm;
+    ofstream err_log_strm;
+
+    pthread_mutex_t log_strm_mutex;
+    pthread_mutex_t err_log_strm_mutex;
+
+    string server_ip_address;
+    string input_filename;
+    string output_filename;
+
+    string port_str_anon;
+    string port_str_x_509;
+
+    int port_num_anon     = 0;
+    int port_num_x_509    = 0;
+
+    int listen_client_port = 0;
+    string listen_client_port_str;
+
+    int pull_request_interval = 0;
+
+    bool listen_client     = false;
+
+    bool save_temp_files = false;
+
+    map<string, string> dn_fields;
+
+    map<string, string> dn_username_map;
+
+    string DEFAULT_CERT_FILENAME;
+    string DEFAULT_KEY_FILENAME;
+    string DEFAULT_CA_FILENAME;
+    string DEFAULT_CRL_FILENAME;
+
+    string log_filename;
+    string err_log_filename;
+
+    int trace_value = 0;
+
+    bool scanner_trace = false;
+    bool parser_trace  = false;
+
+    string gwirdsif_hostname;
+    string gwirdsif_ip_address;
+
+    string gwirdcli_hostname;
+    string gwirdcli_ip_address;
+
+    bool icommands       = true;
+    bool irods_functions = false;
+    bool jargon_trunk    = false;
+    bool jargon_core     = false;
+
+    int irods_server_pid = 0;
+
+    string irods_server_dir;
+
+    string config_dir;
+
+    char admin_data[64];
+    unsigned int admin_data_length;
+
+    bool end_server_enabled = false;
+    bool sleep_server_enabled = false;
+    bool sleep_client_enabled = false;
+
+    bool signal_server_enabled = false;
+    bool signal_client_enabled = false;
+
+    unsigned int purge_logs_interval = 604800U;  /* 1 week in seconds  */
+
+    unsigned int purge_database_interval = 3600U;    /* 1 hour in seconds  */  
+    unsigned int purge_database_limit    = 172800U;  /* 2 days in seconds  */
+
+    pthread_mutex_t purge_server_database_mutex;
+    pthread_cond_t  purge_server_database_cond;
+
+    pthread_mutex_t purge_irods_archive_mutex;
+    pthread_cond_t  purge_irods_archive_cond;
+
+    unsigned int purge_irods_archive_interval = 3600U;    /* 1 hour in seconds  */  
+    unsigned int purge_irods_archive_limit    = 172800U;  /* 2 days in seconds  */
+
+    pthread_mutex_t purge_dc_metadata_mutex;
+    pthread_cond_t  purge_dc_metadata_cond;
+
+    unsigned int purge_dc_metadata_interval = 3600U;    /* 1 hour in seconds  */  
+    unsigned int purge_dc_metadata_limit    = 172800U;  /* 2 days in seconds  */
+
+    unsigned int purge_logs_limit = 14U;  /* 14 days   */
+
+    string socket_dir;
+    string log_dir;
+    string socket_path;
+
+    struct sigaction default_sigint_action;
+    struct sigaction default_sigterm_action;
+
+    bool terminate_on_end_input = true;  /* Used by gwirdcli only.
+                                            \initials{LDF 2013.07.10.}  */
+
+    string command_str;
+
+    int global_debug_level = 0;
+
+    unsigned int suppress_prompt = 0U;
+
+    string mysql_username;
+    string mysql_password_filename;
+    char *mysql_password = 0;
+
+    string client_command_filename;
+
+
+@
+\LOG
+\initials{LDF 2012.07.19.}
+Added |string homedir|, |string gwirdsif_dir| and |string gpg_homedir|.
+
+\initials{LDF 2012.07.23.}
+Added |vector <string> session_id_vector|.
+
+\initials{LDF 2012.09.20.}
+Added |string remote_hostname|, |bool remote_connection = false|.
+
+\initials{LDF 2012.09.21.}
+Added |bool anonymous = false|.
+
+\initials{LDF 2012.10.15.}
+Added |bool standalone_handle|.  It is used by the server program `gwirdsif'.
+Currently, it is set to |true| by default.
+For production use, it should be set here to |false| and the command-line option 
+\.{--standalone-handle} should be used to set it to |true|.
+
+\initials{LDF 2012.11.16.}
+Removed |vector<string> temp_file_vector|.  I've replaced it with a data member in 
+|Scan_Parse_Parameter_Type| of the same name and type.  The temporary files will be deleted 
+in the destructor for |Scan_Parse_Parameter_Type|.  This ensures that temporary files 
+that are still needed in a  running thread won't be deleted.
+
+\initials{LDF 2013.05.02.}
+Added |multimap<string, int> signal_number_map| and |map<int, string> signal_name_map|.
+@:NOTE@> !! PLEASE NOTE:  Some signal names and numbers are implementation-dependent!
+
+\initials{LDF 2013.09.19.}
+Added |char *gpg_passphrase| and |char *gpg_key_id|.
+
+\initials{LDF 2013.09.20.}
+Added |size_t gpg_passphrase_length|.
+
+\initials{LDF 2013.09.27.}
+Added |int gpg_passphrase_fifo_fd = 0| and |string gpg_passphrase_fifo_name|.
+
+\initials{LDF 2013.10.02.}
+Added |pthread_mutex_t gpg_passphrase_fifo_mutex|.
+
+\initials{LDF 2014.01.29.}
+Added |bool is_gwirdpcl|.
+\ENDLOG 
+
+@<Global Variables@>=
+
+   vector<string> cert_filenames;
+   vector<string> key_filenames;
+   vector<string> ca_filenames;   
+
+   vector<string> crl_filenames;  
+
+   string session_id;  
+
+   string homedir;
+   string gwirdsif_dir;
+   string gpg_homedir;
+
+   char *gpg_passphrase = 0;
+
+   size_t gpg_passphrase_length = 0;
+
+   char *gpg_key_id = 0;
+
+   int gpg_passphrase_fifo_fd = 0;
+   
+   string gpg_passphrase_fifo_name;
+
+   pthread_mutex_t gpg_passphrase_fifo_mutex;
+
+   vector <string> session_id_vector;
+
+   bool is_gwrdwbap = false;
+   bool is_gwirdcli = false;
+   bool is_gwirdsif = false;
+   bool is_gwirdpcl = false;
+
+   string remote_hostname;
+   bool remote_connection = false;
+   bool anonymous = false;
+
+   bool standalone_handle = true;  /* |false|.  !! Change default to |false| for
+                                      production use!  
+                                      \initials{LDF 2012.10.15.}
+                                   */
+
+   multimap<string, int> signal_number_map;
+   map<int, string> signal_name_map;
+
+
+@q ** (2) Extern declarations for global variables.  @>
+
+@ Extern declarations for global variables.  
+\initials{LDF 2012.07.02.}
+
+@<|extern| declarations for global variables@>=
+
+   extern unsigned int global_thread_ctr;
+   extern unsigned int save_global_thread_ctr;
+   extern bool global_thread_ctr_wrapped_around;
+
+   extern unsigned int purge_server_logs_thread_ctr;
+   extern unsigned int purge_database_thread_ctr;
+   extern unsigned int purge_irods_archive_thread_ctr;
+   extern unsigned int purge_dc_metadata_thread_ctr;
+
+   extern unsigned int listen_local_thread_ctr;
+   extern unsigned int listen_remote_anon_thread_ctr;
+   extern unsigned int listen_remote_X_509_thread_ctr;
+   extern unsigned int pull_request_thread_ctr;
+
+   extern pthread_t purge_server_logs_thread_id;
+   extern pthread_t purge_database_thread_id;
+   extern pthread_t purge_irods_archive_thread_id;
+   extern pthread_t purge_dc_metadata_thread_id;
+
+   extern pthread_mutex_t thread_ctr_mutex;
+   extern pthread_mutex_t sql_mutex;
+   extern pthread_mutex_t sql_lock_tables_mutex;
+
+   extern pthread_mutex_t cerr_mutex;
+   extern pthread_mutex_t cout_mutex;
+
+   extern map<unsigned int, pthread_t> thread_ctr_id_map;
+   extern map<pthread_t, unsigned int> thread_id_ctr_map;
+
+   extern pthread_mutex_t thread_ctr_id_map_mutex;
+
+   extern pthread_mutex_t session_data_mutex;
+
+   extern ofstream log_strm;
+   extern ofstream err_log_strm;
+
+   extern ofstream output_file_strm;
+
+   extern pthread_mutex_t log_strm_mutex;
+   extern pthread_mutex_t err_log_strm_mutex;
+
+   extern string server_ip_address;
+   extern string input_filename;
+   extern string output_filename;
+
+   extern string port_str_anon;
+   extern int    port_num_anon;
+
+   extern string port_str_x_509;
+   extern int    port_num_x_509;
+
+   extern int listen_client_port;
+   extern string listen_client_port_str;
+   extern bool listen_client;
+
+   extern int pull_request_interval;
+
+   extern bool save_temp_files;
+
+   extern map<string, string> dn_fields;
+
+   extern map<string, string> dn_username_map;
+
+#if 0 
+   extern string distinguished_name_str;
+#endif 
+
+   extern string DEFAULT_CERT_FILENAME;
+   extern string DEFAULT_KEY_FILENAME;
+   extern string DEFAULT_CA_FILENAME;
+   extern string DEFAULT_CRL_FILENAME;
+
+   extern string log_filename;
+   extern string err_log_filename;
+
+   extern vector<string> cert_filenames;
+   extern vector<string> key_filenames;
+   extern vector<string> ca_filenames;  
+   extern vector<string> crl_filenames;
+
+   extern string session_id; 
+
+   extern int trace_value;
+
+   extern bool scanner_trace;
+   extern bool parser_trace;
+
+   extern bool icommands;
+   extern bool irods_functions;
+   extern bool jargon_trunk;
+   extern bool jargon_core;
+
+   extern int irods_server_pid;
+
+   extern string irods_server_dir;
+
+   extern string config_dir;
+
+   extern string homedir;
+   extern string gwirdsif_dir;
+   extern string gpg_homedir;
+
+   extern char *gpg_passphrase;
+    
+   extern size_t gpg_passphrase_length;
+
+   extern char *gpg_key_id;
+
+   extern int gpg_passphrase_fifo_fd;
+   
+   extern string gpg_passphrase_fifo_name;
+
+   extern pthread_mutex_t gpg_passphrase_fifo_mutex;
+
+   extern vector <string> session_id_vector;
+
+   extern bool is_gwrdwbap;
+   extern bool is_gwirdcli;
+   extern bool is_gwirdsif;
+   extern bool is_gwirdpcl;
+
+   extern string gwirdsif_hostname;
+   extern string gwirdsif_ip_address;
+
+   extern string gwirdcli_hostname;
+   extern string gwirdcli_ip_address;
+
+   extern string remote_hostname;
+   extern bool remote_connection;
+   extern bool anonymous;
+
+   extern bool standalone_handle;
+
+   extern char admin_data[64];
+   extern unsigned int admin_data_length;
+
+   extern bool end_server_enabled;
+   extern bool sleep_server_enabled;
+   extern bool sleep_client_enabled;
+
+   extern bool signal_server_enabled;
+   extern bool signal_client_enabled;
+
+   extern unsigned int purge_logs_interval;
+   extern unsigned int purge_logs_limit;
+
+   extern unsigned int purge_database_interval;
+   extern unsigned int purge_database_limit;
+
+   extern unsigned int purge_irods_archive_interval;
+   extern unsigned int purge_irods_archive_limit;
+
+   extern unsigned int purge_dc_metadata_interval;
+   extern unsigned int purge_dc_metadata_limit;
+
+   extern pthread_mutex_t purge_server_database_mutex;
+   extern pthread_cond_t  purge_server_database_cond;
+
+   extern pthread_mutex_t purge_irods_archive_mutex;
+   extern pthread_cond_t  purge_irods_archive_cond;
+
+   extern pthread_mutex_t purge_dc_metadata_mutex;
+   extern pthread_cond_t  purge_dc_metadata_cond;
+
+   extern string socket_dir;
+   extern string log_dir;
+
+   extern string socket_path;
+
+   extern struct sigaction default_sigint_action;
+   extern struct sigaction default_sigterm_action;
+
+   extern multimap<string, int> signal_number_map;
+   extern map<int, string> signal_name_map;
+
+   extern bool terminate_on_end_input;
+
+   extern string command_str;
+
+   extern int global_debug_level;
+
+   extern unsigned int suppress_prompt;
+
+   extern string mysql_username;
+   extern string mysql_password_filename;
+   extern char *mysql_password;
+
+   extern string client_command_filename;
+
+@q * (1) Forward declarations.  @>
+@ Forward declarations.
+\initials{LDF 2012.07.02.}
+
+@<Forward declarations@>=
+
+   class Scan_Parse_Parameter_Type;
+
+@q ** (2) Putting `glblvrbl.web' together.  @>
+
+@ Putting {\tt glblvrbl\PERIOD web} together.
+
+@q *** (3) This is what's compiled.  @>
+
+This is what's compiled.  
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF Undated.}
+Now defining the preprocessor macro |_GNU_SOURCE| in the compiled code 
+and in the header file.  It's needed for |pthread_timedjoin_np|.
+\ENDLOG 
+
+@c
+@<Include files@>@;@/
+
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif 
+
+using namespace std;
+namespace gwrdifpk
+{
+@<Global Variables@>@;@/
+};
+#if 0 
+@<Forward declarations@>@;@/
+#endif 
+
+@q *** (3) This is what's written to the header file.  @>
+
+@ This is what's written to the header file.  
+\initials{LDF 2012.07.02.}
+
+@(glblvrbl.h@>=
+
+#ifndef GLBLVRBL_H
+#define GLBLVRBL_H 1
+
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif 
+
+using namespace std;
+namespace gwrdifpk
+{
+@<|extern| declarations for global variables@>@;@/
+};
+@<Forward declarations@>@;@/
+#endif 
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode) (abbrev-mode t))           @>
+
+@q * (1) Local variables for Emacs @>
+
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode: t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

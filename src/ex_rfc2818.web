@@ -1,0 +1,764 @@
+@q ex_rfc2818.web  @>
+
+@q Copied from the GNU TLS manual and adapted by  @>
+@q Laurence D. Finston (LDF) Tue Nov 17 15:22:57 CET 2009  @>
+
+@q Copied to the `gwirdifpk' package from the `dbsrvcli' package (OptiNum-Grid project) @>
+@q by Laurence D. Finston (LDF) Wed May  8 15:39:35 CEST 2013                           @>
+
+@q This example code is placed in the public domain. @>
+
+@q * (1) Example RFC 2818.  @>
+@ Example RFC 2818.
+
+@q ** (2) Include files.  @>
+@ Include files.
+\initials{LDF 2009.11.30.}
+
+@<Include files@>=
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <limits.h>
+
+#include <string>
+#include <fstream>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+
+#include <deque>
+#include <vector>
+
+#include <pthread.h>
+
+#include <mysql.h>
+
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
+
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "utilfncs.h++"
+
+#if 0 
+#include "entries.h++"
+#include "dstngnmt.h++"
+#include "glblfncs.h++"
+#endif 
+
+
+#include "x509cert.h++"
+#include "gntlsfnc.h++"
+
+@q ** (2) Verify certificate.  @>
+@ Verify certificate.
+\initials{LDF 2009.11.30.}
+
+This function will try to verify the peer's certificate, and
+also check if the hostname matches, and the activation, expiration dates.
+\initials{LDF 2009.11.30.}
+
+It is invoked in |client_connect_auth|, which is defined in \filename{cnnctcli.web}.
+\initials{LDF 2010.08.04.}
+
+\LOG
+\initials{LDF 2010.01.15.}
+Made |hostname| argument optional with default 0.
+
+\initials{LDF 2010.04.01.}
+Changed return value from |void| to |int|.
+
+\initials{LDF 2013.05.08.}
+Added optional argument |X509_Cert_Type *x509_cert_ptr = 0|.
+\ENDLOG
+
+@q *** (3) Declaration @>
+
+@<Declare |verify_certificate|@>=
+
+int
+verify_certificate (gnutls_session_t session, 
+                    X509_Cert_Type *x509_cert_ptr = 0,  
+                    const char *hostname = 0);
+
+@q *** (3) Definition @>
+@
+@<Define |verify_certificate|@>=
+
+int
+verify_certificate(gnutls_session_t session, 
+                   X509_Cert_Type *x509_cert_ptr, 
+                   const char *hostname)
+{
+@q **** (4) @>
+
+  bool DEBUG = false;  /* |true|  */
+
+  set_debug_level(DEBUG);
+
+#if DEBUG_COMPILE 
+  if (DEBUG) 
+  {
+     lock_cerr_mutex(); 
+     cerr << "*** Entering `verify_certificate'." << endl;
+     unlock_cerr_mutex(); 
+
+  } /* |if (DEBUG)| */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+  unsigned int status;
+  const gnutls_datum_t *cert_list;
+  unsigned int cert_list_size;
+  int ret;
+  gnutls_x509_crt_t cert;
+
+  char temp_str[256];
+
+  /* This verification function uses the trusted CAs in the credentials
+   * structure. So you must have installed one or more CA certificates.
+
+   LDF 2009.11.23.
+   This would seem to mean using the 
+   |gnutls_certificate_set_x509_trust_file| and |gnutls_certificate_set_x509_key_file|
+   functions.
+
+  */
+
+  ret = gnutls_certificate_verify_peers2 (session, &status);
+
+  if (ret < 0)
+  {
+
+    strcpy(temp_str, "ERROR  In `verify_certificate':\n");
+    strcat(temp_str, 
+           "`gnutls_certificate_verify_peers2' failed returning %d\n");
+  
+    lock_cerr_mutex(); 
+    fprintf(stderr, temp_str, ret);
+    fprintf(stderr, "*** Exiting `verify_certificate' unsuccessfully return value 1.\n");
+    unlock_cerr_mutex(); 
+
+    return 1;
+  }
+
+@
+\LOG
+\initials{LDF 2010.04.01.}
+Now exiting unsuccessfully when the certificate not trusted, revoked, etc.
+\ENDLOG 
+
+@<Define |verify_certificate|@>=
+
+
+  if (status & GNUTLS_CERT_INVALID)
+  {
+      lock_cerr_mutex(); 
+      fprintf(stderr, "The certificate is not trusted.\n");
+      fprintf(stderr, "*** Exiting `verify_certificate' unsuccessfully with return value 1.\n");
+      unlock_cerr_mutex(); 
+      return 1;
+  }
+#if DEBUG_COMPILE 
+  else if (DEBUG) 
+  {
+      lock_cerr_mutex(); 
+      fprintf(stderr, "The certificate is trusted.\n");
+      unlock_cerr_mutex(); 
+  }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+  if (status & GNUTLS_CERT_SIGNER_NOT_FOUND)
+  {
+      lock_cerr_mutex(); 
+      fprintf(stderr, "The certificate hasn't got a known issuer.\n");
+      fprintf(stderr, "*** Exiting `verify_certificate' unsuccessfully with return value 1.\n");
+      unlock_cerr_mutex(); 
+      return 1;
+  }
+#if DEBUG_COMPILE 
+  else if (DEBUG) 
+  {
+      lock_cerr_mutex(); 
+      fprintf(stderr, "The certificate has got a known issuer.\n");
+      unlock_cerr_mutex(); 
+  }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+  if (status & GNUTLS_CERT_REVOKED)
+  {
+      lock_cerr_mutex(); 
+      fprintf(stderr, "The certificate has been revoked.\n");
+      fprintf(stderr, "*** Exiting `verify_certificate' unsuccessfully with return value 1.\n");
+      unlock_cerr_mutex(); 
+      return 1;
+  }
+#if DEBUG_COMPILE 
+  else if (DEBUG) 
+  {
+      lock_cerr_mutex(); 
+      fprintf(stderr, "The certificate hasn't been revoked.\n");
+      unlock_cerr_mutex(); 
+  }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@
+@<Define |verify_certificate|@>=
+
+
+  /* Up to here the process is the same for X.509 certificates and
+   * OpenPGP keys. From now on X.509 certificates are assumed. This can
+   * be easily extended to work with openpgp keys as well.
+   */
+
+  if (gnutls_certificate_type_get (session) != GNUTLS_CRT_X509)
+  {
+    lock_cerr_mutex(); 
+    fprintf(stderr, "`gnutls_certificate_type_get (session)' != GNUTLS_CRT_X509\n");
+    fprintf(stderr, "*** Exiting `verify_certificate' unsuccessfully with return value 1.\n");
+    unlock_cerr_mutex(); 
+    return 1;
+  }
+
+  if (gnutls_x509_crt_init (&cert) < 0)
+  {
+      lock_cerr_mutex(); 
+      fprintf(stderr, "ERROR  In `verify_certificate':  Error in initialization\n");
+      fprintf(stderr, "*** Exiting `verify_certificate' unsuccessfully with return value 1.\n");
+      unlock_cerr_mutex(); 
+      return 1;
+  }
+
+  cert_list = gnutls_certificate_get_peers (session, &cert_list_size);
+
+  if (cert_list == NULL)
+    {
+      lock_cerr_mutex(); 
+      fprintf(stderr, "ERROR  In `verify_certificate':  No certificate was found!\n");
+      fprintf(stderr, "*** Exiting `verify_certificate' unsuccessfully with return value 1.\n");
+      unlock_cerr_mutex(); 
+
+      gnutls_x509_crt_deinit(cert);
+
+      return 1;
+    }
+#if DEBUG_COMPILE 
+  else if (DEBUG) 
+  {
+      lock_cerr_mutex(); 
+      fprintf(stderr, "In `verify_certificate':  Certificate was found.\n");
+      unlock_cerr_mutex(); 
+  }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+  if (gnutls_x509_crt_import (cert, &cert_list[0], GNUTLS_X509_FMT_DER) < 0)
+    {
+      lock_cerr_mutex(); 
+      fprintf(stderr, "ERROR  In `verify_certificate':  error parsing certificate\n");
+      fprintf(stderr, "*** Exiting `verify_certificate' unsuccessfully with return value 1.\n");
+      unlock_cerr_mutex(); 
+
+      gnutls_x509_crt_deinit(cert);
+
+      return 1;
+    }
+#if DEBUG_COMPILE 
+  else if (DEBUG) 
+  {
+      lock_cerr_mutex(); 
+      fprintf(stderr, "Parsed certificate successfully\n");
+      unlock_cerr_mutex(); 
+  }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<Define |verify_certificate|@>=
+
+  time_t temp_val = gnutls_x509_crt_get_expiration_time(cert);
+
+  if (temp_val == static_cast<time_t>(-1))
+  {
+      lock_cerr_mutex(); 
+      cerr << "ERROR!  `In verify_certificate':  `gnutls_x509_crt_get_expiration_time' "
+           << "failed, returning `(time_t) -1.'."
+           << endl 
+           << "Exiting `verify_certificate' unsuccessfully with return value 1."
+           << endl;
+      unlock_cerr_mutex(); 
+
+      gnutls_x509_crt_deinit(cert);
+
+      return 1;
+
+  }  /* |if (temp_val == static_cast<time_t>(-1))|  */
+
+/* !! TODO:  LDF 2013.05.15.  Maybe return different values, depending on
+   what error occurs.  In particular, maybe return different values if 
+   cert. is expired or not yet activated.  Possibly, I could pass an argument 
+   to store this info.
+ */
+
+  else if (temp_val < time (0))
+  {
+    lock_cerr_mutex(); 
+    cerr << "WARNING!  In `verify_certificate':  Certificate expired."
+         << endl 
+         << "Exiting function unsuccessfully with return value 1."
+         << endl;
+    unlock_cerr_mutex(); 
+
+    gnutls_x509_crt_deinit(cert);
+
+    return 1;
+  }
+#if DEBUG_COMPILE 
+  else if (DEBUG) 
+  {
+      lock_cerr_mutex(); 
+      cerr << "The certificate hasn't expired."
+           << endl;
+      unlock_cerr_mutex(); 
+  }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q **** (4) @>
+@
+@<Define |verify_certificate|@>=
+
+  temp_val = gnutls_x509_crt_get_activation_time(cert);
+
+  if (temp_val == static_cast<time_t>(-1))
+  {
+      lock_cerr_mutex(); 
+      cerr << "ERROR!  `In verify_certificate':  `gnutls_x509_crt_get_activation_time' "
+           << "failed, returning `(time_t) -1.'."
+           << endl 
+           << "Exiting `verify_certificate' unsuccessfully with return value 1."
+           << endl;
+      unlock_cerr_mutex(); 
+
+      gnutls_x509_crt_deinit(cert);
+
+      return 1;
+
+  }  /* |if (temp_val == static_cast<time_t>(-1))|  */
+
+  else if (temp_val > time (0))
+  {
+    lock_cerr_mutex(); 
+    cerr << "WARNING!  In `verify_certificate':  Certificate not activated yet."
+         << endl 
+         << "Exiting function unsuccessfully with return value 1."
+         << endl;
+    unlock_cerr_mutex(); 
+
+    gnutls_x509_crt_deinit(cert);
+
+    return 1;
+  }
+#if DEBUG_COMPILE 
+  else if (DEBUG) 
+  {
+      lock_cerr_mutex(); 
+      cerr << "The certificate has been activated."
+           << endl;
+      unlock_cerr_mutex(); 
+  }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q **** (4) @>
+@ !! TODO: \initials{LDF 2009.12.08.}  Maybe use this to test whether the owner of the 
+server's certificate is who we think it is.
+\initials{LDF 2009.12.08.}
+
+\LOG
+\initials{LDF 2009.12.08.}
+Commented-out.  Later, this code may be useful.  See ``TODO'' note above.
+\ENDLOG 
+
+@<Define |verify_certificate|@>=
+
+#if 0 
+  if (hostname && !gnutls_x509_crt_check_hostname (cert, hostname))
+    {
+      lock_cerr_mutex(); 
+      fprintf(stderr, "The certificate's owner does not match hostname '%s'\n",
+	      hostname);
+      fprintf(stderr, "*** Exiting `verify_certificate' unsuccessfully with return value 1.\n");
+      unlock_cerr_mutex(); 
+
+      gnutls_x509_crt_deinit(cert);
+
+      return 1;
+    }
+   else
+   {
+      lock_cerr_mutex(); 
+      fprintf(stderr, "The certificate's owner matches hostname '%s'\n", hostname);
+      unlock_cerr_mutex(); 
+   }
+
+#endif 
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2013.05.08.}
+Added this section.
+\ENDLOG
+
+@<Define |verify_certificate|@>=
+
+   if (x509_cert_ptr != 0)
+   {
+@q ***** (5) @>
+
+      char serial[40];
+      size_t size;
+      size = sizeof(serial);  
+
+      status = gnutls_x509_crt_get_serial(cert, serial, &size);
+
+      if (status != GNUTLS_E_SUCCESS)
+      {
+          lock_cerr_mutex();   
+          cerr << "ERROR!  In `verify_certificate':  "
+               << "`gnutls_x509_crt_get_serial' failed, returning " << status << ":"
+               << endl 
+               << gnutls_strerror(status)
+               << endl
+               << "Failed to obtain serial number of user certificate."
+               << endl
+               << "Exiting function unsuccessfully with return value 1."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          gnutls_x509_crt_deinit(cert);
+
+          return 1;
+
+
+      }  /* |if (status != GNUTLS_E_SUCCESS)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE 
+      if (DEBUG)
+      {
+          lock_cerr_mutex();   
+          cerr << "In `verify_certificate':  "  
+               << "`gnutls_x509_crt_get_serial' returned " << status << "."
+               << endl 
+               << "Subject certificate serial number: " 
+               << bin2hex(serial, size)
+               << endl
+               << "`size' == " << size
+               << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<Define |verify_certificate|@>=
+
+      unsigned long int temp_uint;
+
+      errno = 0;
+      temp_uint = strtoul(bin2hex(serial, size), 0, 16);
+
+      if (temp_uint == ULONG_MAX)
+      {
+          lock_cerr_mutex();   
+          cerr << "ERROR!  In `verify_certificate':  "
+               << "`strtoul' failed, returning `ULONG_MAX':"
+               << endl 
+               << strerror(errno)
+               << endl
+               << "Failed to convert serial number of user certificate to unsigned long integer."
+               << endl
+               << "Exiting function unsuccessfully with return value 1."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          gnutls_x509_crt_deinit(cert);
+
+          return 1;
+
+      }  /* |if (temp_uint == ULONG_MAX)|  */
+
+@q ***** (5) @>
+
+      x509_cert_ptr->serialNumber = temp_uint;
+
+#if DEBUG_COMPILE 
+      if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          cerr << "In `verify_certificate_chain':  `x509_cert_ptr->serialNumber' == hex " 
+               << hex << x509_cert_ptr->serialNumber << " "
+               << "decimal " << dec << x509_cert_ptr->serialNumber
+               << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) Get validity dates for |x509_cert_ptr|.  @>
+
+@ Get validity dates for |x509_cert_ptr|.
+\initials{LDF 2013.05.10.}
+
+@<Define |verify_certificate|@>=
+
+      time_t t;
+      char outstr[200];
+      struct tm tmp;
+      struct tm* tmp_ptr = &tmp;
+
+@q ****** (6) Activation.  (Validity_notBefore) for |x509_cert_ptr|.  @>
+
+@ Activation.  (|Validity_notBefore|) for |x509_cert_ptr|.
+\initials{LDF 2013.05.10.}
+
+@<Define |verify_certificate|@>=
+
+      t = gnutls_x509_crt_get_activation_time(cert);
+
+      if (t == static_cast<time_t>(-1))
+      {
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `verify_certificate':"
+                << endl
+                << "`gnutls_x509_crt_get_activation_time' failed, returning `(time_t) -1'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+                 
+           gnutls_x509_crt_deinit(cert);
+
+           return 1;
+
+      }  /* |if (t == static_cast<time_t>(-1))|  */
+
+      x509_cert_ptr->Validity_notBefore = t;
+
+@q ****** (6) @>
+
+      errno = 0;
+      gmtime_r(&t, tmp_ptr);
+
+      if (tmp_ptr == 0) 
+      {
+          lock_cerr_mutex(); 
+          cerr << "ERROR!  In `verify_certificate':  `gmtime_r' failed, "
+               << "returning NULL:"
+               << endl
+               << strerror(errno)
+               << endl 
+               << "Exiting function unsuccessfully with return value 1."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          gnutls_x509_crt_deinit(cert);
+
+          return 1;
+          
+      }  /* |if (tmp_ptr == 0) |  */
+
+      if (strftime(outstr, sizeof(outstr), "%Y-%m-%d %H:%M:%S UTC", tmp_ptr) == 0) 
+      {
+          lock_cerr_mutex(); 
+          cerr << "ERROR!  In `verify_certificate':  `strftime' returned 0."
+               << endl
+               << "Exiting function unsuccessfully with return value 1."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          gnutls_x509_crt_deinit(cert);
+
+          return 1;
+
+      }
+#if DEBUG_COMPILE 
+      else if (DEBUG) 
+      {
+         lock_cerr_mutex(); 
+         cerr << "In `verify_certificate':  Activation time is \""
+              << outstr << "\"" << endl;
+         unlock_cerr_mutex(); 
+      }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) Expiration.  (Validity_notAfter) for |user_cert|. @>
+
+@ Expiration.  (|Validity_notAfter|) for |user_cert|. 
+\initials{LDF 2013.05.10.}
+
+@<Define |verify_certificate|@>=
+
+      tmp_ptr = &tmp;
+
+      t = gnutls_x509_crt_get_expiration_time(cert);
+
+      if (t == static_cast<time_t>(-1))
+      {
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `verify_certificate_chain':"
+                << endl
+                << "`gnutls_x509_crt_get_expiration_time' failed, returning `(time_t) -1'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+                 
+           gnutls_x509_crt_deinit(cert);
+
+           return 1;
+      }
+
+      x509_cert_ptr->Validity_notAfter = t;
+
+@q ****** (6) @>
+
+      errno = 0;
+      gmtime_r(&t, tmp_ptr);
+
+      if (tmp_ptr == 0) 
+      {
+          lock_cerr_mutex(); 
+          cerr << "ERROR!  In `verify_certificate':  `gmtime_r' failed, "
+               << "returning NULL:"
+               << endl
+               << strerror(errno)
+               << endl 
+               << "Exiting function unsuccessfully with return value 1."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          gnutls_x509_crt_deinit(cert);
+
+          return 1;
+          
+      }  /* |if (tmp_ptr == 0) |  */
+
+      if (strftime(outstr, sizeof(outstr), "%Y-%m-%d %H:%M:%S UTC", tmp_ptr) == 0) 
+      {
+          lock_cerr_mutex(); 
+          cerr << "ERROR!  In `verify_certificate':  `strftime' returned 0."
+               << endl
+               << "Exiting function unsuccessfully with return value 1."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          gnutls_x509_crt_deinit(cert);
+
+          return 1;
+
+      }
+#if DEBUG_COMPILE 
+      else if (DEBUG) 
+      {
+         lock_cerr_mutex(); 
+         cerr << "In `verify_certificate':  Expiration time is \""
+              << outstr << "\"" << endl;
+         unlock_cerr_mutex(); 
+      }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<Define |verify_certificate|@>=
+
+      status = extract_dn_fields(cert, x509_cert_ptr);
+
+      if (status != 0)
+      {
+          lock_cerr_mutex(); 
+          cerr << "ERROR!  In `verify_certificate':  `extract_dn_fields' failed, returning "
+               << status << "."
+               << endl
+               << "Exiting function unsuccessfully with return value 1."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          gnutls_x509_crt_deinit(cert);
+
+          return 1;
+
+      }  /* |if (status != 0)|  */
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `verify_certificate':  `extract_dn_fields' succeeded, returning 0."
+            << endl;
+       x509_cert_ptr->show();
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+     
+@q ***** (5) @>
+
+
+   }  /* |if (x509_cert_ptr != 0)|  */
+
+
+
+
+@q **** (4) @>
+@
+@<Define |verify_certificate|@>=
+
+  gnutls_x509_crt_deinit (cert);
+
+#if DEBUG_COMPILE 
+  if (DEBUG)
+  {
+     lock_cerr_mutex(); 
+     fprintf(stderr, "Verification succeeded\n");
+     fprintf(stderr, "*** Exiting `verify_certificate' successfully with return value 0.\n");
+     unlock_cerr_mutex(); 
+
+  }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+  return 0;
+
+}  /* End of |verify_certificate| definition  */
+
+@q ** (2) This is what's compiled.@>
+@ This is what's compiled.
+\initials{LDF 2009.11.30.}
+
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+@<Declare |verify_certificate|@>@;@/
+@<Define |verify_certificate|@>@;@/
+
+@q ** (2) This is what's written to the header file `ex_rfc2818.h'.@>
+
+@ This is what's written to the header file \filename{ex\_rfc2818.h}.
+
+@(ex_rfc2818.h@>=
+#ifndef EX_RFC2818_H
+#define EX_RFC2818_H 1
+@<Declare |verify_certificate|@>@;@/
+#endif 

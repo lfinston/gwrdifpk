@@ -1,0 +1,738 @@
+@q lstnrmta.web  @>
+@q Created by Laurence D. Finston (LDF) Wed Sep 19 17:51:09 CEST 2012  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+@q ** (2)  lstnrmta.web  @>
+@* Listen function for remote connections.
+\initials{LDF 2012.09.19.}
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <math.h>
+#include <pwd.h>
+#include <grp.h>
+#include <dirent.h>
+
+
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/un.h>
+#include <sys/wait.h>
+#include <time.h>
+#include <unistd.h>
+
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <netinet/in.h>
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+#include <expat.h>
+
+#include <string>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <stdarg.h>
+#include <limits.h>
+#include <algorithm>
+#include <fstream>
+#include <iterator>
+#include <time.h>
+#include <math.h>
+#include <sstream>   
+
+#include <map>
+#include <vector>
+#include <deque>
+#include <stack>
+#include <set>
+
+#include <pthread.h>
+
+#if HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#include <mysql.h>
+
+#undef NAME_LEN
+#undef LOCAL_HOST
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "parser.h++"  
+#include "scanner.h++"
+#include "rspnstp.h++" 
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+#include "connect.h++"
+
+@q ** (2) |listen_remote_anon|  @>
+@ |listen_remote_anon|.
+\initials{LDF 2012.09.19.}
+
+\LOG
+\initials{LDF 2012.09.19.}
+Added this function.  
+\ENDLOG
+
+@q *** (3) Declaration @>
+
+@<|listen_remote_anon| declaration@>=
+void*
+listen_remote_anon(void *v);
+
+@q *** (3) Definition @>
+@
+@<|listen_remote_anon| definition@>=
+void*
+listen_remote_anon(void *v)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+   int status = 0;
+
+   int listen_remote_anon_thread_ctr = *static_cast<int*>(v);
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdsif] [Thread " << listen_remote_anon_thread_ctr << "] "
+            << "Entering `listen_remote_anon'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|listen_remote_anon| definition@>=
+
+  int err, listen_sd, i;
+  int ret;
+  struct sockaddr_in sa_serv;
+  struct sockaddr_in sa_cli;
+  int client_len;
+  char topbuf[512];
+  int optval = 1;
+
+  gnutls_anon_allocate_server_credentials (&anoncred);
+
+  generate_dh_params ();
+
+  gnutls_anon_set_server_dh_params (anoncred, dh_params);
+
+  /* Socket operations   */
+
+  errno = 0;
+  listen_sd = socket (AF_INET, SOCK_STREAM, 0);
+
+  if (listen_sd == -1)
+  {
+      lock_cerr_mutex(); 
+      cerr << "[gwirdsif] [Thread " << listen_remote_anon_thread_ctr << "]"
+           << endl 
+           << "ERROR!  In `listen_remote_anon':  `socket' failed, returning -1:"
+           << endl 
+           << strerror(errno) << endl
+           << "Exiting thread function unsuccessfully with return value 0."
+           << endl;
+      unlock_cerr_mutex(); 
+      pthread_exit(0);
+  }
+
+  memset (&sa_serv, '\0', sizeof (sa_serv));
+  sa_serv.sin_family = AF_INET;
+  sa_serv.sin_addr.s_addr = INADDR_ANY;
+  sa_serv.sin_port = htons (port_num_anon);	/* Server Port number */
+
+  setsockopt (listen_sd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof (int));
+
+  errno = 0;
+  status = bind (listen_sd, (SA *) & sa_serv, sizeof (sa_serv));
+
+  if (status == -1)
+  {
+      lock_cerr_mutex(); 
+      cerr << "[gwirdsif] [Thread " << listen_remote_anon_thread_ctr << "]"
+           << endl 
+           << "ERROR!  In `listen_remote_anon':  `bind' failed, returning -1:"
+           << endl 
+           << strerror(errno) << endl
+           << "Exiting thread function unsuccessfully with return value 0."
+           << endl;
+      unlock_cerr_mutex(); 
+
+      close(listen_sd);
+
+      pthread_exit(0);
+  }
+
+  errno = 0;
+  status = listen (listen_sd, 1024);
+
+  if (status == -1)
+  {
+      lock_cerr_mutex(); 
+      cerr << "[gwirdsif] [Thread " << listen_remote_anon_thread_ctr << "]"
+           << endl 
+           << "ERROR!  In `listen_remote_anon':  `listen' failed, returning -1:"
+           << endl 
+           << strerror(errno) << endl
+           << "Exiting thread function unsuccessfully with return value 0."
+           << endl;
+      unlock_cerr_mutex(); 
+
+      close(listen_sd);
+
+      pthread_exit(0);
+  }
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdsif] [Thread " << listen_remote_anon_thread_ctr << "]"
+            << endl 
+            << "In `listen_remote_anon':  Server ready. Listening to port " 
+            << port_num_anon << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+  client_len = sizeof (sa_cli);
+
+@q **** (4) Main accept loop.  @>
+
+@ Main accept loop.
+\initials{LDF 2012.09.20.}
+
+@<|listen_remote_anon| definition@>=
+
+  stringstream temp_strm;
+
+  temp_strm << "[Thread " << listen_remote_anon_thread_ctr << "]  "
+            << "In `listen_remote_anon':   Server ready. Listening to port " 
+            << port_num_anon << "."
+            << endl;
+
+  lock_cout_mutex(); 
+  lock_cerr_mutex(); 
+  cout << temp_strm.str();
+  unlock_cerr_mutex(); 
+  unlock_cout_mutex(); 
+
+  temp_strm.str("");  
+
+  Scan_Parse_Parameter_Type *param = 0;
+
+  pthread_attr_t attr;
+
+  pthread_attr_init(&attr);
+  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+
+  pthread_t id = 0UL;
+
+  for (;;)
+  {
+@q ***** (5) @>
+
+      param = 0;        
+
+      id = 0UL;
+
+      try 
+      {
+#if DEBUG_COMPILE
+           if (DEBUG) 
+           {
+               lock_cerr_mutex(); 
+               cerr << "[gwirdsif] [Thread " << listen_remote_anon_thread_ctr 
+                    << "] [Thread " << listen_remote_anon_thread_ctr << "] "
+                    << "In `listen_remote_anon':  Creating new `Scan_Parse_Parameter_Type' object."
+                    << endl;
+               unlock_cerr_mutex();                
+
+           }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */  
+
+           param = new Scan_Parse_Parameter_Type;
+           param->connection_type = Scan_Parse_Parameter_Type::ANON_AUTH_TYPE;
+
+      }  /* |try|  */
+ 
+      catch (Initialize_Exception_Type)  /* Currently, the 
+                                            |Scan_Parse_Parameter_Type| constructor
+                                            doesn't throw any other exceptions.
+                                            \initials{LDF 2012.07.13.}  */
+      {
+          lock_cerr_mutex(); 
+          cerr << "[gwirdsif] [Thread " << listen_remote_anon_thread_ctr 
+               << "] ERROR!  In `listen_remote_anon':  "
+               << "The `Scan_Parse_Parameter_Type' constructor "
+               << "failed, throwing exception `Initialize_Exception_Type'."
+               << endl
+               << "Failed to create `Scan_Parse_Parameter_Type' object."
+               << endl 
+               << "Exiting thread function `listen_remote_anon' unsuccessfully "
+               << "with exit status 0."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          close(listen_sd);
+          pthread_exit(0);
+
+      }  /* |catch|  */
+       
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+         lock_cerr_mutex(); 
+         cerr << "[gwirdsif] [Thread " << listen_remote_anon_thread_ctr 
+              << "] In `listen_remote_anon':  "
+              << "Finished creating new `Scan_Parse_Parameter_Type' object."
+              << endl;
+         unlock_cerr_mutex(); 
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+      param->session = initialize_tls_session ();
+
+      /* BUG FIX:  Added cast of |&client_len| argument to |socklen_t*|.
+         The way it was before is only a bug when compiling with a \CPLUSPLUS/ compiler.
+         LDF 2010.02.03.  */
+
+
+#if DEBUG_COMPILE
+      if (DEBUG) 
+      {
+          lock_cerr_mutex(); 
+          cerr << "[gwirdsif] [Thread " << listen_remote_anon_thread_ctr 
+               << "] In `listen_remote_anon':  Waiting for a connection...\n";
+          unlock_cerr_mutex(); 
+      }
+#endif  /* |DEBUG_COMPILE|  */  
+
+      param->sock = accept (listen_sd, (SA *) &sa_cli, (socklen_t*) &client_len);
+
+      lock_cout_mutex();
+      lock_cerr_mutex(); 
+      cout << "[gwirdsif] [Thread " << listen_remote_anon_thread_ctr << "]"
+           << endl 
+           << "In `listen_remote_anon':  Connection from "
+           << inet_ntop (AF_INET, &sa_cli.sin_addr, topbuf, sizeof (topbuf))
+           << ", port " << ntohs (sa_cli.sin_port) << "." 
+           << endl;
+      unlock_cerr_mutex(); 
+      unlock_cout_mutex();
+
+      gnutls_transport_set_ptr (param->session, 
+                                reinterpret_cast<gnutls_transport_ptr_t>(param->sock));
+      ret = gnutls_handshake (param->session);
+
+      if (ret < 0)
+      {
+          lock_cerr_mutex(); 
+          cerr << "[gwirdsif] [Thread " << listen_remote_anon_thread_ctr 
+               << "] ERROR!  In `listen_remote_anon':"
+               << endl 
+               << "`gnutls_handshake' failed, returning " << ret << ":"
+               << endl
+               << gnutls_strerror (ret)
+               << endl
+               << "Can't connect.  Continuing."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          delete param;
+          param = 0;
+
+	  continue;
+      }
+      
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          lock_cerr_mutex();
+          cerr << "[gwirdsif] [Thread " << listen_remote_anon_thread_ctr 
+               << "] In `listen_remote_anon':"
+               << endl  
+               << "Handshake was completed." << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ***** (5) @>
+@    
+
+@:TODO@> !! TODO:  Test this!  This will not be easy to test.  Some maximum value much less than
+|UINT_MAX| will have to be used and multiple threads will have to be started and kept running.
+@:NOTE@> !! PLEASE NOTE:  The other ``listen'' functions |listen_local| and |listen_remote_X_509|
+contain (nearly) identical code.  It will have to be tested with all three functions!
+\initials{LDF 2013.05.23.}
+
+\LOG
+\initials{LDF 2013.05.23.}
+Added code for setting |global_thread_ctr| after it has wrapped around.
+This should never happen, unless \.{gwirdsif} runs for a {\it long\/} time without 
+being stopped.
+\ENDLOG 
+
+@<|listen_remote_anon| definition@>=
+      
+      pthread_mutex_lock(&thread_ctr_mutex);
+
+      param->thread_ctr = 0;
+
+      if (global_thread_ctr_wrapped_around == false)
+      {
+          param->thread_ctr = ++global_thread_ctr;
+          
+          if (global_thread_ctr == UINT_MAX)
+          {
+               global_thread_ctr_wrapped_around == true;
+               global_thread_ctr = save_global_thread_ctr;
+          }
+      }
+
+@q ***** (5) @>
+@
+@<|listen_remote_anon| definition@>=
+
+      else
+      {
+@q ****** (6) @>
+
+           map<unsigned int, pthread_t>::iterator iter;
+
+           for (int i = global_thread_ctr; i <= UINT_MAX; ++i)
+           {
+               iter = thread_ctr_id_map.find(i);
+
+               if (iter == thread_ctr_id_map.end())
+               {
+                   param->thread_ctr = i;
+
+                   if (i == UINT_MAX)
+                      global_thread_ctr = save_global_thread_ctr;
+                   else
+                      global_thread_ctr = i + i;   
+                   
+ 
+                   break;
+               }
+                  
+           }  /* |for|  */
+
+@q ****** (6) @>
+
+           if (param->thread_ctr == 0)  
+           {
+               /* Try again once more from the beginning. 
+                  \initials{LDF 2013.05.23.}  */
+
+               for (unsigned int i = save_global_thread_ctr; 
+                    i <= UINT_MAX; 
+                    ++i)
+               {
+                  iter = thread_ctr_id_map.find(i);
+
+                  if (iter == thread_ctr_id_map.end())
+                  {
+ 
+                      param->thread_ctr = i;
+
+                      if (i == UINT_MAX)
+                         global_thread_ctr = save_global_thread_ctr;
+                      else
+                         global_thread_ctr = i + i;   
+
+                     break;
+                  }
+                  
+               }
+
+           }  /* |if|  */
+
+@q ****** (6) @>
+
+           if (param->thread_ctr == 0)  
+           {
+
+               /* If we still couldn't set |param->thread_ctr|, we quit.
+                  \initials{LDF 2013.05.23.}  */
+
+               lock_cerr_mutex();
+               cerr << "[gwirdsif] [Thread " << listen_remote_anon_thread_ctr 
+                    << "] ERROR!  In `listen_remote_anon':  Failed to set `param->thread_ctr'."
+                    << endl
+                    << "Exiting thread unsuccessfully with return value 0."
+                    << endl;
+               unlock_cerr_mutex();  
+
+               pthread_mutex_unlock(&thread_ctr_mutex);
+
+               delete param;
+               param = 0;
+
+               close(listen_sd);
+
+               pthread_exit(0);
+
+           }
+
+@q ****** (6) @>
+
+      } /* |else|  */
+
+      pthread_mutex_unlock(&thread_ctr_mutex);
+
+@q ***** (5) @>
+@
+@<|listen_remote_anon| definition@>=
+
+
+
+      lock_cerr_mutex(); 
+      cerr << "[gwirdsif] [Thread " << listen_remote_anon_thread_ctr << "] "
+           << "In `listen_remote_anon':  "
+           << "Calling `connect_func' via `pthread_create'."
+           << endl;
+      unlock_cerr_mutex(); 
+
+      param->remote_connection = true;
+
+      status = pthread_create(&id,
+                              &attr, /* Attribute  */
+                              connect_func, 
+                              static_cast<void*>(param));
+
+      thread_ctr_id_map[param->thread_ctr] = id;
+      thread_id_ctr_map[id]                = param->thread_ctr;
+
+      lock_cerr_mutex(); 
+      cerr << "[gwirdsif] [Thread " << listen_remote_anon_thread_ctr << "] "
+           << "In `listen_remote_anon':  "
+           << "`pthread_create' returned " << status << "." 
+           << endl;
+      unlock_cerr_mutex(); 
+
+    }  /* |for|  */
+
+
+@q **** (4) Exit.  This code will never be reached in normal operation.  @>
+
+@ Exit.  This code will never be reached in normal operation.
+\initials{LDF 2012.09.20.}
+
+@<|listen_remote_anon| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdsif] [Thread " << listen_remote_anon_thread_ctr << "] "
+            << "Exiting thread function `listen_remote_anon' successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   close (listen_sd);  /* Will normally never be reached.  \initials{LDF 2012.09.20.}  */
+
+   pthread_exit(0);  
+
+}  /* End of |listen_remote_anon| definition  */
+
+@q **** (4) @>
+@
+@<|initialize_tls_session| declaration@>=
+gnutls_session_t
+initialize_tls_session (void);
+
+@
+@<|initialize_tls_session| definition@>=
+
+gnutls_session_t
+initialize_tls_session (void)
+{
+  gnutls_session_t session;
+
+  gnutls_init (&session, GNUTLS_SERVER);
+
+  gnutls_priority_set_direct (session, "NORMAL:+ANON-DH", NULL);
+
+  gnutls_credentials_set (session, GNUTLS_CRD_ANON, anoncred);
+
+  gnutls_dh_set_prime_bits (session, DH_BITS);
+
+  return session;
+}
+
+@q **** (4) @>
+@
+@<|generate_dh_params| declaration@>=
+static int
+generate_dh_params (void);
+
+@
+@<|generate_dh_params| definition@>=
+
+int
+generate_dh_params (void)
+{
+
+  /* Generate Diffie Hellman parameters - for use with DHE
+   * kx algorithms. These should be discarded and regenerated
+   * once a day, once a week or once a month. Depending on the
+   * security requirements.
+   */
+  gnutls_dh_params_init (&dh_params);
+  gnutls_dh_params_generate2 (dh_params, DH_BITS);
+
+  return 0;
+}
+
+
+
+@q **** (4) @>
+@
+@<Garbage@>=
+
+@q **** (4) @>
+
+@q *** (3) Putting `lstnrmta.web' together.  @>
+
+@ Putting {\tt lstnrmta\PERIOD web} together.
+
+@q **** (4) This is what's compiled.  @>
+@ This is what's compiled.
+@c
+@<Include files@>@;@/
+
+
+#define SA struct sockaddr
+
+#define DH_BITS 1024
+
+#define SOCKET_ERR(err,s) if(err==-1) {perror(s);return(1);}
+
+using namespace std;
+using namespace gwrdifpk;
+
+
+extern gnutls_anon_server_credentials_t anoncred;
+static gnutls_dh_params_t dh_params;
+
+@<|generate_dh_params| declaration@>@;@/
+@<|initialize_tls_session| declaration@>@;@/
+@<|listen_remote_anon| declaration@>@;@/
+@<|generate_dh_params| definition@>@;@/
+@<|initialize_tls_session| definition@>@;@/
+@<|listen_remote_anon| definition@>@;@/
+
+#if 0 
+@<Garbage@>@;@/
+#endif 
+
+@q **** (4) This is what's written to the header file `lstnrmta.h'.  @>
+
+@ This is what's written to the header file \filename{lstnrmta.h}.
+\initials{LDF 2012.06.27.}
+
+@(lstnrmta.h@>=
+#ifndef LSTNRMTA_H
+#define LSTNRMTA_H 1
+using namespace std;
+using namespace gwrdifpk;
+@<|generate_dh_params| declaration@>@;@/
+@<|initialize_tls_session| declaration@>@;@/
+@<|listen_remote_anon| declaration@>@;@/
+#endif 
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))                          @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+

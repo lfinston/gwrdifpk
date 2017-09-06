@@ -1,0 +1,2970 @@
+@q grouptp.web  @>
+@q [...]/Finston/gwrdifpk/src/grouptp.web @>
+
+@q Created by Laurence D. Finston (LDF) Tue Jun  4 18:18:22 CEST 2013  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q ** (2)  grouptp.web  @>
+@* {\bf class Group\_Type}.
+
+\LOG
+\initials{LDF 2013.06.04.}
+Added this file.
+\ENDLOG
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+#include <stdlib.h>  /* Standard Library for C  */
+#include <stdio.h>
+#include <string.h>
+
+#include <limits.h>
+#include <errno.h>
+#include <unistd.h>
+
+#include <expat.h>
+
+#include <fstream> /* Standard Template Library (STL) for C++  */
+#include <iomanip>
+#include <ios>
+#include <iostream>
+
+#include <map>
+#include <vector>
+#include <stack>
+
+#include <string>
+
+#if 0 
+#include <time.h>
+#include <math.h>
+#endif 
+
+#include <sstream>  
+
+#include <pthread.h>  /* POSIX threads  */
+
+#include <mysql.h>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif 
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "utilfncs.h++"
+
+
+@q ** (2) |class Group_Type|. @>
+@ {\bf class Group\_Type}.
+\initials{LDF 2013.06.04.}
+
+\LOG
+\initials{LDF 2013.06.04.}
+Added this type declaration.
+
+\initials{LDF 2014.02.03.}
+Added |static const unsigned int PULL_REQUEST_PRIVILEGE|.
+
+\initials{LDF 2014.02.05.}
+Added the public static data members |map<unsigned int, string> privilege_name_map|
+and |map<string, unsigned int> privilege_map|.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|class Group_Type| declaration@>=
+
+class Group_Type
+{
+                               
+    friend class Scan_Parse_Parameter_Type;
+
+    typedef void* yyscan_t;  
+
+    friend int yyparse(yyscan_t parameter);
+
+#if 0 
+   friend int exchange_data_with_server(Scan_Parse_Parameter_Type&);
+   friend int exchange_data_with_client(Scan_Parse_Parameter_Type&);
+
+#endif 
+
+   private:
+
+      int group_id;     
+
+      string group_name;
+ 
+      map<int, pair<string, unsigned int> > member_id_map;
+
+      int creator_id;
+
+      string creator_username;
+
+      time_t created;
+
+   public:
+
+      static const unsigned int NULL_PRIVILEGE;
+      static const unsigned int ADD_USER_PRIVILEGE;
+      static const unsigned int DELETE_USER_PRIVILEGE;
+      static const unsigned int DELETE_GROUP_PRIVILEGE;
+      static const unsigned int PULL_REQUEST_PRIVILEGE;
+
+      static map<string, unsigned int> privilege_map;
+      static map<unsigned int, string> privilege_name_map;
+
+      @<|Group_Type| function declarations@>@;
+
+};
+
+@q *** (3) Initialize |static const| |Group_Type| data members.  @>
+
+@ Initialize |static const| |Group_Type| data members.
+\initials{LDF 2013.06.05.}
+
+\LOG
+\initials{LDF 2013.06.05.}
+Added this section.
+\ENDLOG
+
+@<Initialize |static const| |Group_Type| data members@>=
+
+    const unsigned int Group_Type::NULL_PRIVILEGE         = 0U;
+    const unsigned int Group_Type::ADD_USER_PRIVILEGE     = 1U;
+    const unsigned int Group_Type::DELETE_USER_PRIVILEGE  = 2U;
+    const unsigned int Group_Type::DELETE_GROUP_PRIVILEGE = 4U;
+    const unsigned int Group_Type::PULL_REQUEST_PRIVILEGE = 8U;
+
+    map<string, unsigned int> Group_Type::privilege_map;
+    map<unsigned int, string> Group_Type::privilege_name_map;
+
+                                                                                          
+@q *** (3) Default constructor.  @>                                                      
+@ Default constructor.                                                                    
+\initials{LDF 2013.06.04.}
+
+@q **** (4) Declaration  @>
+
+@<|Group_Type| function declarations@>=
+Group_Type(void);
+
+@q **** (4) Definition  @>
+@
+@<|Group_Type| constructor definitions@>=
+
+Group_Type::Group_Type(void)
+{
+
+   group_id = creator_id = 0;
+
+
+   created = static_cast<time_t>(0); 
+
+   return;
+}
+
+@q *** (3) Copy constructor.  @>                                                      
+@ Copy constructor.                                                                    
+\initials{LDF 2014.02.05.}
+
+@q **** (4) Declaration  @>
+
+@<|Group_Type| function declarations@>=
+
+Group_Type(const Group_Type &g);
+
+@q **** (4) Definition  @>
+@
+@<|Group_Type| constructor definitions@>=
+
+Group_Type::Group_Type(const Group_Type &g)
+{
+
+    operator=(g);
+
+    return;
+
+}
+
+
+@q *** (3) Destructor.  @>
+@ Destructor.
+\initials{LDF 2013.06.04.}
+
+\LOG
+\initials{LDF 2013.06.04.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Group_Type| function declarations@>=
+~Group_Type(void);
+
+@q **** (4) Definition  @>
+@
+@<|Group_Type| destructor definition@>=
+
+Group_Type::~Group_Type(void)
+{
+
+   return;
+
+}  /* End of |Group_Type| destructor definition  */
+
+
+@q *** (3) Assignment operator.  @>                                                      
+@ Assignment operator.                                                                    
+\initials{LDF 2014.02.05.}
+
+\LOG
+\initials{LDF 2014.02.05.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Group_Type| function declarations@>=
+
+const Group_Type&
+operator=(const Group_Type &g);
+
+@q **** (4) Definition  @>
+@
+@<|Group_Type::operator=| definition@>=
+
+const Group_Type&
+Group_Type::operator=(const Group_Type &g)
+{
+
+   group_id         = g.group_id;
+   group_name       = g.group_name;
+   creator_id       = g.creator_id;
+   creator_username = g.creator_username;
+   created          = g.created;
+
+   member_id_map = g.member_id_map;
+
+   return g;
+
+}
+
+@q *** (3) Initialize maps.  @>
+@ Initialize maps.
+\initials{LDF 2014.02.05.}
+
+\LOG
+\initials{LDF 2014.02.05.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Group_Type| function declarations@>=
+static 
+void
+initialize_maps(void);
+
+
+@q **** (4) Definition  @>
+@
+@<|Group_Type::initialize_maps| definition@>=
+void
+Group_Type::initialize_maps(void)
+
+{
+@q ***** (5) @>
+ 
+    privilege_name_map[NULL_PRIVILEGE]         = "NULL_PRIVILEGE";
+    privilege_name_map[ADD_USER_PRIVILEGE]     = "ADD_USER_PRIVILEGE";
+    privilege_name_map[DELETE_USER_PRIVILEGE]  = "DELETE_USER_PRIVILEGE";
+    privilege_name_map[DELETE_GROUP_PRIVILEGE] = "DELETE_GROUP_PRIVILEGE";
+    privilege_name_map[PULL_REQUEST_PRIVILEGE] = "PULL_REQUEST_PRIVILEGE";
+
+    privilege_map["NULL_PRIVILEGE"]            = NULL_PRIVILEGE;
+    privilege_map["ADD_USER_PRIVILEGE"]        = ADD_USER_PRIVILEGE;
+    privilege_map["DELETE_USER_PRIVILEGE"]     = DELETE_USER_PRIVILEGE;
+    privilege_map["DELETE_GROUP_PRIVILEGE"]    = DELETE_GROUP_PRIVILEGE;
+    privilege_map["PULL_REQUEST_PRIVILEGE"]    = PULL_REQUEST_PRIVILEGE;
+
+    return;
+
+@q ***** (5) @>
+
+}  /* End of |Group_Type::initialize_maps| definition  */
+
+
+
+@q *** (3) Set.  @>
+@ Set.
+\initials{LDF 2013.06.05.}
+
+|curr_row| must be a row that resulted from the following MySQL query:\hfil\break 
+%
+\vskip.5\baselineskip
+%
+\.{select group\_id, group\_name, user\_id, username, add\_user\_priv,
+delete\_user\_priv, delete\_group\_priv, pull\_request\_priv, creator\_id, 
+creator\_name, unix\_timestamp(created) from gwirdsif.Group\_Info 
+where group\_id > 0 and user\_id > 0 order by group\_id, user\_id}
+
+@q select group_id, group_name, user_id, username, add_user_priv, delete_user_priv,        @>
+@q delete_group_priv, pull_request_priv, creator_id, creator_name, unix_timestamp(created) @>
+@q from gwirdsif.Group_Info where group_id > 0 and user\_id > 0                            @>
+@q order by group_id, user_id                                                              @>
+
+\LOG
+\initials{LDF 2013.06.05.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Group_Type| function declarations@>=
+int
+set(MYSQL_ROW &curr_row, string thread_str = "");
+
+
+@q **** (4) Definition  @>
+@
+@<|Group_Type::set| definition@>=
+int
+Group_Type::set(MYSQL_ROW &curr_row, string thread_str) 
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0);
+
+   int status;
+
+   unsigned long temp_val;
+
+   string temp_username;
+
+   int temp_user_id;
+
+   unsigned int temp_privileges = 0U;
+
+   unsigned int field_ctr = 0;
+
+#if DEBUG_COMPILE 
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Group_Type::set' (with `MYSQL_ROW &' argument)."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   clear();
+
+@q ***** (5) Retrieve columns.  @>
+@ Retrieve columns.
+\initials{LDF 2013.06.05.}
+
+@q ****** (6) |group_id|.  @>
+
+@ |group_id|.  
+\initials{LDF 2013.06.05.}
+
+@<|Group_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Group_Type::set':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' is NULL or empty.  Can't set `group_id'."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Group_Type::set':"
+            << endl 
+            << "Retrieved `group_id':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' == " << curr_row[field_ctr] << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   errno = 0;
+   temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+   if (temp_val == ULONG_MAX)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Group_Type::set':"
+            << endl 
+            << "`strtoul' failed, returning `ULONG_MAX':"
+            << endl 
+            << strerror(errno)
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (temp_val == ULONG_MAX)|  */
+
+   group_id = temp_val;
+
+   temp_val = 0UL;
+
+   ++field_ctr;
+
+@q ****** (6) |group_name|.  @>
+
+@ |group_name|.  
+\initials{LDF 2013.06.05.}
+
+@<|Group_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Group_Type::set':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' is NULL or empty.  Can't set `group_name'."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Group_Type::set':"
+            << endl 
+            << "Retrieved `group_name':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' == " << curr_row[field_ctr] << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   group_name = curr_row[field_ctr];
+
+   ++field_ctr;
+
+@q ****** (6) |user_id|.  @>
+
+@ |user_id|.  
+\initials{LDF 2013.06.05.}
+
+@<|Group_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Group_Type::set':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' is NULL or empty.  Failed to retrieve `user_id'."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Group_Type::set':"
+            << endl 
+            << "Retrieved `user_id':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' == " << curr_row[field_ctr] << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   errno = 0;
+   temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+   if (temp_val == ULONG_MAX)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Group_Type::set':"
+            << endl 
+            << "`strtoul' failed, returning `ULONG_MAX':"
+            << endl 
+            << strerror(errno)
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (temp_val == ULONG_MAX)|  */
+
+   temp_user_id = temp_val;
+
+   temp_val = 0UL;
+
+   ++field_ctr;
+
+@q ****** (6) |username|.  @>
+
+@ |username|.  
+\initials{LDF 2013.06.05.}
+
+@<|Group_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Group_Type::set':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' is NULL or empty.  "
+            << "Failed to retrieve `username'."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Group_Type::set':"
+            << endl 
+            << "Retrieved `username':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' == " << curr_row[field_ctr] << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   temp_username = curr_row[field_ctr];
+
+   ++field_ctr;
+
+@q ****** (6) |add_user_priv|.  @>
+
+@ |add_user_priv|.  
+\initials{LDF 2013.06.05.}
+
+@<|Group_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Group_Type::set':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' is NULL or empty.  "
+            << "Failed to retrieve `add_user_priv'."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Group_Type::set':"
+            << endl 
+            << "Retrieved `add_user_priv':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' == " << curr_row[field_ctr] << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   errno = 0;
+   temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+   if (temp_val == ULONG_MAX)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Group_Type::set':"
+            << endl 
+            << "`strtoul' failed, returning `ULONG_MAX':"
+            << endl 
+            << strerror(errno)
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (temp_val == ULONG_MAX)|  */
+
+   if (temp_val > 0)
+      temp_privileges |= ADD_USER_PRIVILEGE;
+
+   ++field_ctr;
+
+
+@q ****** (6) |delete_user_priv|.  @>
+
+@ |delete_user_priv|.  
+\initials{LDF 2013.06.05.}
+
+@<|Group_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Group_Type::set':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' is NULL or empty.  "
+            << "Failed to retrieve `delete_user_priv'."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Group_Type::set':"
+            << endl 
+            << "Retrieved `delete_user_priv':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' == " << curr_row[field_ctr] << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   errno = 0;
+   temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+   if (temp_val == ULONG_MAX)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Group_Type::set':"
+            << endl 
+            << "`strtoul' failed, returning `ULONG_MAX':"
+            << endl 
+            << strerror(errno)
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (temp_val == ULONG_MAX)|  */
+
+   if (temp_val > 0)
+      temp_privileges |= DELETE_USER_PRIVILEGE;
+
+   ++field_ctr;
+
+
+@q ****** (6) |delete_group_priv|.  @>
+
+@ |delete_group_priv|.  
+\initials{LDF 2013.06.05.}
+
+@<|Group_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Group_Type::set':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' is NULL or empty.  "
+            << "Failed to retrieve `delete_group_priv'."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Group_Type::set':"
+            << endl 
+            << "Retrieved `delete_group_priv':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' == " << curr_row[field_ctr] << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   errno = 0;
+   temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+   if (temp_val == ULONG_MAX)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Group_Type::set':"
+            << endl 
+            << "`strtoul' failed, returning `ULONG_MAX':"
+            << endl 
+            << strerror(errno)
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (temp_val == ULONG_MAX)|  */
+
+   if (temp_val > 0)
+      temp_privileges |= DELETE_GROUP_PRIVILEGE;
+
+   ++field_ctr;
+
+@q ****** (6) |pull_request_priv|.  @>
+
+@ |pull_request_priv|.  
+\initials{LDF 2014.02.03.}
+
+\LOG
+\initials{LDF 2014.02.03.}
+Added this section.
+\ENDLOG
+
+@<|Group_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Group_Type::set':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' is NULL or empty.  "
+            << "Failed to retrieve `pull_request_priv'."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Group_Type::set':"
+            << endl 
+            << "Retrieved `pull_request_priv':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' == " << curr_row[field_ctr] << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   errno = 0;
+   temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+   if (temp_val == ULONG_MAX)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Group_Type::set':"
+            << endl 
+            << "`strtoul' failed, returning `ULONG_MAX':"
+            << endl 
+            << strerror(errno)
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (temp_val == ULONG_MAX)|  */
+
+   if (temp_val > 0)
+      temp_privileges |= PULL_REQUEST_PRIVILEGE;
+
+   ++field_ctr;
+
+@q ****** (6) |creator_id|.  @>
+
+@ |creator_id|.  
+\initials{LDF 2013.06.05.}
+
+@<|Group_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Group_Type::set':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' is NULL or empty.  Can't set `creator_id'."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Group_Type::set':"
+            << endl 
+            << "Retrieved `creator_id':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' == " << curr_row[field_ctr] << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   errno = 0;
+   temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+   if (temp_val == ULONG_MAX)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Group_Type::set':"
+            << endl 
+            << "`strtoul' failed, returning `ULONG_MAX':"
+            << endl 
+            << strerror(errno)
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (temp_val == ULONG_MAX)|  */
+
+   creator_id = temp_val;
+
+   temp_val = 0UL;
+
+   ++field_ctr;
+
+@q ****** (6) |creator_username|.  @>
+
+@ |creator_username|.  
+\initials{LDF 2013.06.05.}
+
+@<|Group_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Group_Type::set':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' is NULL or empty.  "
+            << "Failed to retrieve `creator_username'."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Group_Type::set':"
+            << endl 
+            << "Retrieved `creator_username':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' == " << curr_row[field_ctr] << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   creator_username = curr_row[field_ctr];
+
+   ++field_ctr;
+
+@q ****** (6) |created|.  @>
+
+@ |created|.  
+\initials{LDF 2013.06.05.}
+
+@<|Group_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Group_Type::set':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' is NULL or empty.  Can't set `created'."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Group_Type::set':"
+            << endl 
+            << "Retrieved `created':"
+            << endl 
+            << "`curr_row[" << field_ctr << "]' == " << curr_row[field_ctr] << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   errno = 0;
+   temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+   if (temp_val == ULONG_MAX)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Group_Type::set':"
+            << endl 
+            << "`strtoul' failed, returning `ULONG_MAX':"
+            << endl 
+            << strerror(errno)
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (temp_val == ULONG_MAX)|  */
+
+   created = static_cast<time_t>(temp_val); 
+
+   temp_val = 0UL;
+
+   ++field_ctr;
+
+@q ****** (6) @>
+
+@q ***** (5) @>
+@
+@<|Group_Type::set| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "temp_username == " << temp_username << endl
+            << "temp_privileges == " << oct << temp_privileges << " (octal)"
+            << dec << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+   if (temp_user_id > 0 && !temp_username.empty())
+      member_id_map.insert(make_pair(temp_user_id, make_pair(temp_username, temp_privileges)));
+
+@q ***** (5) @>
+@
+@<|Group_Type::set| definition@>=
+
+#if DEBUG_COMPILE 
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Group_Type::set' (with `MYSQL_ROW &' argument) "
+            << "successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+@q ***** (5) @>
+
+
+}  /* End of |Group_Type::set| definition  */
+
+@q **** (4) @>
+
+@q *** (3) Clear.  @>
+@ Clear.
+\initials{LDF 2013.06.05.}
+
+\LOG
+\initials{LDF 2013.06.05.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Group_Type| function declarations@>=
+int
+clear(void);
+
+@q **** (4) Definition  @>
+@
+@<|Group_Type::clear| definition@>=
+int
+Group_Type::clear(void) 
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status;
+
+#if DEBUG_COMPILE 
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `Group_Type::clear'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Group_Type::clear| definition@>=
+
+   group_id = creator_id = 0;
+  
+   created = static_cast<time_t>(0);
+
+   member_id_map.clear();
+
+   group_name = creator_username = "";
+
+@q ***** (5) @>
+@
+@<|Group_Type::clear| definition@>=
+
+#if DEBUG_COMPILE 
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `Group_Type::clear' successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |Group_Type::clear| definition  */
+
+@q **** (4) @>
+
+@q *** (3) Show.  @>
+@ Show.
+\initials{LDF 2013.06.04.}
+
+\LOG
+\initials{LDF 2013.06.04.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Group_Type| function declarations@>=
+int
+show(string s = "", stringstream *strm = 0) const;
+
+@q **** (4) Definition  @>
+@
+@<|Group_Type::show| definition@>=
+int
+Group_Type::show(string s, stringstream *strm) const
+{
+
+   stringstream temp_strm;
+
+   if (s.size() == 0)
+      s = "Group_Type:";
+
+   temp_strm << s 
+             << endl
+             << "group_id ==           " << group_id
+             << endl
+             << "`group_name' ==       " << group_name
+             << endl
+             << "`creator_id' ==       " << creator_id
+             << endl 
+             << "`creator_username' == " << creator_username
+             << endl
+             << "`created' ==          " << created << " == " << convert_seconds(created)
+             << endl;
+
+
+   temp_strm << "member_id_map.size() == " << member_id_map.size()
+             << endl;
+
+   if (member_id_map.size() > 0)
+   {
+       temp_strm << "member_id_map:" << endl;
+
+int i;
+
+       for (map<int, pair<string, unsigned int> >::const_iterator iter = member_id_map.begin();
+            iter != member_id_map.end();
+            ++iter)
+       {
+           temp_strm << "User ID: " << setw(2) << iter->first << "  "
+                     << "Username: " << left << setw(8) << iter->second.first << "  "
+                     << right 
+                     << "Privileges: " << oct << iter->second.second << " (octal) " << dec
+                     << endl
+                     << "   Add user privilege:      " 
+                     << ((iter->second.second & ADD_USER_PRIVILEGE) ? "true" : "false")
+                     << endl 
+                     << "   Delete user privilege:   " 
+                     << ((iter->second.second & DELETE_USER_PRIVILEGE) ? "true" : "false")
+                     << endl 
+                     << "   Delete group privilege:  " 
+                     << ((iter->second.second & DELETE_GROUP_PRIVILEGE) ? "true" : "false")
+                     << endl
+                     << "   Pull request privilege:  " 
+                     << ((iter->second.second & PULL_REQUEST_PRIVILEGE) ? "true" : "false")
+                     << endl;
+             
+       }
+
+       temp_strm << endl;
+
+   }  /* |if (member_id_map.size() > 0)|  */
+
+   if (strm)
+      *strm << temp_strm.str();
+   else
+      cerr << temp_strm.str();
+
+   return 0;
+
+} /* |Group_Type::show|  */
+
+@q *** (3) Write to database.  @>
+@ Write to database.
+\initials{LDF 2013.06.04.}
+
+\LOG
+\initials{LDF 2013.06.04.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration @>
+
+@<|Group_Type| function declarations@>=
+
+int
+write_to_database(MYSQL *mysql_ptr);
+
+@q **** (4) Definition  @>
+@
+@<|Group_Type::write_to_database| definition@>=
+
+int
+Group_Type::write_to_database(MYSQL *mysql_ptr)
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status;
+
+   stringstream temp_strm;
+
+   MYSQL_RES *result = 0;
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+
+   long affected_rows;
+
+   MYSQL_ROW curr_row;
+
+   stringstream sql_strm;
+
+#if DEBUG_COMPILE 
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `Group_Type::write_to_database'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Group_Type::write_to_database| definition@>=
+
+#if DEBUG_COMPILE 
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `Group_Type::write_to_database' "
+            << "successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |Group_Type::write_to_database| definition  */
+
+@q *** (3) Get all groups.  @>
+@ Get all groups.
+\initials{LDF 2013.06.05.}
+
+\LOG
+\initials{LDF 2013.06.05.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration @>
+
+@<|Group_Type| function declarations@>=
+
+static
+int
+get_all_groups(MYSQL *mysql_ptr, 
+               vector<Group_Type>& group_vector,
+               int thread_ctr = 0);
+
+@q **** (4) Definition  @>
+@
+@<|Group_Type::get_all_groups| definition@>=
+
+int
+Group_Type::get_all_groups(MYSQL *mysql_ptr, 
+                           vector<Group_Type>& group_vector,
+                           int thread_ctr)
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status;
+
+   stringstream temp_strm;
+
+   MYSQL_RES *result = 0;
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+
+   long affected_rows;
+
+   MYSQL_ROW curr_row;
+
+   stringstream sql_strm;
+
+   string thread_str;
+
+   Group_Type curr_group;
+
+   if (thread_ctr > 0)
+   {
+       temp_strm << "[Thread " << thread_ctr << "] ";
+       thread_str = temp_strm.str();
+       temp_strm.str("");
+
+   }
+
+#if DEBUG_COMPILE 
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Group_Type::get_all_groups'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Group_Type::get_all_groups| definition@>=
+
+   sql_strm << "select group_id, group_name, user_id, username, "
+            << "add_user_priv, delete_user_priv, delete_group_priv, pull_request_priv, "
+            << "creator_id, creator_name, unix_timestamp(created) from gwirdsif.Group_Info "
+            << "where group_id > 0 and user_id > 0 "
+            << "order by group_id, user_id";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Group_Type::get_all_groups':"
+            << endl 
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   status = submit_mysql_query(sql_strm.str(), 
+                               result, 
+                               mysql_ptr, 
+                               &row_ctr, 
+                               &field_ctr, 
+                               0,
+                               thread_str);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Group_Type::get_all_groups':"
+            << endl 
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+
+        if (result)
+           mysql_free_result(result);
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+ 
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Group_Type::get_all_groups':"
+            << endl 
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "`row_ctr' == " << row_ctr
+            << endl 
+            << "`field_ctr' == " << field_ctr
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Group_Type::get_all_groups| definition@>=
+
+   if (row_ctr == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "WARNING!  In `Group_Type::get_all_groups':"
+            << endl 
+            << "`row_ctr' == 0.  No rows found."
+            << endl
+            << "Exiting function unsuccessfully with return value 2."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result);
+
+       return 2;
+
+   }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|Group_Type::get_all_groups| definition@>=
+
+   for (int i = 0; i < row_ctr; ++i)
+   {
+@q ****** (6) @>
+
+       curr_row = mysql_fetch_row(result);
+
+       if (curr_row == 0)
+        {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `Group_Type::get_all_groups':"
+                << endl 
+                << "`mysql_fetch_row' failed:"
+                << endl
+                << mysql_error(mysql_ptr)
+                << endl 
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result);
+
+           return 1;
+
+        }  /* |if (curr_row == 0)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `Group_Type::get_all_groups':"
+                 << endl;
+            if (curr_row[0])
+               cerr << "`curr_row[0]' == " << curr_row[0]
+                    << endl;
+            else
+               cerr << "`curr_row[0]' is NULL." << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+        status = curr_group.set(curr_row, thread_str);
+
+        if (status != 0)
+        {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `Group_Type::get_all_groups':"
+                << endl 
+                << "`Group_Type::set' failed, returning " << status << "."
+                << endl
+                << "Failed to set `curr_group'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           if (result)
+              mysql_free_result(result);
+
+           return 1;
+
+        }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Group_Type::get_all_groups':"
+                << endl 
+                << "`Group_Type::set' succeeded, returning 0."
+                << endl;
+
+           curr_group.show("curr_group:");
+           unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */                      
+
+@q ****** (6) @>
+
+        if (   group_vector.size() == 0
+            || curr_group.group_id != group_vector.back().group_id)
+        {
+            group_vector.push_back(curr_group);
+        }
+        else if (curr_group.group_id == group_vector.back().group_id)
+        {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "curr_group.group_id == " << curr_group.group_id << endl
+                    << "group_vector.back().group_id == " << group_vector.back().group_id 
+                    << endl;
+                unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+           group_vector.back().member_id_map.insert(curr_group.member_id_map.begin(), 
+                                                    curr_group.member_id_map.end());
+
+        }  /* |else if (curr_group.group_id == group_vector.back().group_id)|  */
+
+        curr_group.clear();
+
+@q ****** (6) @>
+
+   }  /* |for|  */
+
+
+@q ***** (5) @>
+@
+@<|Group_Type::get_all_groups| definition@>=
+
+#if DEBUG_COMPILE 
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Group_Type::get_all_groups' "
+            << "successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |Group_Type::get_all_groups| definition  */
+
+@q *** (3) Get groups from database (|get_groups_from_database|).  @>
+@ Get groups from database (|get_groups_from_database|).
+\initials{LDF 2014.02.05.}
+
+\LOG
+\initials{LDF 2014.02.05.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration @>
+
+@<|Group_Type| function declarations@>=
+static
+int
+get_groups_from_database(MYSQL *mysql_ptr, 
+                         vector<int> &group_id_vector,
+                         vector<Group_Type> &group_vector,
+                         string thread_str = 0);
+
+@q **** (4) Definition  @>
+@
+@<|Group_Type::get_groups_from_database| definition@>=
+
+int
+Group_Type::get_groups_from_database(MYSQL *mysql_ptr,
+                                     vector<int> &group_id_vector, 
+                                     vector<Group_Type> &group_vector,
+                                     string thread_str)
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status;
+
+   MYSQL_RES *result = 0;
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+
+   long affected_rows;
+
+   MYSQL_ROW curr_row;
+
+   stringstream sql_strm;
+
+   Group_Type curr_group;
+
+#if DEBUG_COMPILE 
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Group_Type::get_groups_from_database'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Group_Type::get_groups_from_database| definition@>=
+
+   string comma_str;
+
+   sql_strm << "select group_id, group_name, user_id, username, "
+            << "add_user_priv, delete_user_priv, delete_group_priv, pull_request_priv, "
+            << "creator_id, creator_name, unix_timestamp(created) from gwirdsif.Group_Info "
+            << "where group_id in (";
+
+   for (vector<int>::iterator iter = group_id_vector.begin();
+        iter != group_id_vector.end();
+        ++iter)
+   {
+      sql_strm << comma_str << *iter;
+      comma_str = ", ";
+   }
+
+   sql_strm << ") order by group_id";
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Group_Type::get_groups_from_database':"
+            << endl 
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   status = submit_mysql_query(sql_strm.str(), 
+                               result, 
+                               mysql_ptr, 
+                               &row_ctr, 
+                               &field_ctr, 
+                               0,
+                               thread_str);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Group_Type::get_groups_from_database':"
+            << endl 
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+
+        if (result)
+           mysql_free_result(result);
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+ 
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Group_Type::get_groups_from_database':"
+            << endl 
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "`row_ctr' == " << row_ctr
+            << endl 
+            << "`field_ctr' == " << field_ctr
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Group_Type::get_groups_from_database| definition@>=
+
+   if (row_ctr == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "WARNING!  In `Group_Type::get_groups_from_database':"
+            << endl 
+            << "`row_ctr' == 0.  No rows found."
+            << endl
+            << "Exiting function unsuccessfully with return value 2."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result);
+
+       return 2;
+
+   }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|Group_Type::get_groups_from_database| definition@>=
+
+   for (int i = 0; i < row_ctr; ++i)
+   {
+@q ****** (6) @>
+
+       curr_row = mysql_fetch_row(result);
+
+       if (curr_row == 0)
+        {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `Group_Type::get_groups_from_database':"
+                << endl 
+                << "`mysql_fetch_row' failed:"
+                << endl
+                << mysql_error(mysql_ptr)
+                << endl 
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result);
+
+           return 1;
+
+        }  /* |if (curr_row == 0)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `Group_Type::get_groups_from_database':"
+                 << endl;
+            if (curr_row[0])
+               cerr << "`curr_row[0]' == " << curr_row[0]
+                    << endl;
+            else
+               cerr << "`curr_row[0]' is NULL." << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+        status = curr_group.set(curr_row, thread_str);
+
+        if (status != 0)
+        {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `Group_Type::get_groups_from_database':"
+                << endl 
+                << "`Group_Type::set' failed, returning " << status << "."
+                << endl
+                << "Failed to set `curr_group'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           if (result)
+              mysql_free_result(result);
+
+           return 1;
+
+        }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Group_Type::get_groups_from_database':"
+                << endl 
+                << "`Group_Type::set' succeeded, returning 0."
+                << endl;
+
+           curr_group.show("curr_group:");
+           unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */                      
+
+@q ****** (6) @>
+
+        if (   group_vector.size() == 0
+            || curr_group.group_id != group_vector.back().group_id)
+        {
+            group_vector.push_back(curr_group);
+        }
+        else if (curr_group.group_id == group_vector.back().group_id)
+        {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "curr_group.group_id == " << curr_group.group_id << endl
+                    << "group_vector.back().group_id == " << group_vector.back().group_id 
+                    << endl;
+                unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+           group_vector.back().member_id_map.insert(curr_group.member_id_map.begin(), 
+                                                    curr_group.member_id_map.end());
+
+        }  /* |else if (curr_group.group_id == group_vector.back().group_id)|  */
+
+        curr_group.clear();
+
+@q ****** (6) @>
+
+   }  /* |for|  */
+
+@q ***** (5) @>
+
+   mysql_free_result(result); 
+   result = 0;
+
+@q ***** (5) @>
+@
+@<|Group_Type::get_groups_from_database| definition@>=
+
+#if DEBUG_COMPILE 
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Group_Type::get_groups_from_database' "
+            << "successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+
+}  /* End of |Group_Type::get_groups_from_database| definition  */
+
+@q *** (3) Get (single) group from database (|get_group_from_database|).  @>
+@ Get (single) group from database (|get_group_from_database|).
+\initials{LDF 2014.02.05.}
+
+\LOG
+\initials{LDF 2014.02.05.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration @>
+
+@<|Group_Type| function declarations@>=
+int
+get_group_from_database(MYSQL *mysql_ptr, 
+                        string thread_str = 0);
+
+@q **** (4) Definition  @>
+@
+@<|Group_Type::get_group_from_database| definition@>=
+
+int
+Group_Type::get_group_from_database(MYSQL *mysql_ptr,
+                                    string thread_str)
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status;
+
+   MYSQL_RES *result = 0;
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+
+   long affected_rows;
+
+   MYSQL_ROW curr_row;
+
+   stringstream sql_strm;
+
+   Group_Type curr_group;
+
+#if DEBUG_COMPILE 
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Group_Type::get_group_from_database'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   vector<int> group_id_vector;
+
+   group_id_vector.push_back(group_id);
+   vector<Group_Type> group_vector;
+
+   status = get_groups_from_database(mysql_ptr, group_id_vector, group_vector, thread_str);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex();
+       cerr << thread_str << "ERROR!  In `Group_Type::get_group_from_database':"
+            << endl
+            << "`Group_Type::get_groups_from_database' failed, returning " << status << "."
+            << endl
+            << "Exiting function unsuccessfully with return value " << status << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return status;
+
+   }
+   else if (group_vector.size() == 0)
+   {
+       lock_cerr_mutex();
+       cerr << thread_str << "ERROR!  In `Group_Type::get_group_from_database':"
+            << endl
+            << "`groups_vector.size()' == 0:  Failed to set `Group_Type' object (`*this')."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }
+   else
+      operator=(group_vector.back());
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Group_Type::get_group_from_database':"
+            << endl;
+
+       show("*this:");
+       
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ***** (5) @>
+@
+@<|Group_Type::get_group_from_database| definition@>=
+
+#if DEBUG_COMPILE 
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Group_Type::get_group_from_database' "
+            << "successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |Group_Type::get_group_from_database| definition  */
+
+@q *** (3) Check privileges.  @>
+@ Check privileges.
+\initials{LDF 2014.02.05.}
+
+\LOG
+\initials{LDF 2014.02.05.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration @>
+
+@<|Group_Type| function declarations@>=
+
+static
+int
+check_privileges(MYSQL *mysql_ptr, 
+                 int user_id,
+                 unsigned int privileges,
+                 bool and_or_flag = true,
+                 int member_id = 0,
+                 vector<Group_Type> *group_vector = 0,
+                 string thread_str = "");
+
+@q **** (4) Definition  @>
+@
+@<|Group_Type::check_privileges| definition@>=
+
+int
+Group_Type::check_privileges(MYSQL *mysql_ptr, 
+                             int user_id,
+                             unsigned int privileges,
+                             bool and_or_flag,
+                             int member_id,
+                             vector<Group_Type> *group_vector,
+                             string thread_str)
+                             
+                             
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status;
+
+   MYSQL_RES *result = 0;
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+
+   long affected_rows;
+
+   MYSQL_ROW curr_row;
+
+   stringstream sql_strm;
+
+   Group_Type curr_group;
+
+   string database_name = (is_gwirdsif) ? "gwirdsif" : "gwirdcli";
+
+   string and_or_str;
+   string comma_str;
+
+@q ***** (5) @>
+@
+@<|Group_Type::check_privileges| definition@>=
+
+#if DEBUG_COMPILE 
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Group_Type::check_privileges'."
+            << endl
+            << "privileges & ADD_USER_PRIVILEGE     == " 
+            << ((privileges & ADD_USER_PRIVILEGE) ? 1 : 0)
+            << endl 
+            << "privileges & DELETE_USER_PRIVILEGE  == " 
+            << ((privileges & DELETE_USER_PRIVILEGE) ? 1 : 0)
+            << endl 
+            << "privileges & DELETE_GROUP_PRIVILEGE == " 
+            << ((privileges & DELETE_GROUP_PRIVILEGE) ? 1 : 0)
+            << endl 
+            << "privileges & PULL_REQUEST_PRIVILEGE == " 
+            << ((privileges & PULL_REQUEST_PRIVILEGE) ? 1 : 0)
+            << endl; 
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Group_Type::check_privileges| definition@>=
+
+   sql_strm << "select group_id "
+            << "from " << database_name << ".Group_Info "
+            << "where user_id = " << user_id << " "
+            << "and ";
+
+   if (privileges & ADD_USER_PRIVILEGE)
+   {
+
+        sql_strm << "add_user_priv = 1 ";
+
+        and_or_str = (and_or_flag) ? "and " : "or ";
+
+   }
+
+   if (privileges & DELETE_USER_PRIVILEGE)
+   {
+
+        sql_strm << and_or_str << "delete_user_priv = 1 ";
+
+        and_or_str = (and_or_flag) ? "and " : "or ";
+
+   }
+   
+   if (privileges & DELETE_GROUP_PRIVILEGE)
+   {
+
+        sql_strm << and_or_str << "delete_group_priv = 1 ";
+
+        and_or_str = (and_or_flag) ? "and " : "or ";
+
+   }
+
+   if (privileges & PULL_REQUEST_PRIVILEGE)
+   {
+
+        sql_strm << and_or_str << "pull_request_priv = 1 ";
+
+        and_or_str = (and_or_flag) ? "and " : "or ";
+   }
+
+   sql_strm << "order by group_id";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Group_Type::check_privileges':"
+            << endl 
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@  
+@<|Group_Type::check_privileges| definition@>=
+
+   status = submit_mysql_query(sql_strm.str(), 
+                               result, 
+                               mysql_ptr, 
+                               &row_ctr, 
+                               &field_ctr, 
+                               0, 
+                               thread_str);
+
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Group_Type::check_privileges':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << ":"
+            << endl
+            << "Failed to query `" << database_name << ".Group_Info' database view."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl; 
+       unlock_cerr_mutex(); 
+
+       if (result)
+          mysql_free_result(result); 
+
+       return 1;
+
+
+   }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@  
+@<|Group_Type::check_privileges| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Group_Type::check_privileges':"
+            << endl
+            << "`submit_mysql_query' succeeded, returning 0:"
+            << endl
+            << "`row_ctr' == " << row_ctr
+            << endl
+            << "`field_ctr' == " << field_ctr
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Group_Type::check_privileges| definition@>=
+
+   if (row_ctr == 0)
+   {
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          cerr << thread_str << "In `Group_Type::check_privileges':"
+               << endl
+               << "`row_ctr' == 0.  No corresponding groups found." 
+               << endl
+               << "Exiting function with return value 2."
+               << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */      
+
+      mysql_free_result(result);
+
+      return 2;
+
+   }  /* |if (row_ctr == 0)|  */
+
+
+@q ***** (5) @>
+@
+@<|Group_Type::check_privileges| definition@>=
+
+   else if (member_id <= 0 && group_vector == 0)
+   {
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          cerr << thread_str << "In `Group_Type::check_privileges':"
+               << endl
+               << "`row_ctr' == " << row_ctr 
+               << endl
+               << "`member_id' == " << member_id << " (<= 0) and `group_vector' == NULL."
+               << endl
+               << "Not checking membership of user `member_id' in group(s) "
+               << "or setting `group_vector'."
+               << endl
+               << "Exiting function successfully with return value 0."
+               << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */      
+
+      mysql_free_result(result);
+
+      return 0;
+
+   }  /* |else if (member_id <= 0 && group_vector == 0)|  */
+    
+@q ***** (5) @>
+@
+@<|Group_Type::check_privileges| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG && member_id > 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Group_Type::check_privileges':"
+            << endl
+            << "`row_ctr' == " << row_ctr << " (> 0) and "
+            << "`member_id' == " << member_id << " (> 0)."
+            << endl
+            << "Will check for membership."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG && member_id > 0)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Group_Type::check_privileges| definition@>=
+
+   unsigned long temp_val = 0UL;
+
+   vector<int> group_id_vector;
+
+   for (int i = 0; i < row_ctr; ++i)
+   {
+@q ****** (6) @>
+
+      curr_row = mysql_fetch_row(result);
+
+      if (curr_row == 0)
+      {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `Group_Type::check_privileges':"
+                << endl
+                << "`mysql_fetch_row' failed, returning NULL:" 
+                << endl
+                << mysql_error(mysql_ptr)
+                << endl 
+                << "Exiting function unsuccessfully with return value 1."
+                << endl; 
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result); 
+
+           return 1;
+
+
+      }  /* |if|  */
+
+@q ****** (6) @>
+
+      errno = 0;
+
+      temp_val = strtoul(curr_row[0], 0, 10);
+
+      if (temp_val == ULONG_MAX)
+      {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `Group_Type::check_privileges':"
+                << endl
+                << "`strtoul' failed, returning `ULONG_MAX':" 
+                << endl
+                << strerror(errno)
+                << endl 
+                << "Failed to retrieve value of `group_id' field from `" << database_name 
+                << ".Group_Info' database view."
+                << endl 
+                << "Exiting function unsuccessfully with return value 1."
+                << endl; 
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result); 
+
+           return 1;
+
+      }  /* |if (temp_val == ULONG_MAX)|  */
+
+@q ****** (6) @>
+
+      else if (temp_val > INT_MAX)
+      {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `Group_Type::check_privileges':"
+                << endl
+                << "`strtoul' returned << `temp_val' == " << temp_val << " (> `INT_MAX')"
+                << endl
+                << "Invalid value retrieved for `group_id' field from the `" << database_name 
+                << ".Group_Info' database view."
+                << endl 
+                << "Exiting function unsuccessfully with return value 1."
+                << endl; 
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result); 
+
+           return 1;
+
+      }  /* |if (temp_val == ULONG_MAX)|  */
+
+@q ****** (6) @>
+
+      else
+      {
+          group_id_vector.push_back(temp_val);
+
+      } 
+
+@q ****** (6) @>
+
+   }  /* |for|  */
+
+@q ***** (5) @>
+@
+@<|Group_Type::check_privileges| definition@>=
+
+   mysql_free_result(result);
+   result = 0;
+   sql_strm.str("");
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "group_id_vector.size() == " << group_id_vector.size() << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Group_Type::check_privileges| definition@>=
+
+   if (group_id_vector.size() == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "WARNING!  In `Group_Type::check_privileges':"
+            << endl 
+            << "`group_id_vector.size()' == 0."
+            << endl 
+            << "This code should never be reached, because this case should have been "
+            << "caught above."
+            << endl
+            << "Exiting function with return value 2."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result);
+
+       return 2;
+
+   }  /* |if (group_id_vector.size() != 0)|  */
+
+@q ***** (5) @>
+@
+@<|Group_Type::check_privileges| definition@>=
+
+   if (member_id > 0) 
+   {
+@q ****** (6) @>
+
+       sql_strm << "select group_id from Groups_Users where group_id in (";
+
+       for (vector<int>::iterator iter = group_id_vector.begin();
+            iter != group_id_vector.end();
+            ++iter)
+       {
+           sql_strm << comma_str << *iter;
+
+           comma_str = ", ";
+       }
+
+       sql_strm << ") and user_id = " << member_id;
+
+@q ****** (6) @>
+@
+@<|Group_Type::check_privileges| definition@>=
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Group_Type::check_privileges':"
+                << endl 
+                << "`sql_strm.str()' == " << sql_strm.str()
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@  
+@<|Group_Type::check_privileges| definition@>=
+
+       status = submit_mysql_query(sql_strm.str(), 
+                                   result, 
+                                   mysql_ptr, 
+                                   &row_ctr, 
+                                   &field_ctr, 
+                                   0, 
+                                   thread_str);
+
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `Group_Type::check_privileges':"
+                << endl
+                << "`submit_mysql_query' failed, returning " << status << ":"
+                << endl
+                << "Failed to query `" << database_name << ".Groups_Users' database table."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl; 
+           unlock_cerr_mutex(); 
+
+           if (result)
+              mysql_free_result(result); 
+
+           return 1;
+
+       }  /* |if (status != 0)|  */
+
+
+@q ****** (6) @>
+@  
+@<|Group_Type::check_privileges| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Group_Type::check_privileges':"
+                << endl
+                << "`submit_mysql_query' succeeded, returning 0:"
+                << endl
+                << "`row_ctr' == " << row_ctr
+                << endl
+                << "`field_ctr' == " << field_ctr
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Group_Type::check_privileges| definition@>=
+
+       if (row_ctr == 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Group_Type::check_privileges':"
+                << endl 
+                << "`row_ctr' == 0."
+                << endl 
+                << "User `member_id' == " << member_id << " is not a member of any groups "
+                << "for which user `user_id' == " << user_id 
+                << " has the `pull_request' privilege."
+                << endl
+                << "Exiting function with return value 2."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result);
+
+           return 2;
+
+       }  /* |if (group_id_vector.size() != 0)|  */
+
+
+@q ****** (6) @>
+@
+@<|Group_Type::check_privileges| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Group_Type::check_privileges':"
+                << endl 
+                << "`row_ctr' == " << row_ctr << " (> 0)."
+                << endl 
+                << "User `member_id' == " << member_id << " is a member of at least one group"
+                << endl 
+                << "for which user `user_id' == " << user_id 
+                << " has the `pull_request' privilege."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+   }  /* |if (member_id > 0) |  */
+
+@q ***** (5) @>
+
+@q ***** (5) @>
+@
+@<|Group_Type::check_privileges| definition@>=
+
+   if (group_vector == 0)
+   {
+#if DEBUG_COMPILE 
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Group_Type::get_groups_from_database':"
+                << endl
+                << "`group_vector' == NULL.  Not calling `get_groups_from_database'."
+                << endl
+                << "Exiting function successfully with return value 0."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       if (result)
+          mysql_free_result(result);
+
+       return 0;
+
+   }  /* |if (group_vector == 0)|  */
+
+
+@q ***** (5) @>
+@
+@<|Group_Type::check_privileges| definition@>=
+
+   else  /* |group_vector != 0|  */
+   {
+#if DEBUG_COMPILE 
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Group_Type::get_groups_from_database':"
+                << endl
+                << "`group_vector' != NULL.  Calling `get_groups_from_database'."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+       if (member_id > 0)
+       {
+@q ******* (7) @>
+
+           group_id_vector.clear();
+
+           for (int i = 0; i < row_ctr; ++i)
+           {
+@q ******* (7) @>
+
+               curr_row = mysql_fetch_row(result);
+
+               if (curr_row == 0)
+               {
+                    lock_cerr_mutex(); 
+                    cerr << thread_str << "ERROR!  In `Group_Type::check_privileges':"
+                         << endl
+                         << "`mysql_fetch_row' failed, returning NULL:" 
+                         << endl
+                         << mysql_error(mysql_ptr)
+                         << endl 
+                         << "Exiting function unsuccessfully with return value 1."
+                         << endl; 
+                    unlock_cerr_mutex(); 
+
+                    mysql_free_result(result); 
+
+                    return 1;
+
+
+               }  /* |if|  */
+
+@q ******* (7) @>
+
+               errno = 0;
+
+               temp_val = strtoul(curr_row[0], 0, 10);
+
+               if (temp_val == ULONG_MAX)
+               {
+                    lock_cerr_mutex(); 
+                    cerr << thread_str << "ERROR!  In `Group_Type::check_privileges':"
+                         << endl
+                         << "`strtoul' failed, returning `ULONG_MAX':" 
+                         << endl
+                         << strerror(errno)
+                         << endl 
+                         << "Failed to retrieve value of `group_id' field from `" << database_name 
+                         << ".Group_Info' database view."
+                         << endl 
+                         << "Exiting function unsuccessfully with return value 1."
+                         << endl; 
+                    unlock_cerr_mutex(); 
+
+                    mysql_free_result(result); 
+
+                    return 1;
+
+               }  /* |if (temp_val == ULONG_MAX)|  */
+
+@q ******* (7) @>
+
+               else if (temp_val > INT_MAX)
+               {
+                    lock_cerr_mutex(); 
+                    cerr << thread_str << "ERROR!  In `Group_Type::check_privileges':"
+                         << endl
+                         << "`strtoul' returned << `temp_val' == " << temp_val << " (> `INT_MAX')"
+                         << endl
+                         << "Invalid value retrieved for `group_id' field from the "
+                         << "`" << database_name << ".Group_Info' database view."
+                         << endl 
+                         << "Exiting function unsuccessfully with return value 1."
+                         << endl; 
+                    unlock_cerr_mutex(); 
+
+                    mysql_free_result(result); 
+
+                    return 1;
+
+               }  /* |if (temp_val == ULONG_MAX)|  */
+
+@q ******* (7) @>
+
+               else 
+               {
+                   group_id_vector.push_back(temp_val);
+
+               } 
+
+@q ******* (7) @>
+
+           }  /* |for|  */   
+
+       }  /* |if (member_id > 0)|  */
+
+@q ****** (6) @>
+@
+@<|Group_Type::check_privileges| definition@>=
+
+      mysql_free_result(result);
+      result = 0;
+
+      if (group_id_vector.size() == 0)
+      {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "WARNING!  In `Group_Type::check_privileges':"
+                << endl 
+                << "`group_id_vector.size()' == 0."
+                << endl 
+                << "No corresponding groups."
+                << endl
+                << "Exiting function with return value 2."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 2;
+ 
+
+      }  /* |if (group_id_vector.size() == 0)|  */
+
+
+@q ****** (6) @>
+@
+@<|Group_Type::check_privileges| definition@>=
+
+      else
+      {
+@q ******* (7) @>
+
+          status = get_groups_from_database(mysql_ptr, 
+                                            group_id_vector, 
+                                            *group_vector, 
+                                            thread_str); 
+ 
+@q ******* (7) @>
+
+          if (status != 0)
+          {
+              lock_cerr_mutex(); 
+              cerr << thread_str << "ERROR!  In `Group_Type::check_privileges':"
+                   << endl 
+                   << "`Group_Type::get_groups_from_database' failed, "
+                   << "returning " << status << "."
+                   << endl
+                   << "Failed to retrieve `Group_Type' objects from "
+                   << "`" << database_name << "' database."
+                   << endl
+                   << "Exiting function with return value 1."
+                   << endl;
+              unlock_cerr_mutex(); 
+
+              return 1;
+          }
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+          else if (DEBUG)
+          {
+              lock_cerr_mutex(); 
+              cerr << thread_str << "In `Group_Type::check_privileges':"
+                   << endl 
+                   << "`Group_Type::get_groups_from_database' succeeded, returning 0."
+                   << endl
+                   << "`group_vector->size()' == " << group_vector->size() << endl;
+
+              if (group_vector->size() > 0)
+              {
+                  cerr << "`*group_vector':" << endl;
+
+                  for (vector<Group_Type>::iterator iter = group_vector->begin();
+                       iter != group_vector->end();
+                       ++iter)
+                     iter->show();
+
+                  cerr << endl;
+
+              }
+
+              unlock_cerr_mutex(); 
+
+          }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ******* (7) @>
+
+      }  /* |if (group_id_vector.size() == 0)|  */
+
+@q ****** (6) @>
+
+
+   }  /* |else| (|group_vector != 0|)  */
+
+@q ***** (5) @>
+@
+@<|Group_Type::check_privileges| definition@>=
+
+   if (result)
+      mysql_free_result(result);
+
+
+@q ***** (5) @>
+@
+@<|Group_Type::check_privileges| definition@>=
+
+#if DEBUG_COMPILE 
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Group_Type::check_privileges' "
+            << "successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |Group_Type::check_privileges| definition  */
+
+
+@q *** (3) @>
+
+@q ** (2) @>
+
+@q **** (4) @>
+
+@q *** (3) Putting `grouptp.web' together.  @>
+
+@ Putting {\tt grouptp\PERIOD web} together.
+
+@q **** (4) This is what's compiled.  @>
+@ This is what's compiled.
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+@<|class Group_Type| declaration@>@;@/
+@<Initialize |static const| |Group_Type| data members@>@;@/
+@<|Group_Type::initialize_maps| definition@>@;@/
+@<|Group_Type| constructor definitions@>@;@/
+@<|Group_Type| destructor definition@>@;@/
+@<|Group_Type::operator=| definition@>@;@/
+@<|Group_Type::set| definition@>@;@/
+@<|Group_Type::clear| definition@>@;@/
+@<|Group_Type::show| definition@>@;@/
+@<|Group_Type::write_to_database| definition@>@;@/
+@<|Group_Type::get_all_groups| definition@>@;@/
+@<|Group_Type::get_groups_from_database| definition@>@;@/
+@<|Group_Type::get_group_from_database| definition@>@;@/
+@<|Group_Type::check_privileges| definition@>@;@/
+
+@q **** (4) This is what's written to the header file `grouptp.h'.  @>
+
+@ This is what's written to the header file \filename{grouptp.h}.
+@
+@(grouptp.h@>=
+#ifndef GROUPTP_H
+#define GROUPTP_H 1
+using namespace std;
+using namespace gwrdifpk;
+class Scan_Parse_Parameter_Type;
+class Group_Type;
+@<|class Group_Type| declaration@>@;@/
+#endif 
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))                          @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

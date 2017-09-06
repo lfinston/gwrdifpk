@@ -1,0 +1,852 @@
+@q stpdblcr.web @>
+@q [...]/gwrdifpk/src/stpdblcr.web  @>
+
+@q Created by Laurence D. Finston (LDF) Fri Sep  6 13:43:03 CEST 2013  @>
+
+@q * (1) Top @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+@q ** (2) Include files@>
+
+@ Include files.
+\initials{LDF 2013.09.04.}
+
+@<Include files@>=
+
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <pthread.h>  /* POSIX threads  */
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
+
+#include <mysql.h>
+
+#include <expat.h>
+
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <fstream>
+#include <sstream>   
+#include <string>
+#include <getopt.h>
+
+#include <map>
+#include <vector>
+#include <deque>
+#include <set>
+#include <stack>
+#include <utility>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif 
+
+
+#include "rspercds.h++"
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "helper.h++"
+#include "tanfncs.h++"
+#include "pidfncs.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "usrinftp.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+
+#include "stpclopt.h++"
+
+@q ** (2) Create database tables for Dublin Core metadata (gwirdsif).  @>
+
+@ Create database tables for Dublin Core metadata (gwirdsif).
+\initials{LDF 2013.09.06.}
+
+@q *** (3) Declaration  @>
+
+@<|create_tables_dublin_core| declaration@>=
+
+int
+create_tables_dublin_core(Scan_Parse_Parameter_Type &param);
+
+
+@q *** (3) Definition @>
+@
+@<|create_tables_dublin_core| definition@>=
+
+int
+create_tables_dublin_core(Scan_Parse_Parameter_Type &param)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status;
+   stringstream sql_strm;
+
+   stringstream temp_strm;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+         cerr << "Entering `create_tables_dublin_core'."
+              << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   MYSQL_RES* result = 0;
+   MYSQL_ROW curr_row;
+
+   size_t result_array_size = 16;
+
+   MYSQL_RES *result_array[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+   unsigned int row_ctr   = 0;
+   unsigned int field_ctr = 0;
+   long int affected_rows = 0;
+
+   vector<string> query_vector;
+
+   vector<unsigned int *> row_ctr_vector;
+   vector<unsigned int *> field_ctr_vector;
+   vector<long int *>     affected_rows_vector;
+
+   vector<string> comment_vector;
+
+   string comma_str;
+
+@q **** (4) @>
+
+       sql_strm << "use " << gwirdsif_database_name;
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+@q **** (4) Dublin_Core_Metadata.  @>
+
+@ \.{Dublin\_Core\_Metadata}.
+\initials{LDF 2013.09.06.}
+
+@<|create_tables_dublin_core| definition@>=
+
+       sql_strm << "create table Dublin_Core_Metadata"
+                << endl
+                << "("
+                << "    dublin_core_metadata_id bigint unsigned primary key not null,"
+                << "    user_id int not null references Users(user_id),"
+                << "    irods_server_id int unsigned references Irods_Servers(irods_server_id),"
+                << "    irods_object_path varchar(1024),"
+                << "    handle_id bigint references handlesystem_standalone(handle_id),"
+                << "    deleted boolean default 0,"
+                << "    created datetime not null default 0,"
+                << "    last_modified datetime not null default 0"
+                << ")";
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+
+@q ***** (5) @>
+@
+@<|create_tables_dublin_core| definition@>=
+
+       sql_strm << "insert into Dublin_Core_Metadata"
+                << endl
+                << "("
+                << endl
+                << "    dublin_core_metadata_id,"
+                << endl
+                << "    user_id, "
+                << endl
+                << "    irods_server_id,"
+                << endl
+                << "    irods_object_path,"
+                << endl
+                << "    handle_id,"
+                << endl
+                << "    deleted,"
+                << endl
+                << "    created,"
+                << endl
+                << "    last_modified"
+                << endl
+                << ")"
+                << endl
+                << "values"
+                << endl
+                << "(0, 0, 0, 'NULL IRODS_OBJECT_PATH', 0, false, 0, 0)";
+
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(new long int(0L));
+       comment_vector.push_back("insert Dublin_Core_Metadata");
+
+       sql_strm.str("");
+
+
+@q **** (4) Dublin_Core_Metadata_Sub.  @>
+
+@ \.{Dublin\_Core\_Metadata\_Sub}.
+\initials{LDF 2013.09.06.}
+
+@<|create_tables_dublin_core| definition@>=
+
+       sql_strm << "create table Dublin_Core_Metadata_Sub"
+                << "("
+                << endl
+                << "    dublin_core_metadata_sub_id bigint unsigned primary key not null,"
+                << endl
+                << "    dublin_core_metadata_id bigint unsigned not null "
+                << endl
+                << "       references Dublin_Core_Metadata(dublin_core_metadata_id),"
+                << endl
+                << "    dublin_core_element_id int unsigned not null default 0 "
+                << endl
+                << "       references Dublin_Core_Elements(dublin_core_element_id),"
+                << endl
+                << "    dublin_core_term_id int unsigned not null default 0 "
+                << endl
+                << "       references Dublin_Core_Terms(dublin_core_term_id),"
+                << endl
+                << "    value varchar(1024) not null default ''"
+                << endl
+                << ")";
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+@q ***** (5) @>
+@
+@<|create_tables_dublin_core| definition@>=
+
+       sql_strm << "insert into Dublin_Core_Metadata_Sub"
+                << endl
+                << "(dublin_core_metadata_sub_id, dublin_core_metadata_id, "
+                << "dublin_core_element_id, value)"
+                << endl
+                << "values"
+                << endl
+                << "(0, 0, 0, 'NULL_DUBLIN_CORE_METADATA_SUB_VALUE')";
+
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(new long int(0L));
+       comment_vector.push_back("insert Dublin_Core_Metadata_Sub");
+
+       sql_strm.str("");
+
+
+@q **** (4) Dublin_Core_Elements.  @>
+
+@ \.{Dublin\_Core\_Elements}.
+\initials{LDF 2013.09.06.}
+
+@<|create_tables_dublin_core| definition@>=
+
+       sql_strm << "create table Dublin_Core_Elements"
+                << endl
+                << "("
+                << endl
+                << "    dublin_core_element_id int unsigned primary key not null,"
+                << endl
+                << "    element_name varchar(32) not null"
+                << endl
+                << ")";
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+@q ***** (5) @>
+@
+@<|create_tables_dublin_core| definition@>=
+
+       sql_strm << "insert into Dublin_Core_Elements"
+                << "(dublin_core_element_id, element_name)"
+                << endl
+                << "values"
+                << endl
+                << "(0,  'NULL_DUBLIN_CORE_ELEMENT'),"
+                << endl
+                << "(1,  'title'),"
+                << endl
+                << "(2,  'creator'),	 "
+                << endl
+                << "(3,  'subject'),	 "
+                << endl
+                << "(4,  'description'),"
+                << endl
+                << "(5,  'publisher'),	 "
+                << endl
+                << "(6,  'contributor'),"
+                << endl
+                << "(7,  'date'),	 "
+                << endl
+                << "(8,  'type'),	 "
+                << endl
+                << "(9,  'format'),	 "
+                << endl
+                << "(10, 'identifier'),"
+                << endl
+                << "(11, 'source'),	 "
+                << endl
+                << "(12, 'language'),	 "
+                << endl
+                << "(13, 'relation'),	 "
+                << endl
+                << "(14, 'coverage'),	 "
+                << endl
+                << "(15, 'rights')";
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(new long int(0L));
+       comment_vector.push_back("insert Dublin_Core_Elements");
+
+       sql_strm.str("");
+
+@q **** (4) Dublin_Core_Terms.  @>
+
+@ \.{Dublin\_Core\_Terms}.
+\initials{LDF 2013.09.06.}
+
+@<|create_tables_dublin_core| definition@>=
+
+       sql_strm << "create table Dublin_Core_Terms"
+                << endl
+                << "("
+                << endl
+                << "    dublin_core_term_id int unsigned primary key not null,"
+                << endl
+                << "    term_name varchar(64) not null"
+                << endl
+                << ")";
+
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+
+@q ***** (5) @>
+@
+@<|create_tables_dublin_core| definition@>=
+
+
+       sql_strm << "insert into Dublin_Core_Terms"
+                << endl
+                << "(dublin_core_term_id, term_name)"
+                << endl
+                << "values"
+                << endl
+                << "(0,  'NULL_DUBLIN_CORE_TERM'),"
+                << endl
+                << "(1,  'abstract'), "
+                << endl
+                << "(2,  'accessRights'),"
+                << endl
+                << "(3,  'accrualMethod '),"
+                << endl
+                << "(4,  'accrualPeriodicity'),"
+                << endl
+                << "(5,  'accrualPolicy'),"
+                << endl
+                << "(6,  'alternative'),"
+                << endl
+                << "(7,  'audience'),"
+                << endl
+                << "(8,  'available'),"
+                << endl
+                << "(9,  'bibliographicCitation'),"
+                << endl
+                << "(10, 'conformsTo'),"
+                << endl
+                << "(11, 'contributor'),"
+                << endl
+                << "(12, 'coverage'),"
+                << endl
+                << "(13, 'created'),"
+                << endl
+                << "(14, 'creator'),"
+                << endl
+                << "(15, 'date'),"
+                << endl
+                << "(16, 'dateAccepted'),"
+                << endl
+                << "(17, 'dateCopyrighted'),"
+                << endl
+                << "(18, 'dateSubmitted'),"
+                << endl
+                << "(19, 'description'),"
+                << endl
+                << "(20, 'educationLevel'),"
+                << endl
+                << "(21, 'extent'),"
+                << endl
+                << "(22, 'format'),"
+                << endl
+                << "(23, 'hasFormat'),"
+                << endl
+                << "(24, 'hasPart'),"
+                << endl
+                << "(25, 'hasVersion'),"
+                << endl
+                << "(26, 'identifier'),"
+                << endl
+                << "(27, 'instructionalMethod'),"
+                << endl
+                << "(28, 'isFormatOf'),"
+                << endl
+                << "(29, 'isPartOf'),"
+                << endl
+                << "(30, 'isReferencedBy'),"
+                << endl
+                << "(31, 'isReplacedBy'),"
+                << endl
+                << "(32, 'isRequiredBy'),"
+                << endl
+                << "(33, 'issued'),"
+                << endl
+                << "(34, 'isVersionOf'),"
+                << endl
+                << "(35, 'language'),"
+                << endl
+                << "(36, 'license'),"
+                << endl
+                << "(37, 'mediator'),"
+                << endl
+                << "(38, 'medium'),"
+                << endl
+                << "(39, 'modified'),"
+                << endl
+                << "(40, 'provenance'),"
+                << endl
+                << "(41, 'publisher'),"
+                << endl
+                << "(42, 'references'),"
+                << endl
+                << "(43, 'relation'),"
+                << endl
+                << "(44, 'replaces'),"
+                << endl
+                << "(45, 'requires'),"
+                << endl
+                << "(46, 'rights'),"
+                << endl
+                << "(47, 'rightsHolder'),"
+                << endl
+                << "(48, 'source'),"
+                << endl
+                << "(49, 'spatial'),"
+                << endl
+                << "(50, 'subject'),"
+                << endl
+                << "(51, 'tableOfContents'),"
+                << endl
+                << "(52, 'temporal'),"
+                << endl
+                << "(53, 'title'),"
+                << endl
+                << "(54, 'type'),"
+                << endl
+                << "(55, 'valid')";
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(new long int(0L));
+       comment_vector.push_back("insert Dublin_Core_Terms");
+
+       sql_strm.str("");
+
+@q **** (4) Dublin_Core_Qualifiers.  @>
+
+@ \.{Dublin\_Core\_Qualifiers}.
+\initials{LDF 2013.09.06.}
+
+@<|create_tables_dublin_core| definition@>=
+
+       sql_strm << "create table Dublin_Core_Qualifiers"
+                << endl
+                << "("
+                << endl
+                << "    dublin_core_qualifier_id bigint unsigned primary key not null,"
+                << endl
+                << "    dublin_core_metadata_id bigint unsigned "
+                << endl
+                << "       references Dublin_Core_Metadata(dublin_core_metadata_id),"
+                << endl
+                << "    dublin_core_element_id bigint unsigned "
+                << endl
+                << "       references Dublin_Core_Elements(dublin_core_element_id),"
+                << endl
+                << "    dublin_core_term_id bigint unsigned "
+                << "references Dublin_Core_Terms(dublin_core_term_id),"
+                << endl
+                << "    value varchar(512) not null default '' "
+                << endl
+                << ")";
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+@q ***** (5) @>
+@
+@<|create_tables_dublin_core| definition@>=
+
+       sql_strm << "insert into Dublin_Core_Qualifiers"
+                << endl
+                << "(dublin_core_qualifier_id, dublin_core_metadata_id, dublin_core_element_id, "
+                << endl
+                << " dublin_core_term_id, value)"
+                << endl
+                << "values"
+                << endl
+                << "(0, 0, 0, 0, '')";
+
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(new long int(0L));
+       comment_vector.push_back("insert Dublin_Core_Qualifiers");
+
+       sql_strm.str("");
+
+
+@q **** (4) Dublin_Core_Attributes.  @>
+
+@ \.{Dublin\_Core\_Attributes}.
+\initials{LDF 2013.09.06.}
+
+@<|create_tables_dublin_core| definition@>=
+
+       sql_strm << "create table Dublin_Core_Attributes"
+                << endl
+                << "("
+                << endl
+                << "    dublin_core_metadata_id bigint unsigned not null references "
+                << endl
+                << "       Dublin_Core_Metadata(dublin_core_metadata_id),"
+                << endl
+                << "    dublin_core_metadata_sub_id bigint unsigned not null references "
+                << endl
+                << "       Dublin_Core_Metadata_Sub(dublin_core_metadata_sub_id),"
+                << endl
+                << "    attribute varchar(128),"
+                << endl
+                << "    value varchar(256)"
+                << endl
+                << ")";
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+@q **** (4) @>
+@
+@<|create_tables_dublin_core| definition@>=
+
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          cerr << "query_vector.size() == " << query_vector.size() << endl;
+
+          for (vector<string>::iterator iter = query_vector.begin();
+               iter != query_vector.end();
+               ++iter)
+          {
+              cerr << *iter << endl;
+
+          }  /* |for|  */
+
+          cerr << endl;
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */           
+
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2013.09.04.}
+Added this section.
+\ENDLOG
+
+@<|create_tables_dublin_core| definition@>=
+
+      for (vector<string>::iterator iter = query_vector.begin();
+           iter != query_vector.end();
+           ++iter)
+      {
+
+          out_strm << *iter << ";" << endl << endl;
+
+      }
+
+@q **** (4) @>
+@
+@<|create_tables_dublin_core| definition@>=
+
+      status = param.submit_mysql_queries(query_vector, 
+                                           result_array,
+                                           row_ctr_vector, 
+                                           field_ctr_vector, 
+                                           affected_rows_vector, 
+                                           false);
+
+      if (status != 0)
+      {
+           cerr << "ERROR!  In `create_tables_dublin_core':  `submit_mysql_queries' failed, "
+                << "returning " << status << "."
+                << endl
+                << "Exiting `create_tables_dublin_core' unsuccessfully with return value 1."
+                << endl;
+
+           delete_and_clear(result_array, 
+                            result_array_size, 
+                            row_ctr_vector, 
+                            field_ctr_vector,
+                            affected_rows_vector,
+                            query_vector);
+
+
+           out_strm << "/* Failed  */" 
+                    << endl << endl
+                    << "/* ***************************************"
+                    << "****************************** */"
+                << endl << endl;
+
+           return 1;
+
+      }  /* |if (status != 0)|  */
+
+@q **** (4) @>
+@
+@<|create_tables_dublin_core| definition@>=
+
+#if DEBUG_COMPILE
+      else if (DEBUG)
+      {
+          cerr << "In `create_tables_dublin_core':  `submit_mysql_queries' succeeded, returning 0."
+               << endl
+               << "Created tables in `" << gwirdsif_database_name << "' database successfully."
+               << endl;
+
+          int i = 0;
+          int j = 0;
+
+          for (vector<long int *>::iterator iter = affected_rows_vector.begin();
+               iter != affected_rows_vector.end();
+                ++iter)
+          {
+               if (*iter != 0)
+               {
+ 
+                  temp_strm.str("");
+                  temp_strm << "[" << i << "]";
+
+                  cerr << "*affected_rows_vector" << setw(4) << left << temp_strm.str() 
+                       << " == " 
+                       << setw(2) << right << *affected_rows_vector[i];
+
+                   if (comment_vector.size() > j)
+                      cerr  << "  " << comment_vector[j++];
+
+                   cerr << endl;
+               }
+
+               ++i;
+
+
+          }  /* |for|  */
+
+          temp_strm.str("");
+
+          cerr << endl;
+
+      }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|create_tables_dublin_core| definition@>=
+
+       out_strm << "/* Succeeded  */" 
+                << endl << endl
+                << "/* ********************************************************************* */"
+                << endl << endl
+                << "/* !! TODO:  */"
+                << endl << endl;
+
+       delete_and_clear(result_array, 
+                        result_array_size, 
+                        row_ctr_vector, 
+                        field_ctr_vector,
+                        affected_rows_vector,
+                        query_vector);
+
+       sql_strm.str("");
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+         cerr << "Exiting `create_tables_dublin_core' successfully with return value 0."
+              << endl;
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       return 0;
+
+}  /* End of |create_tables_dublin_core| definition  */
+
+@q ** (2) Garbage@>
+
+@ Garbage.  This section needs to exist, because it's included below.
+It can be used for temporarily (or permanently) commenting-out code.
+\initials{LDF 2013.09.05.}
+
+@<Garbage@>=
+#if 0
+   /* Empty  */
+#endif 
+
+@q ** (2) This is what's compiled.  @>
+
+@ This is what's compiled.  
+\initials{LDF 2013.09.03.}
+
+@c
+using namespace std;
+@<Include files@>@;@/
+using namespace gwrdifpk;
+@<|create_tables_dublin_core| definition@>@;@/
+
+#if 0 
+@<Garbage@>@;@/
+#endif 
+
+@q ** (2) This is what's written to the header file `stpdblcr.h'.  @>
+
+@ This is what's written to the header file \filename{stpdblcr.h}.
+\initials{LDF 2013.09.03.}
+
+@(stpdblcr.h@>=
+#ifndef STPDBLCR_H
+#define STPDBLCR_H 1
+@<|create_tables_dublin_core| declaration@>@;@/
+#endif 
+
+@q (progn (cweb-mode) (outline-minor-mode))                       @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+
+

@@ -1,0 +1,6119 @@
+@q hndlvltp.web @>
+
+@q Created by Laurence D. Finston (LDF) Thu Feb 28 09:07:45 CET 2013  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q * (1) Handle_Value_Type (hndlvltp.web).  @>
+
+@*  \.{Handle\_Value\_Type} (hndlvltp\PERIOD web).
+
+\LOG
+\initials{LDF 2013.02.28.}
+Added this file.  It contains code for |class Handle_Value_Type| removed from
+\filename{hndltype.web}.
+\ENDLOG
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif 
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stddef.h>
+#include <unistd.h>
+#include <limits.h>
+
+#if 0 
+#include <sys/stat.h>
+#include <sys/time.h>
+#endif 
+
+#include <time.h>
+
+#include <sys/types.h>
+
+#if 0 
+#include <dirent.h>
+#endif 
+
+#include <string.h>
+#if 0 
+#include <pwd.h>
+#endif 
+
+#include <errno.h>
+
+#include <pthread.h>
+
+#include <fstream>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <string>
+#include <sstream>  
+#include <deque>    
+#include <map>   
+#include <stack>   
+#include <vector>   
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+#include <expat.h>
+
+#include <mysql.h>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#undef NAME_LEN
+#undef LOCAL_HOST
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "rspercds.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "hndlvltp.h++"
+#include "rspnstp.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "grouptp.h++"
+#include "irdsavtp.h++"
+#include "irdsobtp.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "dstngnmt.h++"
+#include "x509cert.h++"
+#include "usrinftp.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+
+@q ** (2) |class Handle_Value_Type|.  @>
+@ {\bf class Handle\_Type}.
+
+\LOG
+\initials{LDF 2012.10.12.}
+Added this |class| declaration.
+
+\initials{LDF 2012.11.22.}
+Added |string filename|.
+
+\initials{LDF 2013.01.11.}
+Added |bool deleted|.  It's set to |false| by default.
+
+\initials{LDF 2013.01.14.}
+Added |friend| declaration for |generate_pids|.
+
+\initials{LDF 2013.01.31.}
+Added |static const unsigned int| data members for use in the \.{idx} field
+of handles (i.e., PIDs).
+
+\initials{LDF 2013.02.05.}
+Added |static const unsigned int OTHER_HANDLE_VALUE_TYPE_INDEX|.  Changed the values of the
+other constants so that ranges can be used.  A handle can have multiple values
+of the same type, so that it must be possible to use different indices for a
+given type.
+
+\initials{LDF 2013.02.07.}
+Added |string created_str| and |string last_modified_str|.
+
+\initials{LDF 2013.02.08.}
+Add |int created_by_user_id|.
+
+\initials{LDF 2013.02.22.}
+Added |static map<string, unsigned int> type_idx_map|.
+
+\initials{LDF 2013.02.22.}
+Added the |static const unsigned int| data members |RESERVED_0_INDEX|,
+|RESERVED_1_INDEX| and |RESERVED_2_INDEX|.
+
+\initials{LDF 2013.02.22.}
+Added |friend| declaration for |main|.  This is needed for the |main| function of
+the program \.{genpids}.
+
+\initials{LDF 2013.02.27.}
+Renamed this class.  Old name:  |class Handle_Type|.  New name:  |class Handle_Value_Type|.
+Added a new |class Handle_Type| which contains a |map<Handle_Value_Type|.  See the declaration 
+of the latter class below.
+\par
+Added |friend| declaration for |class Handle_Type|.
+
+\initials{LDF 2013.02.28.}
+Moved this class declaration and the member function definitions from \filename{hndltype.web}
+to this file (\filename{hndlvltp.web}).
+
+\initials{LDF 2013.02.28.}
+Added |string created_by_user_name|.  See comment below.
+
+\initials{LDF 2013.03.07.}
+Added the |static const unsigned int| data members |DC_METADATA_IRODS_OBJECT_INDEX|,
+|DC_METADATA_IRODS_OBJECT_PID_INDEX| and |DC_METADATA_IRODS_OBJECT_REF_INDEX|.
+
+\initials{LDF 2013.07.03.}
+Added the |static const unsigned int| data members 
+|CREATOR_INDEX| and |OWNER_INDEX|. 
+
+\initials{LDF 2013.07.04.}
+Added |static const unsigned int IRODS_OBJECT_DELETED_INDEX|.
+
+\initials{LDF 2013.07.25.}
+Added |static const unsigned int HANDLE_MARKED_FOR_DELETION_INDEX|.
+
+\initials{LDF 2013.08.09.}
+Added |static const unsigned int IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB_INDEX|,
+|static const unsigned int DC_METADATA_IRODS_OBJECT_DELETED_FROM_ARCHIVE_INDEX|
+and
+|static const unsigned int DC_METADATA_IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB_INDEX|.
+
+\initials{LDF 2013.08.12.}
+Added |static const unsigned int IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE_INDEX|,
+|static const unsigned int IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB_INDEX|,
+|static const unsigned int DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE_INDEX|
+and
+|static const unsigned int DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB_INDEX|.
+
+\initials{LDF 2013.08.15.}
+Added the |static unsigned int| constants 
+|IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE_INDEX|,
+|IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB_INDEX|,
+|DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE_INDEX|
+and
+|DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB_INDEX|.
+
+\initials{LDF 2013.08.26.}
+Added |time_t delete_from_database_timestamp|, |string delete_from_database_timestamp_str|.
+and |unsigned long irods_object_id|.
+
+\initials{LDF 2013.11.28.}
+Added the |static const unsigned int| data members |DC_METADATA_DELETED_INDEX| and
+|DC_METADATA_DELETED_PID_INDEX|.
+
+\initials{LDF 2013.11.28.}
+Added |friend| declaration for |purge_dc_metadata|.
+
+\initials{LDF 2014.01.02.}
+Added the following |const unsigned int| values:
+|CHECKSUM_MD5_INDEX|,
+|CHECKSUM_SHA1_INDEX|,
+|CHECKSUM_SHA224_INDEX|,
+|CHECKSUM_SHA256_INDEX|,
+|CHECKSUM_SHA384_INDEX| 
+and 
+|CHECKSUM_SHA512_INDEX|.
+
+\initials{LDF 2014.01.14.}
+Added the following |static const unsigned int| values:
+|ENCRYPTED_INDEX|,
+|SIGNED_INDEX|,
+|CLEARSIGNED_INDEX|,
+|VERIFIED_INDEX|.
+
+\initials{LDF 2014.01.15.}
+Added the |static const unsigned int| values
+|GPG_KEY_FINGERPRINT_INDEX|,
+|IRODS_OBJECT_REF_PID_INDEX|,
+|DETACHED_SIGNATURE_INDEX|,
+|DETACHED_SIGNATURE_REF_INDEX|
+and
+|DETACHED_SIGNATURE_PID_INDEX|.
+
+\initials{LDF 2014.01.23.}
+Added the |static const unsigned int| values
+|COMPRESSED_TAR_FILE_INDEX|,
+|COMPRESSED_GZIP_INDEX|
+and
+|COMPRESSED_BZIP2_INDEX|.
+\ENDLOG  
+
+@q *** (3) Declaration  @>
+
+@<Declare |class Handle_Value_Type|@>=
+
+class Handle_Value_Type
+{
+@q **** (4) @>
+
+    friend class Scan_Parse_Parameter_Type;
+    friend class Irods_Object_Type;
+    friend class Handle_Type;
+    friend int exchange_data_with_client (Scan_Parse_Parameter_Type &param);
+    friend int zzparse(yyscan_t);
+
+    friend int main(int argc, char *argv[]);
+
+    friend int generate_pids(MYSQL *mysql_ptr,
+                             string prefix_str,
+                             string &pid_str,
+                             vector<string> *pid_vector_ptr,
+                             unsigned int number_of_pids,
+                             vector<unsigned long int> *handle_id_vector_ptr,
+                             vector<unsigned long int> *handle_value_id_vector_ptr,
+                             bool standalone_hs,
+                             string institute_str,
+                             string suffix_str,
+                             vector<Handle_Type> *handle_vector,
+                             string fifo_pathname,
+                             long int user_id,
+                             string username);
+
+
+    friend void *purge_dc_metadata(void *v);
+
+    string filename;
+
+    string handle;
+    int idx;
+    string type;
+    char *data;
+    unsigned int data_length;
+    int ttl_type;
+    int ttl;
+    time_t timestamp;
+    char *refs;
+    unsigned int refs_length;
+    bool admin_read;
+    bool admin_write;
+    bool pub_read;
+    bool pub_write;
+    unsigned long int handle_id;
+    unsigned long int handle_value_id;
+
+    unsigned long int irods_object_id;
+
+    int created_by_user_id;
+
+    string created_by_user_name;  /* As of this date (2013.02.28.), |created_by_user_name|
+                                     is only used in |Scan_Parse_Parameter_Type::get_handle|
+                                     and |zzparse|.  Otherwise it's not needed, since 
+                                     the |username| is available on the server-side.
+                                     There is no corresponding field in the \.{gwirdsif.Users}
+                                     database table.  */
+
+    bool marked_for_deletion;
+    time_t created;
+    time_t last_modified;
+
+    time_t delete_from_database_timestamp;
+
+    string created_str;
+    string last_modified_str;
+    string delete_from_database_timestamp_str;
+
+@q **** (4) @>
+
+    public:
+       @<|Handle_Value_Type| function declarations@>@;@/
+
+    static const unsigned int NULL_HANDLE_VALUE_TYPE_INDEX;
+
+    static const unsigned int IRODS_OBJECT_INDEX;
+    static const unsigned int IRODS_OBJECT_PID_INDEX;
+    static const unsigned int IRODS_OBJECT_REF_INDEX;
+    static const unsigned int IRODS_OBJECT_REF_PID_INDEX;
+
+    static const unsigned int IRODS_OBJECT_DELETED_FROM_ARCHIVE_INDEX;
+    static const unsigned int IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB_INDEX;
+
+    static const unsigned int IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE_INDEX;
+    static const unsigned int IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB_INDEX;
+
+
+    static const unsigned int IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE_INDEX;
+    static const unsigned int IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB_INDEX;
+
+    static const unsigned int DC_METADATA_INDEX;
+    static const unsigned int DC_METADATA_PID_INDEX;
+    static const unsigned int DC_METADATA_REF_INDEX;
+    static const unsigned int DC_METADATA_DELETED_INDEX;
+    static const unsigned int DC_METADATA_DELETED_PID_INDEX;    
+
+    static const unsigned int DC_METADATA_IRODS_OBJECT_INDEX;
+    static const unsigned int DC_METADATA_IRODS_OBJECT_PID_INDEX;
+    static const unsigned int DC_METADATA_IRODS_OBJECT_REF_INDEX;
+
+    static const unsigned int DC_METADATA_IRODS_OBJECT_DELETED_FROM_ARCHIVE_INDEX;
+    static const unsigned int DC_METADATA_IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB_INDEX;
+
+    static const unsigned int DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE_INDEX;
+    static const unsigned int DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB_INDEX;
+
+    static const unsigned int DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE_INDEX;
+    static const unsigned int DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB_INDEX;
+
+    static const unsigned int CREATOR_INDEX;
+    static const unsigned int OWNER_INDEX;
+
+    static const unsigned int HANDLE_MARKED_FOR_DELETION_INDEX;
+
+    static const unsigned int CHECKSUM_MD5_INDEX;
+    static const unsigned int CHECKSUM_SHA1_INDEX;
+    static const unsigned int CHECKSUM_SHA224_INDEX;
+    static const unsigned int CHECKSUM_SHA256_INDEX;
+    static const unsigned int CHECKSUM_SHA384_INDEX; 
+    static const unsigned int CHECKSUM_SHA512_INDEX;
+
+    static const unsigned int ENCRYPTED_INDEX;
+    static const unsigned int SIGNED_INDEX;
+    static const unsigned int CLEARSIGNED_INDEX;
+    static const unsigned int VERIFIED_INDEX;
+
+    static const unsigned int GPG_KEY_FINGERPRINT_INDEX;
+    static const unsigned int DETACHED_SIGNATURE_INDEX;
+    static const unsigned int DETACHED_SIGNATURE_REF_INDEX;
+    static const unsigned int DETACHED_SIGNATURE_PID_INDEX;
+
+    static const unsigned int COMPRESSED_TAR_FILE_INDEX;
+    static const unsigned int COMPRESSED_GZIP_INDEX;
+    static const unsigned int COMPRESSED_BZIP2_INDEX;
+
+    static const unsigned int RESERVED_0_INDEX;
+    static const unsigned int RESERVED_1_INDEX;
+    static const unsigned int RESERVED_2_INDEX;
+    static const unsigned int OTHER_HANDLE_VALUE_TYPE_INDEX;
+
+    static map<int, string> idx_type_map;
+    static map<string, unsigned int> type_idx_map;
+
+@q **** (4) @>
+
+};
+
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2013.01.31.}
+Added this section.
+\ENDLOG
+
+@<Initialize |static| |Handle_Value_Type| data members@>=
+
+
+   const unsigned int Handle_Value_Type::NULL_HANDLE_VALUE_TYPE_INDEX            =   0;  
+
+   const unsigned int Handle_Value_Type::IRODS_OBJECT_INDEX                      =   1;
+   const unsigned int Handle_Value_Type::IRODS_OBJECT_PID_INDEX                  =  11;
+   const unsigned int Handle_Value_Type::IRODS_OBJECT_REF_INDEX                  =  21;
+   const unsigned int Handle_Value_Type::IRODS_OBJECT_REF_PID_INDEX              =  22;
+
+   const unsigned int Handle_Value_Type::IRODS_OBJECT_DELETED_FROM_ARCHIVE_INDEX =  31;
+   const unsigned int 
+      Handle_Value_Type::IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB_INDEX             =  41;
+
+
+   const unsigned int Handle_Value_Type::IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE_INDEX =  51;
+   const unsigned int 
+      Handle_Value_Type::IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB_INDEX             =  61;
+
+   const unsigned int Handle_Value_Type::IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE_INDEX 
+                                                                                 =  71;
+   const unsigned int 
+      Handle_Value_Type::IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB_INDEX 
+                                                                                 =  81;
+
+
+   const unsigned int Handle_Value_Type::DC_METADATA_INDEX                       =  91; 
+   const unsigned int Handle_Value_Type::DC_METADATA_PID_INDEX                   = 101;
+   const unsigned int Handle_Value_Type::DC_METADATA_REF_INDEX                   = 111;
+   const unsigned int Handle_Value_Type::DC_METADATA_DELETED_INDEX               = 115;
+   const unsigned int Handle_Value_Type::DC_METADATA_DELETED_PID_INDEX           = 118;
+
+   const unsigned int Handle_Value_Type::DC_METADATA_IRODS_OBJECT_INDEX          = 121;
+   const unsigned int Handle_Value_Type::DC_METADATA_IRODS_OBJECT_PID_INDEX      = 131;
+   const unsigned int Handle_Value_Type::DC_METADATA_IRODS_OBJECT_REF_INDEX      = 141;
+
+   const unsigned int 
+      Handle_Value_Type::DC_METADATA_IRODS_OBJECT_DELETED_FROM_ARCHIVE_INDEX     = 151;
+   const unsigned int 
+      Handle_Value_Type::DC_METADATA_IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB_INDEX = 161;
+
+   const unsigned int 
+      Handle_Value_Type::DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE_INDEX     = 171;
+   const unsigned int 
+      Handle_Value_Type::DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB_INDEX = 181;
+
+
+
+   const unsigned int 
+      Handle_Value_Type::DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE_INDEX     
+                                                                                 = 191;
+   const unsigned int 
+      Handle_Value_Type::DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB_INDEX 
+                                                                                 = 201;
+
+
+
+
+
+   const unsigned int Handle_Value_Type::CREATOR_INDEX                           = 211;
+   const unsigned int Handle_Value_Type::OWNER_INDEX                             = 221;
+
+   const unsigned int Handle_Value_Type::HANDLE_MARKED_FOR_DELETION_INDEX        = 231;
+
+
+   const unsigned int Handle_Value_Type::CHECKSUM_MD5_INDEX                      = 301;
+   const unsigned int Handle_Value_Type::CHECKSUM_SHA1_INDEX                     = 302;
+   const unsigned int Handle_Value_Type::CHECKSUM_SHA224_INDEX                   = 303;
+   const unsigned int Handle_Value_Type::CHECKSUM_SHA256_INDEX                   = 304;
+   const unsigned int Handle_Value_Type::CHECKSUM_SHA384_INDEX                   = 305;
+   const unsigned int Handle_Value_Type::CHECKSUM_SHA512_INDEX                   = 306;
+
+   const unsigned int Handle_Value_Type::ENCRYPTED_INDEX                         = 401;
+   const unsigned int Handle_Value_Type::SIGNED_INDEX                            = 402;
+   const unsigned int Handle_Value_Type::CLEARSIGNED_INDEX                       = 403;
+   const unsigned int Handle_Value_Type::VERIFIED_INDEX                          = 404;
+
+   const unsigned int Handle_Value_Type::GPG_KEY_FINGERPRINT_INDEX               = 405;
+   const unsigned int Handle_Value_Type::DETACHED_SIGNATURE_INDEX                = 406;
+   const unsigned int Handle_Value_Type::DETACHED_SIGNATURE_REF_INDEX            = 407;
+   const unsigned int Handle_Value_Type::DETACHED_SIGNATURE_PID_INDEX            = 408;
+
+   const unsigned int Handle_Value_Type::COMPRESSED_TAR_FILE_INDEX               = 501;
+   const unsigned int Handle_Value_Type::COMPRESSED_GZIP_INDEX                   = 502;  
+   const unsigned int Handle_Value_Type::COMPRESSED_BZIP2_INDEX                  = 503;
+
+   const unsigned int Handle_Value_Type::RESERVED_0_INDEX                        = 601;
+   const unsigned int Handle_Value_Type::RESERVED_1_INDEX                        = 701;
+   const unsigned int Handle_Value_Type::RESERVED_2_INDEX                        = 801;
+
+   const unsigned int Handle_Value_Type::OTHER_HANDLE_VALUE_TYPE_INDEX           = 901;
+
+   map<int, string>          Handle_Value_Type::idx_type_map;
+   map<string, unsigned int> Handle_Value_Type::type_idx_map;
+
+@q *** (3) Default constructor.  @>
+@ Default constructor.
+\initials{LDF 2012.10.12.}
+
+\LOG
+\initials{LDF 2012.10.12.}
+Added this function.
+\ENDLOG
+
+
+@<|Handle_Value_Type| function declarations@>=
+
+Handle_Value_Type(void);
+
+@
+@<|Handle_Value_Type| constructor definitions@>=
+
+Handle_Value_Type::Handle_Value_Type(void)
+{
+
+
+    idx = 0;
+    data = 0;
+    data_length = 0;
+    ttl_type = 0;
+    ttl = 0;
+    timestamp = 0;
+    refs = 0;
+    refs_length = 0;
+    handle_id = 0UL;
+    handle_value_id = 0UL;
+    created_by_user_id = 0;
+    irods_object_id = 0UL;
+
+    marked_for_deletion = false;
+    created = 0;
+    last_modified = 0;
+    delete_from_database_timestamp = 0;
+
+    return;
+
+} /* End of |Handle_Value_Type| default constructor definition  */
+
+@q *** (3) Copy constructor.  @>
+@ Copy constructor.
+\initials{LDF 2013.01.15.}
+
+\LOG
+\initials{LDF 2013.01.15.}
+Added this function.
+\ENDLOG
+
+@<|Handle_Value_Type| function declarations@>=
+
+Handle_Value_Type(const Handle_Value_Type& h);
+
+@
+@<|Handle_Value_Type| constructor definitions@>=
+
+Handle_Value_Type::Handle_Value_Type(const Handle_Value_Type& h)
+{
+
+    bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `Handle_Value_Type' copy constructor." << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    data = 0;
+    refs = 0;
+
+    operator=(h);
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `Handle_Value_Type' copy constructor." << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    return;
+
+}  /* End of |Handle_Value_Type| copy constructor  */
+
+@q *** (3) Assignment operator.  @>
+@ Assignment operator.
+\initials{LDF 2013.02.27.}
+
+\LOG
+\initials{LDF 2013.02.27.}
+Added this function.
+\ENDLOG
+
+@<|Handle_Value_Type| function declarations@>=
+
+void
+operator=(const Handle_Value_Type& h);
+
+@
+@<|Handle_Value_Type::operator=| definition@>=
+
+void
+Handle_Value_Type::operator=(const Handle_Value_Type& h)
+{
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `Handle_Value_Type' assignment operator." << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+    filename          = h.filename;
+    handle            = h.handle;
+    idx               = h.idx;
+    type              = h.type;
+
+    if (data)
+    {
+        delete[] data;
+        data = 0;
+    }
+
+    if (refs)
+    {
+        delete[] refs;
+        refs = 0;
+    }
+
+    data_length                        = h.data_length;
+    ttl_type                           = h.ttl_type;
+    ttl                                = h.ttl;
+    timestamp                          = h.timestamp;
+    refs_length                        = h.refs_length;
+    admin_read                         = h.admin_read;
+    admin_write                        = h.admin_write;
+    pub_read                           = h.pub_read;
+    pub_write                          = h.pub_write;
+    handle_id                          = h.handle_id;
+    handle_value_id                    = h.handle_value_id;
+    marked_for_deletion                = h.marked_for_deletion;
+    created                            = h.created;
+    last_modified                      = h.last_modified;
+    delete_from_database_timestamp     = h.delete_from_database_timestamp;
+    created_str                        = h.created_str;
+    last_modified_str                  = h.last_modified_str;
+    delete_from_database_timestamp_str = h.delete_from_database_timestamp_str;
+
+    created_by_user_id   = h.created_by_user_id;
+    irods_object_id      = h.irods_object_id;
+    created_by_user_name = h.created_by_user_name;
+
+    if (h.data)
+    {
+        data = new char[data_length];
+        memcpy(data, h.data, data_length);
+    }
+    else
+       data = 0;
+
+    if (h.refs)
+    {
+        refs = new char[refs_length];
+        memcpy(refs, h.refs, refs_length);
+    }
+    else
+       refs = 0;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `Handle_Value_Type' assignment operator." << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    return;
+
+}  /* End of |Handle_Value_Type| assignment operator definition  */
+
+@q *** (3) Destructor.  @>
+@ Destructor.
+\initials{LDF 2012.10.12.}
+
+\LOG
+\initials{LDF 2012.10.12.}
+Added this function.
+\ENDLOG
+
+
+@<|Handle_Value_Type| function declarations@>=
+
+~Handle_Value_Type(void);
+
+@
+@<|Handle_Value_Type| destructor definition@>=
+
+Handle_Value_Type::~Handle_Value_Type(void)
+{
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `Handle_Value_Type' destructor."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   if (data)
+   {
+      delete[] data;
+      data = 0;
+   }
+
+
+   if (refs)
+   {
+      delete[] refs;
+      refs = 0;
+   }
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `Handle_Value_Type' destructor successfully with no return value."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+   return;
+
+}  /* End of |Handle_Value_Type| destructor definition  */
+
+
+@q *** (3) Initialize |idx_type_map| and |type_idx_map|.  @>
+@ Initialize |idx_type_map| and |type_idx_map|.
+\initials{LDF 2013.02.05.}
+
+\LOG
+\initials{LDF 2013.02.05.}
+Added this function.
+
+\initials{LDF 2013.02.22.}
+Changed the name of this function from |initialize_idx_type_map| to |initialize_maps|.
+
+\initials{LDF 2013.02.22.}
+Added code for initializing |type_idx_map|.
+
+\initials{LDF 2013.03.07.}
+Added code to account for the new |static const unsigned int| data members 
+|DC_METADATA_IRODS_OBJECT_INDEX|,
+|DC_METADATA_IRODS_OBJECT_PID_INDEX| and |DC_METADATA_IRODS_OBJECT_REF_INDEX|.
+
+No significant changes.
+Added code to account for the new |static const unsigned int| data members 
+|CREATOR_INDEX| and |OWNER_INDEX|.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Handle_Value_Type| function declarations@>=
+
+static int initialize_maps(void);
+
+@q ***** (5) Definition @>
+@
+@<|Handle_Value_Type::initialize_maps| definition@>=
+
+int Handle_Value_Type::initialize_maps(void)
+{
+@q ****** (6) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `Handle_Value_Type::initialize_maps'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+   idx_type_map[NULL_HANDLE_VALUE_TYPE_INDEX]       = "NULL_HANDLE_VALUE_TYPE";        
+
+   idx_type_map[IRODS_OBJECT_INDEX]                 = "IRODS_OBJECT";                  
+   idx_type_map[IRODS_OBJECT_PID_INDEX]             = "IRODS_OBJECT_PID";              
+   idx_type_map[IRODS_OBJECT_REF_INDEX]             = "IRODS_OBJECT_REF";              
+   idx_type_map[IRODS_OBJECT_REF_PID_INDEX]         = "IRODS_OBJECT_REF_PID";              
+
+   idx_type_map[IRODS_OBJECT_DELETED_FROM_ARCHIVE_INDEX] 
+                                       = "IRODS_OBJECT_DELETED_FROM_ARCHIVE";          
+
+
+   idx_type_map[IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB_INDEX] 
+                                       = "IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB";      
+
+
+   idx_type_map[IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE_INDEX] 
+                                       = "IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE";          
+
+
+   idx_type_map[IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB_INDEX] 
+                                       = "IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB";      
+
+
+   idx_type_map[IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE_INDEX] 
+                                       = "IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE";          
+
+
+   idx_type_map[IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB_INDEX] 
+                                       = "IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB";
+
+
+
+   idx_type_map[DC_METADATA_INDEX]                  = "DC_METADATA";                   
+   idx_type_map[DC_METADATA_PID_INDEX]              = "DC_METADATA_PID";               
+   idx_type_map[DC_METADATA_REF_INDEX]              = "DC_METADATA_REF";               
+   idx_type_map[DC_METADATA_DELETED_INDEX]          = "DC_METADATA_DELETED";               
+   idx_type_map[DC_METADATA_DELETED_PID_INDEX]      = "DC_METADATA_DELETED_PID";               
+   idx_type_map[DC_METADATA_IRODS_OBJECT_INDEX]     = "DC_METADATA_IRODS_OBJECT";      
+   idx_type_map[DC_METADATA_IRODS_OBJECT_PID_INDEX] = "DC_METADATA_IRODS_OBJECT_PID";  
+   idx_type_map[DC_METADATA_IRODS_OBJECT_REF_INDEX] = "DC_METADATA_IRODS_OBJECT_REF";  
+   idx_type_map[DC_METADATA_IRODS_OBJECT_REF_INDEX] = "DC_METADATA_IRODS_OBJECT_REF";  
+
+   idx_type_map[DC_METADATA_IRODS_OBJECT_DELETED_FROM_ARCHIVE_INDEX]
+                                    = "DC_METADATA_IRODS_OBJECT_DELETED_FROM_ARCHIVE"; 
+   idx_type_map[DC_METADATA_IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB_INDEX]
+                               =  "DC_METADATA_IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB"; 
+
+
+   idx_type_map[DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE_INDEX]
+                                    = "DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE"; 
+   idx_type_map[DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB_INDEX]
+                               =  "DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB"; 
+
+   idx_type_map[DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE_INDEX]
+                                    = "DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE";
+   idx_type_map[DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB_INDEX]
+                               =  "DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB"; 
+
+
+   idx_type_map[CREATOR_INDEX]                      = "CREATOR";                       
+   idx_type_map[OWNER_INDEX]                        = "OWNER";                         
+
+   idx_type_map[HANDLE_MARKED_FOR_DELETION_INDEX]   = "HANDLE_MARKED_FOR_DELETION";    
+
+   idx_type_map[CHECKSUM_MD5_INDEX]                 = "CHECKSUM_MD5";
+   idx_type_map[CHECKSUM_SHA1_INDEX]                = "CHECKSUM_SHA1";
+   idx_type_map[CHECKSUM_SHA224_INDEX]              = "CHECKSUM_SHA224";
+   idx_type_map[CHECKSUM_SHA256_INDEX]              = "CHECKSUM_SHA256";
+   idx_type_map[CHECKSUM_SHA384_INDEX]              = "CHECKSUM_SHA384";
+   idx_type_map[CHECKSUM_SHA512_INDEX]              = "CHECKSUM_SHA512";
+
+   idx_type_map[ENCRYPTED_INDEX]                    = "ENCRYPTED";
+   idx_type_map[SIGNED_INDEX]                       = "SIGNED";
+   idx_type_map[CLEARSIGNED_INDEX]                  = "CLEARSIGNED";
+   idx_type_map[VERIFIED_INDEX]                     = "VERIFIED";
+
+   idx_type_map[GPG_KEY_FINGERPRINT_INDEX]          = "GPG_KEY_FINGERPRINT";               
+   idx_type_map[DETACHED_SIGNATURE_INDEX]           = "DETACHED_SIGNATURE";                
+   idx_type_map[DETACHED_SIGNATURE_REF_INDEX]       = "DETACHED_SIGNATURE_REF";            
+   idx_type_map[DETACHED_SIGNATURE_PID_INDEX]       = "DETACHED_SIGNATURE_PID";
+
+   idx_type_map[COMPRESSED_TAR_FILE_INDEX]          = "COMPRESSED_TAR_FILE";
+   idx_type_map[COMPRESSED_GZIP_INDEX]              = "COMPRESSED_GZIP";
+   idx_type_map[COMPRESSED_BZIP2_INDEX]             = "COMPRESSED_BZIP2";
+
+   idx_type_map[RESERVED_0_INDEX]                   = "RESERVED_0";                    
+   idx_type_map[RESERVED_1_INDEX]                   = "RESERVED_1";                    
+   idx_type_map[RESERVED_2_INDEX]                   = "RESERVED_2";                    
+   idx_type_map[OTHER_HANDLE_VALUE_TYPE_INDEX]      = "OTHER_HANDLE_VALUE_TYPE";       
+
+@q ****** (6) @>
+
+   type_idx_map["NULL_HANDLE_VALUE_TYPE"]       = NULL_HANDLE_VALUE_TYPE_INDEX;        
+
+   type_idx_map["IRODS_OBJECT"]                 = IRODS_OBJECT_INDEX;                  
+   type_idx_map["IRODS_OBJECT_PID"]             = IRODS_OBJECT_PID_INDEX;              
+   type_idx_map["IRODS_OBJECT_REF"]             = IRODS_OBJECT_REF_INDEX;
+   type_idx_map["IRODS_OBJECT_REF_PID"]         = IRODS_OBJECT_REF_PID_INDEX;
+
+   type_idx_map["IRODS_OBJECT_DELETED_FROM_ARCHIVE"]         
+                      = IRODS_OBJECT_DELETED_FROM_ARCHIVE_INDEX;                       
+
+   type_idx_map["IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB"] 
+                      = IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB_INDEX;                  
+
+
+   type_idx_map["IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE"]         
+                      = IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE_INDEX;                       
+
+   type_idx_map["IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB"] 
+                      = IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB_INDEX;                  
+
+
+   type_idx_map["IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE"]         
+                      = IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE_INDEX;                       
+
+   type_idx_map["IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB"] 
+                      = IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB_INDEX;
+
+
+
+   type_idx_map["DC_METADATA"]                  = DC_METADATA_INDEX;                   
+   type_idx_map["DC_METADATA_PID"]              = DC_METADATA_PID_INDEX;               
+   type_idx_map["DC_METADATA_REF"]              = DC_METADATA_REF_INDEX;               
+   type_idx_map["DC_METADATA_DELETED"]          = DC_METADATA_DELETED_INDEX;
+   type_idx_map["DC_METADATA_DELETED_PID"]      = DC_METADATA_DELETED_PID_INDEX;
+   type_idx_map["DC_METADATA_IRODS_OBJECT"]     = DC_METADATA_IRODS_OBJECT_INDEX;      
+   type_idx_map["DC_METADATA_IRODS_OBJECT_PID"] = DC_METADATA_IRODS_OBJECT_PID_INDEX;  
+   type_idx_map["DC_METADATA_IRODS_OBJECT_REF"] = DC_METADATA_IRODS_OBJECT_REF_INDEX;  
+
+   type_idx_map["DC_METADATA_IRODS_OBJECT_DELETED_FROM_ARCHIVE"]
+                                = DC_METADATA_IRODS_OBJECT_DELETED_FROM_ARCHIVE_INDEX; 
+   type_idx_map["DC_METADATA_IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB"]
+                           =  DC_METADATA_IRODS_OBJECT_DELETED_FROM_GWIRDSIF_DB_INDEX; 
+
+
+   type_idx_map["DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE"]
+                                = DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_ARCHIVE_INDEX; 
+   type_idx_map["DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB"]
+                           =  DC_METADATA_IRODS_OBJECT_REF_DELETED_FROM_GWIRDSIF_DB_INDEX; 
+
+
+   type_idx_map["DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE"]
+                                = DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_ARCHIVE_INDEX;
+   type_idx_map["DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB"]
+                           =  DC_METADATA_IRODS_OBJECT_MARKED_FOR_DELETION_FROM_GWIRDSIF_DB_INDEX; 
+
+   type_idx_map["CREATOR"]                      = CREATOR_INDEX;                       
+   type_idx_map["OWNER"]                        = OWNER_INDEX;                         
+   type_idx_map["HANDLE_MARKED_FOR_DELETION"]   = HANDLE_MARKED_FOR_DELETION_INDEX;    
+
+   type_idx_map["CHECKSUM_MD5"]                 = CHECKSUM_MD5_INDEX;
+   type_idx_map["CHECKSUM_SHA1"]                = CHECKSUM_SHA1_INDEX;
+   type_idx_map["CHECKSUM_SHA224"]              = CHECKSUM_SHA224_INDEX;
+   type_idx_map["CHECKSUM_SHA256"]              = CHECKSUM_SHA256_INDEX;
+   type_idx_map["CHECKSUM_SHA384"]              = CHECKSUM_SHA384_INDEX;
+   type_idx_map["CHECKSUM_SHA512"]              = CHECKSUM_SHA512_INDEX;
+
+   type_idx_map["ENCRYPTED"]                    = ENCRYPTED_INDEX;
+   type_idx_map["SIGNED"]                       = SIGNED_INDEX;
+   type_idx_map["CLEARSIGNED"]                  = CLEARSIGNED_INDEX;
+   type_idx_map["VERIFIED"]                     = VERIFIED_INDEX;
+
+   type_idx_map["GPG_KEY_FINGERPRINT"]          = GPG_KEY_FINGERPRINT_INDEX;               
+   type_idx_map["DETACHED_SIGNATURE"]           = DETACHED_SIGNATURE_INDEX;                
+   type_idx_map["DETACHED_SIGNATURE_REF"]       = DETACHED_SIGNATURE_REF_INDEX;            
+   type_idx_map["DETACHED_SIGNATURE_PID"]       = DETACHED_SIGNATURE_PID_INDEX;            
+
+   type_idx_map["COMPRESSED_TAR_FILE"]          = COMPRESSED_TAR_FILE_INDEX;
+   type_idx_map["COMPRESSED_GZIP"]              = COMPRESSED_GZIP_INDEX;
+   type_idx_map["COMPRESSED_BZIP2"]             = COMPRESSED_BZIP2_INDEX;
+
+   type_idx_map["RESERVED_0"]                   = RESERVED_0_INDEX;                    
+   type_idx_map["RESERVED_1"]                   = RESERVED_1_INDEX;                    
+   type_idx_map["RESERVED_2"]                   = RESERVED_2_INDEX;                    
+   type_idx_map["OTHER_HANDLE_VALUE_TYPE"]      = OTHER_HANDLE_VALUE_TYPE_INDEX;       
+
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+
+       lock_cerr_mutex(); 
+       cerr << "`idx_type_map':" << endl;
+
+       for (map<int, string>::const_iterator iter = idx_type_map.begin();
+            iter != idx_type_map.end(); 
+            ++iter)
+       {
+           cerr << setw(3) << iter->first << ", " << iter->second << endl;
+
+       }  /* |for|  */
+
+
+       unlock_cerr_mutex(); 
+
+
+       lock_cerr_mutex(); 
+       cerr << "Exiting `Handle_Value_Type::initialize_maps' successfully with return value 0."
+            << endl;
+
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+   return 0;
+
+}  /* End of |Handle_Value_Type::initialize_maps| definition  */
+
+
+@q *** (3) Set with |MYSQL_ROW&| argument.  @>
+@ Set with |MYSQL_ROW&| argument.
+\initials{LDF 2012.10.12.}
+
+As of this date (i.e., 2013.02.27.), this function is only called by 
+|Scan_Parse_Parameter_Type::get_handle|, which is defined in 
+\filename{spptfnc1.web}.
+\initials{LDF 2013.02.27.}
+
+\LOG
+\initials{LDF 2012.10.12.}
+Added this function.
+
+\initials{LDF 2013.01.14.}
+@:BUG FIX@> BUG FIX:  Now converting |created| and |last_modified| to |time_t| values.
+
+\initials{LDF 2013.02.07.}
+Added argument |unsigned int field_ctr|.  Made |string hhandle| 
+optional with the empty string as its default value.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Handle_Value_Type| function declarations@>=
+int
+set(MYSQL_ROW &curr_row, 
+    unsigned int field_ctr, 
+    string hhandle = "", 
+    int thread_ctr = -1);
+
+@q **** (4) Definition  @>
+@
+@<|Handle_Value_Type::set| definitions@>=
+int
+Handle_Value_Type::set(MYSQL_ROW &curr_row, 
+                       unsigned int field_ctr, 
+                       string hhandle, 
+                       int thread_ctr)
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+   int status;
+
+   string thread_ctr_str;
+
+   stringstream temp_strm;
+
+   struct tm tmp_tm;
+   char *temp_char_ptr = 0;
+   char temp_buffer[32];
+   unsigned long temp_val = 0;
+
+   memset(temp_buffer, 0, 32);
+
+   if (thread_ctr > 0)
+   {
+      temp_strm << "[Thread " << thread_ctr << "] ";
+   }
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "Entering `Handle_Value_Type::set'."
+            << endl
+            << "`field_ctr' == " << field_ctr << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */     
+
+   clear();
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::set| definitions@>=
+
+   if (field_ctr <= 18)
+      handle = hhandle;
+
+/* !! TODO:  Add error-handling and debugging output.  LDF 2012.10.15. */
+
+@q ****** (6) |handle_id|  @>
+@ |handle_id|.
+
+@<|Handle_Value_Type::set| definitions@>=
+
+   if (curr_row[0] && strlen(curr_row[0]))
+   {
+      handle_id = atoi(curr_row[0]);
+   }
+   else
+   {
+
+   }
+
+@q ****** (6) |handle_value_id|  @>
+@ |handle_value_id|.
+
+@<|Handle_Value_Type::set| definitions@>=
+
+   if (curr_row[1] && strlen(curr_row[1]))
+   {
+      handle_value_id = atoi(curr_row[1]);
+   }
+   else
+   {
+
+   }
+
+@q ****** (6) |idx|  @>
+@ |idx|.
+
+@<|Handle_Value_Type::set| definitions@>=
+
+   if (curr_row[2] && strlen(curr_row[2]))
+   {
+       idx = atoi(curr_row[2]);
+   }
+   else
+   {
+
+   }
+
+@q ****** (6) |type|  @>
+@ |type|.
+
+@<|Handle_Value_Type::set| definitions@>=
+
+   if (curr_row[3] && strlen(curr_row[3]))
+   {
+       type = curr_row[3];
+   }
+   else
+   {
+
+   }
+
+@q ****** (6) |length(data)| and |data|.  @>
+@ \.{length(data)} and |data|.
+
+@<|Handle_Value_Type::set| definitions@>=
+
+   data_length = 0;
+   data        = 0;
+
+   if (curr_row[4] && strlen(curr_row[4]))
+   {
+       data_length = atoi(curr_row[4]);
+
+       if (data_length > 0 && curr_row[5])
+       {
+           data = new char[data_length];
+           memset(data, 0, data_length);
+           memcpy(data, curr_row[5], data_length);
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "In `Handle_Value_Type::set':  "
+                    << "data_length == " << data_length << endl
+                    << "data == " << endl;
+               fwrite(data, 1, data_length, stderr);
+               cerr << endl
+                    << "data[data_length - 1] == " << data[data_length - 1]
+                    << " == numerical value " 
+                    << static_cast<unsigned int>(data[data_length - 1])
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       }  /* |if (data_length > 0 && curr_row[5])|  */
+   }
+   else
+   {
+
+   }
+
+@q ****** (6) |ttl_type|  @>
+@ |ttl_type|.
+
+@<|Handle_Value_Type::set| definitions@>=
+
+   if (curr_row[6] && strlen(curr_row[6]))
+   {
+       ttl_type = atoi(curr_row[6]);
+   }
+   else
+   {
+
+   }
+
+@q ****** (6) |ttl|  @>
+@ |ttl|.
+
+@<|Handle_Value_Type::set| definitions@>=
+
+   if (curr_row[7] && strlen(curr_row[7]))
+   {
+       ttl = atoi(curr_row[7]);
+   }
+   else
+   {
+
+   }
+
+@q ****** (6) |timestamp|  @>
+@ |timestamp|.
+
+@<|Handle_Value_Type::set| definitions@>=
+
+   if (curr_row[8] && strlen(curr_row[8]))
+   {
+        timestamp = strtoul(curr_row[8], 0, 10);
+
+       
+   }
+   else
+   {
+
+   }
+
+@q ****** (6) |length(refs)| and |refs|  @>
+@ \.{length(refs)} and |refs|.
+
+@<|Handle_Value_Type::set| definitions@>=
+
+
+   refs_length = 0;
+   refs        = 0;
+
+   if (curr_row[9] && strlen(curr_row[9]))
+   {
+       refs_length = atoi(curr_row[9]);
+
+       if (refs_length > 0 && curr_row[10])
+       {
+           refs = new char[refs_length];
+           memset(refs, 0, refs_length);
+           memcpy(refs, curr_row[10], refs_length);
+       }
+   }
+   else
+   {
+
+   }
+
+@q ****** (6) |admin_read|  @>
+@ |admin_read|.
+
+@<|Handle_Value_Type::set| definitions@>=
+
+   if (curr_row[11] && strlen(curr_row[11]))
+   {
+           admin_read = atoi(curr_row[11]);
+   }
+   else
+   {
+
+   }
+
+@q ****** (6) |admin_write|  @>
+@ |admin_write|.
+
+@<|Handle_Value_Type::set| definitions@>=
+
+   if (curr_row[12] && strlen(curr_row[12]))
+   {
+           admin_write = atoi(curr_row[12]);
+   }
+   else
+   {
+
+   }
+
+@q ****** (6) |pub_read|  @>
+@ |pub_read|.
+
+@<|Handle_Value_Type::set| definitions@>=
+
+   if (curr_row[13] && strlen(curr_row[13]))
+   {
+       pub_read = atoi(curr_row[13]);
+   }
+   else
+   {
+
+   }
+
+@q ****** (6) |pub_write|  @>
+@ |pub_write|.
+
+@<|Handle_Value_Type::set| definitions@>=
+
+   if (curr_row[14] && strlen(curr_row[14]))
+   {
+       pub_write = atoi(curr_row[14]);
+   }
+   else
+   {
+
+   }
+
+@q ****** (6) |marked_for_deletion|  @>
+@ |marked_for_deletion|.
+
+\LOG
+\initials{LDF 2013.01.11.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Value_Type::set| definitions@>=
+
+   if (curr_row[15] && strlen(curr_row[15]))
+   {
+        marked_for_deletion = strtoul(curr_row[15], 0, 10);
+   }
+   else
+   {
+
+   }
+
+@q ****** (6) |created|  @>
+@ |created|.
+
+\LOG
+\initials{LDF 2013.02.07.}
+Added code for catching the case that |created == 0|.
+\ENDLOG 
+
+@<|Handle_Value_Type::set| definitions@>=
+
+   if (curr_row[16] && strlen(curr_row[16]))
+   {
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+             cerr << "curr_row[16] == " << curr_row[16] << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        created_str = curr_row[16];
+
+        if (strcmp(curr_row[16], "0000-00-00 00:00:00") == 0)
+        {
+           created = 0;
+        }
+        else
+        {
+@q ******** (8) @>
+
+            temp_char_ptr = 0;
+
+            temp_char_ptr = strptime(curr_row[16], "%Y-%m-%d %H:%M:%S", &tmp_tm);
+
+            if (temp_char_ptr == 0)
+            {   
+@q ********* (9) @>
+
+                lock_cerr_mutex(); 
+                cerr << "WARNING!  In `Handle_Value_Type::set':  `strptime' failed, "
+                     << "returning NULL."
+                     << endl
+                     << "Setting `created' to 0.  Will try to continue."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                created = 0;
+
+@q ********* (9) @>
+
+            }  /* |if (temp_char_ptr == 0)|  */
+            else
+            {   
+@q ********* (9) @>
+
+                memset(temp_buffer, 0, 32);
+
+                status = strftime(temp_buffer, 32, "%s", &tmp_tm);
+
+                if (status == 0)
+                {
+                    lock_cerr_mutex(); 
+                    cerr << "WARNING!  In `Handle_Value_Type::set':  `strftime' failed, "
+                         << "returning NULL."
+                         << endl
+                         << "Setting `created' to 0.  Will try to continue."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                    created = 0;
+
+                }  /* |if (status == 0)|  */
+
+               else
+               {
+@q ********** (10) @>
+
+                    errno = 0;
+
+                    temp_val =  strtoul(temp_buffer, 0, 10);
+
+@q ********** (10) @>
+
+                    if (temp_val == ULONG_MAX)
+                    {
+
+                        lock_cerr_mutex(); 
+                        cerr << "WARNING!  In `Handle_Value_Type::set':  "
+                             << "`strtoul' failed, returning `ULONG_MAX':"
+                             << endl
+                             << strerror(errno)
+                             << endl 
+                             << "Setting `created' to 0.  Will try to continue."
+                             << endl;
+                        unlock_cerr_mutex(); 
+
+                        created = 0;
+
+                    }  /* |if (temp_val == ULONG_MAX)|  */
+
+@q ********** (10) @>
+
+                    else
+                    {
+                         created = temp_val;
+                    }     
+
+@q ********** (10) @>
+
+               }  /* |else|  */
+
+@q ********* (9) @>
+
+            }  /* |else|  */
+
+@q ******** (8) @>
+
+        }  /* |else| */
+
+@q ******* (7) @>
+
+   }  /* |if (curr_row[16] && strlen(curr_row[16]))|  */
+
+@q ****** (6) @>
+
+   else
+   {
+
+        created     = 0;
+        created_str = "";
+
+   }
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "`created'     == " << created << endl
+                 << "`created_str' == " << created_str << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) |last_modified|  @>
+@ |last_modified|.
+
+\LOG
+\initials{LDF 2013.02.07.}
+Added code for catching the case that |last_modified == 0|.
+\ENDLOG 
+
+@<|Handle_Value_Type::set| definitions@>=
+
+   if (curr_row[17] && strlen(curr_row[17]))
+   {
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+             cerr << "curr_row[17] == " << curr_row[17] << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        last_modified_str = curr_row[17];
+
+        if (strcmp(curr_row[17], "0000-00-00 00:00:00") == 0)
+        {
+           last_modified = 0;
+        }
+        else
+        {
+@q ******** (8) @>
+
+            temp_char_ptr = 0;
+
+            temp_char_ptr = strptime(curr_row[17], "%Y-%m-%d %H:%M:%S", &tmp_tm);
+
+            if (temp_char_ptr == 0)
+            {   
+@q ********* (9) @>
+
+                lock_cerr_mutex(); 
+                cerr << "WARNING!  In `Handle_Value_Type::set':  `strptime' failed, "
+                     << "returning NULL."
+                     << endl
+                     << "Setting `last_modified' to 0.  Will try to continue."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                last_modified = 0;
+
+@q ********* (9) @>
+
+            }  /* |if (temp_char_ptr == 0)|  */
+            else
+            {   
+@q ********* (9) @>
+
+                memset(temp_buffer, 0, 32);
+
+                status = strftime(temp_buffer, 32, "%s", &tmp_tm);
+
+                if (status == 0)
+                {
+                    lock_cerr_mutex(); 
+                    cerr << "WARNING!  In `Handle_Value_Type::set':  `strftime' failed, "
+                         << "returning NULL."
+                         << endl
+                         << "Setting `last_modified' to 0.  Will try to continue."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                    last_modified = 0;
+
+                }  /* |if (status == 0)|  */
+
+               else
+               {
+@q ********** (10) @>
+
+                    errno = 0;
+
+                    temp_val =  strtoul(temp_buffer, 0, 10);
+
+@q ********** (10) @>
+
+                    if (temp_val == ULONG_MAX)
+                    {
+
+                        lock_cerr_mutex(); 
+                        cerr << "WARNING!  In `Handle_Value_Type::set':  "
+                             << "`strtoul' failed, returning `ULONG_MAX':"
+                             << endl
+                             << strerror(errno)
+                             << endl 
+                             << "Setting `last_modified' to 0.  Will try to continue."
+                             << endl;
+                        unlock_cerr_mutex(); 
+
+                        last_modified = 0;
+
+                    }  /* |if (temp_val == ULONG_MAX)|  */
+
+@q ********** (10) @>
+
+                    else
+                    {
+                         last_modified = temp_val;
+                    }     
+
+@q ********** (10) @>
+
+               }  /* |else|  */
+
+@q ********* (9) @>
+
+            }  /* |else|  */
+
+@q ******** (8) @>
+
+        }  /* |else| */
+
+@q ******* (7) @>
+
+   }  /* |if (curr_row[17] && strlen(curr_row[17]))|  */
+
+   else 
+   {
+       last_modified = 0;
+       last_modified_str = "";
+   }
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "`last_modified'     == " << last_modified << endl
+                 << "`last_modified_str' == " << last_modified_str << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+@q ***** (5) |handle|.  @>
+@ |handle|.  
+\initials{LDF 2013.02.07.}
+
+\LOG
+\initials{LDF 2013.02.07.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Value_Type::set| definitions@>=
+ 
+   if (field_ctr > 18)
+   {
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "In `Handle_Value_Type::set':  `field_ctr' == " 
+            << field_ctr << " (> 18)."
+            << endl 
+            << "Setting `handle' to `curr_row[18]' == `" << curr_row[18] << "'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        handle = curr_row[18];
+
+   }  /* |if (field_ctr > 18)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "In `Handle_Value_Type::set':  `field_ctr' == " 
+            << field_ctr << " (<= 18)."
+            << endl 
+            << "`handle' should have been set to "
+            << "`hhandle' == `" << hhandle << "' above."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) |created_by_user_id|.  @>
+@ |created_by_user_id|.  
+\initials{LDF 2013.02.07.}
+
+\LOG
+\initials{LDF 2013.02.07.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Value_Type::set| definitions@>=
+ 
+   if (field_ctr > 19)
+   {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `Handle_Value_Type::set':  `field_ctr' == " 
+                << field_ctr << " (> 19)."
+                << endl; 
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+       if (curr_row[19] && strlen(curr_row[19]) > 0)
+       {
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_ctr_str << "In `Handle_Value_Type::set':  "
+                    << "`curr_row[19]' == " << curr_row[19]
+                    << endl 
+                    << "Setting `created_by_user_id' to " << curr_row[19] << "."
+                    << endl; 
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+           errno = 0;
+           created_by_user_id = strtol(curr_row[19], 0, 10);
+
+           if (created_by_user_id == LONG_MAX || created_by_user_id == LONG_MIN)
+           {
+               lock_cerr_mutex(); 
+               cerr << "WARNING!  In `Handle_Value_Type::set':  "
+                    << "`strtol' failed, returning ";
+
+               if (created_by_user_id == LONG_MAX)
+                   cerr << "`LONG_MAX'." << endl;
+               else
+                   cerr << "`LONG_MIN'." << endl;
+
+               cerr << endl
+                    << strerror(errno)
+                    << endl 
+                    << "Setting `created_by_user_id' to 0.  Continuing."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               created_by_user_id = 0;
+
+           }  /* |if|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+           else if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_ctr_str << "In `Handle_Value_Type::set':  "
+                    << "`strtol' succeeded.  Set `created_by_user_id' to " 
+                    << created_by_user_id << "."
+                    << endl; 
+               unlock_cerr_mutex(); 
+
+           }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ******* (7) @>
+
+       }  /* |if (curr_row[19] && strlen(curr_row[19]) > 0)|  */
+
+       else
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_ctr_str << "In `Handle_Value_Type::set':  "
+                    << "`curr_row[19]' is NULL or empty."
+                    << endl
+                    << "Setting `created_by_user_id' to 0."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           created_by_user_id = 0;
+            
+       }  /* |else|  */
+
+@q ****** (6) @>
+
+   }  /* |if (field_ctr > 19)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "In `Handle_Value_Type::set':  `field_ctr' == " 
+            << field_ctr << " (<= 19)."
+            << endl
+            << "Not setting `created_by_user_id'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) |irods_object_id|.  @>
+@ |irods_object_id|.  
+\initials{LDF 2013.08.26.}
+
+\LOG
+\initials{LDF 2013.08.26.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Value_Type::set| definitions@>=
+ 
+   if (field_ctr > 20)
+   {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_ctr_str << "In `Handle_Value_Type::set':  `field_ctr' == " 
+                << field_ctr << " (> 20)."
+                << endl; 
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+       if (curr_row[20] && strlen(curr_row[20]) > 0)
+       {
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_ctr_str << "In `Handle_Value_Type::set':  "
+                    << "`curr_row[20]' == " << curr_row[20]
+                    << endl 
+                    << "Setting `irods_object_id' to " << curr_row[20] << "."
+                    << endl; 
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+           errno = 0;
+           irods_object_id = strtoul(curr_row[20], 0, 10);
+
+           if (irods_object_id == ULONG_MAX)
+           {
+               lock_cerr_mutex(); 
+               cerr << "WARNING!  In `Handle_Value_Type::set':  "
+                    << "`strtoul' failed, returning `ULONG_MAX':"
+                    << endl
+                    << strerror(errno)
+                    << endl 
+                    << "Setting `irods_object_id' to 0UL.  Continuing."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               irods_object_id = 0UL;
+
+           }  /* |if|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+           else if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_ctr_str << "In `Handle_Value_Type::set':  "
+                    << "`strtoul' succeeded.  Set `irods_object_id' to " 
+                    << irods_object_id << "."
+                    << endl; 
+               unlock_cerr_mutex(); 
+
+           }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ******* (7) @>
+
+       }  /* |if (curr_row[20] && strlen(curr_row[20]) > 0)|  */
+
+       else
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_ctr_str << "In `Handle_Value_Type::set':  "
+                    << "`curr_row[20]' is NULL or empty."
+                    << endl
+                    << "Setting `irods_object_id' to 0UL."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           irods_object_id = 0UL;
+            
+       }  /* |else|  */
+
+@q ****** (6) @>
+
+   }  /* |if (field_ctr > 20)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "In `Handle_Value_Type::set':  `field_ctr' == " 
+            << field_ctr << " (<= 20)."
+            << endl
+            << "Not setting `irods_object_id'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+
+@q ****** (6) |delete_from_database_timestamp|  @>
+@ |delete_from_database_timestamp|.
+\initials{LDF 2013.08.26.}
+
+\LOG
+\initials{LDF 2013.08.26.}
+Added this section.
+\ENDLOG
+@<|Handle_Value_Type::set| definitions@>=
+
+   if (field_ctr > 21 && curr_row[21] && strlen(curr_row[21]))
+   {
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+             cerr << "curr_row[21] == " << curr_row[21] << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        delete_from_database_timestamp_str = curr_row[21];
+
+        if (strcmp(curr_row[21], "0000-00-00 00:00:00") == 0)
+        {
+           delete_from_database_timestamp = 0;
+        }
+        else
+        {
+@q ******** (8) @>
+
+            temp_char_ptr = 0;
+
+            temp_char_ptr = strptime(curr_row[21], "%Y-%m-%d %H:%M:%S", &tmp_tm);
+
+            if (temp_char_ptr == 0)
+            {   
+@q ********* (9) @>
+
+                lock_cerr_mutex(); 
+                cerr << "WARNING!  In `Handle_Value_Type::set':  `strptime' failed, "
+                     << "returning NULL."
+                     << endl
+                     << "Setting `delete_from_database_timestamp' to 0.  Will try to continue."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                delete_from_database_timestamp = 0;
+
+@q ********* (9) @>
+
+            }  /* |if (temp_char_ptr == 0)|  */
+            else
+            {   
+@q ********* (9) @>
+
+                memset(temp_buffer, 0, 32);
+
+                status = strftime(temp_buffer, 32, "%s", &tmp_tm);
+
+                if (status == 0)
+                {
+                    lock_cerr_mutex(); 
+                    cerr << "WARNING!  In `Handle_Value_Type::set':  `strftime' failed, "
+                         << "returning NULL."
+                         << endl
+                         << "Setting `delete_from_database_timestamp' to 0.  Will try to continue."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                    delete_from_database_timestamp = 0;
+
+                }  /* |if (status == 0)|  */
+
+               else
+               {
+@q ********** (10) @>
+
+                    errno = 0;
+
+                    temp_val =  strtoul(temp_buffer, 0, 10);
+
+@q ********** (10) @>
+
+                    if (temp_val == ULONG_MAX)
+                    {
+
+                        lock_cerr_mutex(); 
+                        cerr << "WARNING!  In `Handle_Value_Type::set':  "
+                             << "`strtoul' failed, returning `ULONG_MAX':"
+                             << endl
+                             << strerror(errno)
+                             << endl 
+                             << "Setting `delete_from_database_timestamp' to 0.  "
+                             << "Will try to continue."
+                             << endl;
+                        unlock_cerr_mutex(); 
+
+                        delete_from_database_timestamp = 0;
+
+                    }  /* |if (temp_val == ULONG_MAX)|  */
+
+@q ********** (10) @>
+
+                    else
+                    {
+                         delete_from_database_timestamp = temp_val;
+                    }     
+
+@q ********** (10) @>
+
+               }  /* |else|  */
+
+@q ********* (9) @>
+
+            }  /* |else|  */
+
+@q ******** (8) @>
+
+        }  /* |else| */
+
+@q ******* (7) @>
+
+   }  /* |if (field_ctr > 21 && curr_row[21] && strlen(curr_row[21]))|  */
+
+#if DEBUG_COMPILE
+   else if (field_ctr <= 21 && DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "In `Handle_Value_Type::set':  `field_ctr' == " 
+            << field_ctr << " (<= 21)."
+            << endl
+            << "Not setting `delete_from_database_timestamp' and "
+            << "`delete_from_database_timestamp_str'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.03.01.}
+Added this section.
+\ENDLOG
+@<|Handle_Value_Type::set| definitions@>=
+
+   if (type == "IRODS_OBJECT" && data != 0 && data_length > 0)
+   {
+       filename.assign(data, data_length);    
+   }
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::set| definitions@>=
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_ctr_str << "Exiting `Handle_Value_Type::set' "
+            << "successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */     
+
+
+    return 0;
+
+}  /* End of |Handle_Value_Type::set|  */
+
+@q *** (3) Set with arguments for the individual data members.  @>
+@ Set with arguments for the individual data members.
+\initials{LDF 2013.01.11.}
+
+\LOG
+\initials{LDF 2013.01.11.}
+Added this function.
+
+\initials{LDF 2013.02.27.}
+Added argument |long int ccreated_by_user_id|.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Handle_Value_Type| function declarations@>=
+int
+set(string hhandle,
+    int iidx, 
+    string ttype, 
+    char *ddata, 
+    unsigned int ddata_length, 
+    int tttl_type, 
+    int tttl,
+    time_t ttimestamp,
+    char *rrefs,
+    unsigned int rrefs_length,
+    bool aadmin_read,
+    bool aadmin_write,
+    bool ppub_read,
+    bool ppub_write,
+    long int ccreated_by_user_id, 
+    unsigned long int hhandle_id,
+    unsigned long int hhandle_value_id,
+    bool mmarked_for_deletion,
+    time_t ccreated,
+    time_t llast_modified,
+    string ccreated_str = "",
+    string llast_modified_str = "",
+    string ffilename = "");
+
+
+@q **** (4) Definition  @>
+@
+@<|Handle_Value_Type::set| definitions@>=
+int
+Handle_Value_Type::set(string hhandle,
+                 int iidx,     
+                 string ttype, 
+                 char *ddata, 
+                 unsigned int ddata_length, 
+                 int tttl_type, 
+                 int tttl,
+                 time_t ttimestamp,
+                 char *rrefs,
+                 unsigned int rrefs_length,
+                 bool aadmin_read,
+                 bool aadmin_write,
+                 bool ppub_read,
+                 bool ppub_write,
+                 long int ccreated_by_user_id,
+                 unsigned long int hhandle_id,
+                 unsigned long int hhandle_value_id,
+                 bool mmarked_for_deletion,
+                 time_t ccreated,
+                 time_t llast_modified,
+                 string ccreated_str,
+                 string llast_modified_str,
+                 string ffilename)
+{
+
+@q ***** (5) @>
+    
+    bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+    int status = 0;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `Handle_Value_Type::set'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.01.30.}
+@:BUG FIX@> BUG FIX:  Now setting |handle| to |hhandle|.
+\ENDLOG 
+
+@<|Handle_Value_Type::set| definitions@>=
+
+    handle              = hhandle;
+    idx                 = iidx;
+    type                = ttype;
+    data_length         = ddata_length;
+    ttl_type            = tttl_type;
+    ttl                 = tttl;
+    timestamp           = ttimestamp;
+
+    refs_length         = rrefs_length;
+    admin_read          = aadmin_read;
+    admin_write         = aadmin_write;
+    pub_read            = ppub_read;
+    pub_write           = ppub_write;
+    handle_id           = hhandle_id;
+    created_by_user_id  = ccreated_by_user_id;
+    handle_value_id     = hhandle_value_id;
+    marked_for_deletion = mmarked_for_deletion;
+    created             = ccreated;
+    last_modified       = llast_modified;
+    created_str         = ccreated_str;
+    last_modified_str   = llast_modified_str;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "admin_data_length == " << admin_data_length << endl;
+       fwrite(admin_data, 1, admin_data_length, stderr);
+       cerr << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    if (ddata && data_length > 0)  
+    {
+       /* |data_length| has been set to |ddata_length| above.
+          \initials{LDF 2013.09.14.}  */
+
+       data = new char[data_length];
+       memcpy(data, ddata, data_length);
+    }
+    else
+       data = 0;
+
+    if (rrefs && refs_length > 0)
+    {
+
+       /* |refs_length| has been set to |rrefs_length| above.
+          \initials{LDF 2013.09.14.}  */
+
+       refs = new char[refs_length];
+       memcpy(refs, rrefs, refs_length);
+    }
+    else
+       refs = 0;
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.02.07.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Value_Type::set| definitions@>=
+
+    struct tm tmp;
+    char buffer[64];
+    memset(buffer, 0, 64);
+
+    if (created > 0 && created_str == "")
+    {
+         if (gmtime_r(&created, &tmp) == 0) 
+         {
+            lock_cerr_mutex(); 
+            cerr << "WARNING!  In `Handle_Value_Type::set':"
+                 << endl
+                 << "`gmtime_r' failed, returning NULL."
+                 << endl
+                 << "Failed to set `created_str'.  Will set it to the empty string."
+                 << endl
+                 << "Continuing."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            created_str = "";
+
+         }
+#if DEBUG_COMPILE
+         else if (DEBUG)
+         {
+             lock_cerr_mutex(); 
+             cerr << "In `Handle_Value_Type::set':"
+                  << endl
+                  << "`gmtime_r' succeeded."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+         }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */         
+
+       status = strftime(buffer, 64, "%Y-%m-%d %H:%M:%S %Z %z", &tmp);
+       
+       if (status == 0)
+       {
+            lock_cerr_mutex(); 
+            cerr << "WARNING!  In `Handle_Value_Type::set':"
+                 << endl
+                 << "`strftime' failed, returning NULL."
+                 << endl
+                 << "Failed to set `created_str'.  Will set it to the empty string."
+                 << endl
+                 << "Continuing."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            created_str = "";
+
+
+       }  /* |if (status == 0)|  */
+
+       else 
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+                lock_cerr_mutex(); 
+                cerr << "In `Handle_Value_Type::set':"
+                     << endl
+                     << "`strftime' succeeded, returning " << status << "."
+                     << endl
+                     << "`buffer' == " << buffer << "."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+           }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           created_str = buffer;
+
+       }  /* |else|  */
+
+    }  /* |if (created > 0 && created_str == "")|  */
+
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.02.07.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Value_Type::set| definitions@>=
+
+    memset(buffer, 0, 64);
+
+    if (last_modified > 0 && last_modified_str == "")
+    {
+         if (gmtime_r(&last_modified, &tmp) == 0) 
+         {
+            lock_cerr_mutex(); 
+            cerr << "WARNING!  In `Handle_Value_Type::set':"
+                 << endl
+                 << "`gmtime_r' failed, returning NULL."
+                 << endl
+                 << "Failed to set `last_modified_str'.  Will set it to the empty string."
+                 << endl
+                 << "Continuing."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            last_modified_str = "";
+
+         }
+#if DEBUG_COMPILE
+         else if (DEBUG)
+         {
+             lock_cerr_mutex(); 
+             cerr << "In `Handle_Value_Type::set':"
+                  << endl
+                  << "`gmtime_r' succeeded."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+         }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */         
+
+       status = strftime(buffer, 64, "%Y-%m-%d %H:%M:%S %Z %z", &tmp);
+       
+       if (status == 0)
+       {
+            lock_cerr_mutex(); 
+            cerr << "WARNING!  In `Handle_Value_Type::set':"
+                 << endl
+                 << "`strftime' failed, returning NULL."
+                 << endl
+                 << "Failed to set `last_modified_str'.  Will set it to the empty string."
+                 << endl
+                 << "Continuing."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            last_modified_str = "";
+
+
+       }  /* |if (status == 0)|  */
+
+       else 
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+                lock_cerr_mutex(); 
+                cerr << "In `Handle_Value_Type::set':"
+                     << endl
+                     << "`strftime' succeeded, returning " << status << "."
+                     << endl
+                     << "`buffer' == " << buffer << "."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+           }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           last_modified_str = buffer;
+
+       }  /* |else|  */
+
+    }  /* |if (last_modified > 0 && last_modified_str == "")|  */
+
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.03.01.}
+Added this section.
+\ENDLOG
+@<|Handle_Value_Type::set| definitions@>=
+
+   if (!ffilename.empty())
+      filename = ffilename;
+
+   else if (type == "IRODS_OBJECT" && data != 0 && data_length > 0)
+   {
+       filename.assign(data, data_length);    
+   }
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::set| definitions@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `Handle_Value_Type::set' successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    return 0;
+
+
+}  /* End of |Handle_Value_Type::set| definition  */
+
+@q *** (3) Delete handle value (|delete_handle_value|).  @>
+@ Delete handle value (|delete_handle_value|).
+\initials{LDF 2013.08.30.}
+
+\LOG
+\initials{LDF 2013.08.30.}
+Added this function.
+
+\initials{LDF 2013.09.10.}
+Added argument |MYSQL &*mysql_ptr|.
+
+\initials{LDF 2013.09.11.}
+Added required argument |deque<Response_Type> &response_deque| and 
+optional arguments |unsigned int options = 0U| and |unsigned long int delay_value = 0|.
+
+\initials{LDF 2013.09.12.}
+Added required arguments |int user_id|, |string username| and |unsigned int privileges|.
+
+\initials{LDF 2013.09.12.}
+Removed the arguments |char *buffer_ptr| and |size_t buffer_size|.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Handle_Value_Type| function declarations@>=
+
+static 
+int 
+delete_handle_value(MYSQL *&mysql_ptr,
+                    string hv_str,
+                    deque<Response_Type> &response_deque,
+                    int user_id,
+                    string username,
+                    unsigned int privileges,
+                    unsigned int options = 0U,
+                    unsigned long int delay_value = 0,
+                    string thread_str = "");
+
+@q ***** (5) Definition @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+int 
+Handle_Value_Type::delete_handle_value(MYSQL *&mysql_ptr,
+                                       string hv_str,
+                                       deque<Response_Type> &response_deque, 
+                                       int user_id,
+                                       string username,
+                                       unsigned int privileges,
+                                       unsigned int options,
+                                       unsigned long int delay_value,
+                                       string thread_str)
+{
+@q ****** (6) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   stringstream temp_strm;
+
+   int status;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Handle_Value_Type::delete_handle_value'."
+            << endl
+            << "`options'     == " << oct << options << " (octal)" << dec
+            << endl 
+            << "`delay_value' == " << delay_value
+            << endl
+            << "`user_id'     == " << user_id
+            << endl
+            << "`username'    == " << username
+            << endl
+            << "`privileges'  == " << oct << privileges << " (octal)" << dec
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+   stringstream sql_strm;
+
+   MYSQL_RES *result  = 0;
+   MYSQL_ROW curr_row;
+
+   unsigned int row_ctr = 0;
+   unsigned int field_ctr = 0;
+   long affected_rows = 0; 
+
+   string prefix;
+   string sub_handle;
+   string handle;
+   int    index = -1;
+   string type;
+
+   Response_Type response;
+   response.type = Response_Type::COMMAND_ONLY_TYPE;
+
+   bool immediate = (options & 1U) ? true : false;
+
+   errno = 0;
+   time_t curr_time = time(0);
+
+   if (curr_time == static_cast<time_t>(-1))
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Value_Type::delete_handle_value':"
+            << endl
+            << "`time' failed, returning `(time_t) -1':"
+            << endl
+            << strerror(errno)
+            << endl
+            << "Failed to get current time."
+            << endl 
+            << "Will send failure notice to client."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       temp_strm.str("");
+
+       temp_strm << "DELETE HANDLE_VALUE RESPONSE " << GW_ERROR << " "
+                 << "\"" << hv_str << "\" -1 \"(Type)\" "
+                 << "\"(Data)\" \"(Failure)\" " << immediate << " " << delay_value << "UL "
+                 << purge_database_limit << "U";
+
+       response.command = temp_strm.str();
+       response_deque.push_back(response);
+
+       return 1;
+
+   }  /* |if (curr_time == static_cast<time_t>(-1))|  */
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+   status = extract(hv_str, 
+                    prefix, 
+                    sub_handle, 
+                    handle, 
+                    index, 
+                    type, 
+                    thread_str);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Value_Type::delete_handle_value':"
+            << endl
+            << "`extract' failed, returning " << status << "."
+            << endl
+            << "Failed to extract fields from handle specifier."
+            << endl
+            << "Will send failure notice to client."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       temp_strm.str("");
+
+       temp_strm << "DELETE HANDLE_VALUE RESPONSE " << GW_ERROR << " "
+                 << "\"" << hv_str << "\" -1 \"(Type)\" "
+                 << "\"(Data)\" \"(Failure)\" " << immediate << " " 
+                 << (curr_time + delay_value) << "UL "
+                 << purge_database_limit << "U";
+
+       response.command = temp_strm.str();
+       response_deque.push_back(response);
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+   else if (prefix.empty() || sub_handle.empty() || (index <= 0 && type.empty()))
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Value_Type::delete_handle_value':"
+            << endl
+            << "`extract' failed to extract prefix, non-prefix part of handle, index and/or type."
+            << endl
+            << "Not enough information to query database for handle."
+            << endl
+            << "Will send failure notice to client."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       temp_strm.str("");
+
+       temp_strm << "DELETE HANDLE_VALUE RESPONSE " 
+                 << GW_INVALID_HANDLE_VALUE_SPECIFIER << " "
+                 << "\"" << hv_str << "\" -1 \"(Type)\" "
+                 << "\"(Data)\" \"(Failure)\" " << immediate << " " 
+                 << (curr_time + delay_value) << "UL "
+                 << purge_database_limit << "U";
+
+       response.command = temp_strm.str();
+       response_deque.push_back(response);
+
+       return 1;
+
+   }  /* |else if|  */ 
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {   
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Value_Type::delete_handle_value':"
+            << endl
+            << "`extract' succeeded, returning 0."
+            << endl
+            << "Extracted fields from handle specifier successfully:"
+            << endl
+            << "`prefix'     == " << prefix
+            << endl 
+            << "`sub_handle' == " << sub_handle
+            << endl 
+            << "`index'      == " << index
+            << endl 
+            << "`handle'     == " << handle
+            << endl 
+            << "`type'       == " << type
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+   if (   type == "HS_ADMIN" 
+       && !(   privileges & Scan_Parse_Parameter_Type::SUPERUSER_PRIVILEGE 
+            || privileges & Scan_Parse_Parameter_Type::DELETE_HS_ADMIN_HANDLE_VALUES_PRIVILEGE))
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Value_Type::delete_handle_value':"
+            << endl
+            << "User `" << username << "', ID " << user_id << ", doesn't have the "
+            << "`delete_hs_admin_handle_value' privilege."
+            << endl 
+            << "Will send failure notice to client."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       temp_strm.str("");
+
+       temp_strm << "DELETE HANDLE_VALUE RESPONSE " 
+                 << GW_NO_PRIVILEGE_ERROR << " "
+                 << "\"" << hv_str << "\" " << index << " "
+                 << "\"HS_ADMIN\" "
+                 << "\"(Data)\" \"User `" << username << "', ID " << user_id << ", "
+                 << "doesn't have the `delete_hs_admin_handle_value' privilege.\" " 
+                 << immediate << " " << "0UL "
+                 << purge_database_limit << "U";
+
+       response.command = temp_strm.str();
+
+       response_deque.push_back(response);
+
+       return 1;
+
+   }  /* |if|  */
+
+@q ****** (6) @>
+@ 
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+   string handle_database = (standalone_handle) ? "handlesystem_standalone" : "handlesystem";
+  
+   sql_strm << "select handle_id, handle_value_id, idx, type, length(data), data, "
+            << "ttl_type, ttl, timestamp, length(refs), refs, admin_read, "
+            << "admin_write, pub_read, pub_write, marked_for_deletion, created, "
+            << "last_modified, handle, created_by_user_id, irods_object_id, "
+            << "delete_from_database_timestamp "
+            << "from " << handle_database << ".handles "
+            << "where handle = '" << prefix << "/" << sub_handle << "' ";
+
+   if (index > 0)
+      sql_strm << "and idx = " << index << " ";
+
+   if (!type.empty())
+      sql_strm << "and type = '" << type << "' ";
+
+   sql_strm << "order by handle, type, idx";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Value_Type::delete_handle_value':"
+            << endl
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+   status = submit_mysql_query(sql_strm.str(), 
+                               result, mysql_ptr, 
+                               &row_ctr, 
+                               &field_ctr, 
+                               0, 
+                               thread_str);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Value_Type::delete_handle_value':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << mysql_error(mysql_ptr)
+            << endl
+            << "Will send failure notice to client."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+          mysql_free_result(result); 
+
+       temp_strm.str("");
+
+       temp_strm << "DELETE HANDLE_VALUE RESPONSE " << GW_SERVER_SIDE_DATABASE_ERROR << " "
+                 << "\"" << hv_str << "\" -1 \"(Type)\" "
+                 << "\"(Data)\" \"(Failure)\" " << immediate << " " 
+                 << (curr_time + delay_value) << "UL "
+                 << purge_database_limit << "U";
+
+       response.command = temp_strm.str();
+       response_deque.push_back(response);
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+  else if (row_ctr == 0)
+  {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Value_Type::delete_handle_value':"
+            << endl
+            << "`submit_mysql_query' returned 0 rows."
+            << endl
+            << "No matching handle values found in "
+            << handle_database << ".handles database table."
+            << endl
+            << "Will send failure notice to client."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+
+       temp_strm.str("");
+
+       temp_strm << "DELETE HANDLE_VALUE RESPONSE " << GW_HANDLE_VALUE_NOT_FOUND << " "
+                 << "\"" << hv_str << "\" ";
+
+       if (index > 0)
+           temp_strm << index << " ";
+       else
+           temp_strm << "-1 ";
+     
+       if (!type.empty())
+           temp_strm << "\"" << type << "\" ";
+       else 
+           temp_strm << "\"(Type)\" ";
+
+       temp_strm << "\"(Data)\" \"No matching handle value\" " << immediate << " " 
+                 << (curr_time + delay_value) << "UL "
+                 << purge_database_limit << "U";
+
+       response.command = temp_strm.str();
+       response_deque.push_back(response);
+
+       return 1;
+
+
+  }  /* |else if (row_ctr == 0)|  */
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Value_Type::delete_handle_value':"
+            << endl
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "`row_ctr' == " << row_ctr
+            << endl 
+            << "`field_ctr' == " << field_ctr
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+   Handle_Value_Type hv;
+   vector<Handle_Value_Type> hv_vector;
+
+   bool hs_admin_found = false;
+
+   for (int i = 0; i < row_ctr; ++i)
+   {
+@q ******* (7) @>
+
+       curr_row = mysql_fetch_row(result);
+
+       if (curr_row == 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str
+               << "ERROR!  In `Handle_Value_Type::delete_handle_value':"
+               << endl 
+               << "`mysql_fetch_row' failed:"
+               << endl
+               << mysql_error(mysql_ptr)
+               << endl 
+               << "Exiting function unsuccessfully with return value 1."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          mysql_free_result(result); 
+
+          temp_strm.str("");
+
+          temp_strm << "DELETE HANDLE_VALUE RESPONSE " << GW_SERVER_SIDE_DATABASE_ERROR << " "
+                    << "\"" << hv_str << "\" ";
+
+          if (index > 0)
+              temp_strm << index << " ";
+          else
+              temp_strm << "-1 ";
+     
+          if (!type.empty())
+              temp_strm << "\"" << type << "\" ";
+          else 
+              temp_strm << "\"(Type)\" ";
+
+          temp_strm << "\"(Data)\" \"Server-side database error\" " 
+                    << immediate << " " << (curr_time + delay_value) << "UL "
+                    << purge_database_limit << "U";
+
+          response.command = temp_strm.str();
+          response_deque.push_back(response);
+
+          return 1;
+
+       }  /* |if (curr_row == 0)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str
+                << "In `Handle_Value_Type::delete_handle_value':"
+                << endl;
+           if (curr_row[0])
+              cerr << "`curr_row[0]' == " << curr_row[0]
+                   << endl;
+           else
+              cerr << "`curr_row[0]' is NULL." << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       hv.clear();
+
+       status = hv.set(curr_row, field_ctr, handle);
+
+       if (status != 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str
+               << "ERROR!  In `Handle_Value_Type::delete_handle_value':"
+               << endl 
+               << "`Handle_Value_Type::set' failed, returning " << status << "."
+               << endl
+               << "Failed to set `Handle_Value_Type' object."
+               << endl 
+               << "Exiting function unsuccessfully with return value 1."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          mysql_free_result(result); 
+
+          temp_strm.str("");
+
+          temp_strm << "DELETE HANDLE_VALUE RESPONSE " << GW_HANDLE_VALUE_ERROR << " "
+                    << "\"" << hv_str << "\" ";
+
+          if (index > 0)
+              temp_strm << index << " ";
+          else
+              temp_strm << "-1 ";
+     
+          if (!type.empty())
+              temp_strm << "\"" << type << "\" ";
+          else 
+              temp_strm << "\"(Type)\" ";
+
+          temp_strm << "\"(Data)\" \"(Failure)\"" << immediate << " " 
+                    << (curr_time + delay_value) << "UL "
+                    << purge_database_limit << "U";
+
+          response.command = temp_strm.str();
+
+          response_deque.push_back(response);
+
+          return 1;
+          
+       }  /* |if (status != 0)|  */
+       
+@q ******* (7) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str
+                << "In `Handle_Value_Type::delete_handle_value':"
+                << endl 
+                << "`Handle_Value_Type::set' succeeded, returning 0:"
+                << endl;
+#if 0 
+           hv.show("hv:");
+#endif 
+
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+\LOG
+\initials{LDF 2013.09.12.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+      if (   hv.created_by_user_id != user_id
+          && !(privileges & Scan_Parse_Parameter_Type::SUPERUSER_PRIVILEGE))
+      {
+          lock_cerr_mutex(); 
+          cerr << thread_str
+               << "WARNING!  In `Handle_Value_Type::delete_handle_value':"
+               << endl 
+               << "`hv.created_by_user_id' != `user_id':"
+               << endl
+               << "`hv.created_by_user_id' == " << hv.created_by_user_id
+               << endl
+               << "`user_id'              == " << user_id
+               << endl 
+               << "User `" << username << "', ID " << user_id << ", "
+               << "didn't create this handle value and doesn't have the `superuser' privilege."
+               << endl
+               << "Not pushing `hv' onto `hv_vector'."
+               << endl 
+               << "Continuing."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          temp_strm.str("");
+
+          temp_strm << "DELETE HANDLE_VALUE RESPONSE " << GW_NO_PRIVILEGE_ERROR << " "
+                    << "\"" << hv_str << "\" ";
+
+          if (hv.idx > 0)
+              temp_strm << hv.idx << " ";
+          else
+              temp_strm << "-1 ";
+     
+          temp_strm << "\"" << hv.type << "\" "
+                    << "\"(Data)\" \"WARNING:  "
+                    << "user `" << username << "', "
+                    << "ID " << user_id << ", "
+                    << "didn't create this handle value"
+                    << endl 
+                    << "and doesn't have the `superuser' privilege."
+                    << endl 
+                    << "Handle value not marked for deletion.\" " 
+                    << immediate << " " 
+                    << (curr_time + delay_value) << "UL "
+                    << purge_database_limit << "U";
+
+          response.command = temp_strm.str();
+
+          response_deque.push_back(response);
+
+          response.command = "";
+          temp_strm.str("");
+
+          if (row_ctr == 1)
+          {
+
+              lock_cerr_mutex(); 
+              cerr << thread_str
+                   << "In `Handle_Value_Type::delete_handle_value':"
+                   << endl 
+                   << "Exiting function with return value 3."
+                   << endl;
+              unlock_cerr_mutex(); 
+
+              mysql_free_result(result); 
+
+              return 3;
+          }
+          else
+             continue;
+
+      }  /* |if|  */
+
+@q ******* (7) @>
+@
+\LOG
+\initials{LDF 2013.09.12.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+       if (   hv.type == "HS_ADMIN" 
+           && !(   privileges & Scan_Parse_Parameter_Type::SUPERUSER_PRIVILEGE
+                || (  privileges 
+                    & Scan_Parse_Parameter_Type::DELETE_HS_ADMIN_HANDLE_VALUES_PRIVILEGE)))
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str
+               << "WARNING!  In `Handle_Value_Type::delete_handle_value':"
+               << endl 
+               << "`hv.type' == \"HS_ADMIN\" and user `" << username << "' "
+               << "doesn't have the `delete_hs_admin_handle_values' privilege."
+               << endl
+               << "Not pushing `hv' onto `hv_vector'."
+               << endl 
+               << "Continuing."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          temp_strm.str("");
+
+          temp_strm << "DELETE HANDLE_VALUE RESPONSE " << GW_NO_PRIVILEGE_ERROR << " "
+                    << "\"" << hv_str << "\" ";
+
+          if (hv.idx > 0)
+              temp_strm << hv.idx << " ";
+          else
+              temp_strm << "-1 ";
+     
+          temp_strm << "\"HS_ADMIN\" "
+                    << "\"(Data)\" \"WARNING:  Handle value is of `type' == `HS_ADMIN',"
+                    << endl 
+                    << "but user `" << username << "', "
+                    << "ID " << user_id << ", "
+                    << "doesn't have the `delete_hs_admin_handle_values' privilege."
+                    << endl 
+                    << "Handle value not marked for deletion.\" " 
+                    << immediate << " " 
+                    << (curr_time + delay_value) << "UL "
+                    << purge_database_limit << "U";
+
+          response.command = temp_strm.str();
+
+          response_deque.push_back(response);
+
+          response.command = "";
+          temp_strm.str("");
+
+          if (row_ctr == 1)
+          {
+
+              lock_cerr_mutex(); 
+              cerr << thread_str
+                   << "In `Handle_Value_Type::delete_handle_value':"
+                   << endl 
+                   << "Exiting function with return value 3."
+                   << endl;
+              unlock_cerr_mutex(); 
+
+              mysql_free_result(result); 
+
+              return 3;
+          }
+          else
+             continue;
+
+       }  /* |if|  */
+
+@q ******* (7) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+       hv_vector.push_back(hv);
+
+@q ******* (7) @>
+
+   }  /* |for|  */
+
+   mysql_free_result(result); 
+   result = 0;
+
+   sql_strm.str("");
+
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2013.09.12.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+   if (hv_vector.size() == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "WARNING!  In `Handle_Value_Type::delete_handle_value':"
+            << endl 
+            << "`hv_vector.size() == 0:  No handle values found."
+            << endl
+            << "Exiting function unsuccessfully with return value 3."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+
+       temp_strm.str("");
+
+       temp_strm << "DELETE HANDLE_VALUE RESPONSE " << GW_HANDLE_VALUE_NOT_FOUND << " "
+                 << "\"" << hv_str << "\" ";
+
+       if (index > 0)
+           temp_strm << index << " ";
+       else
+           temp_strm << "-1 ";
+     
+       if (!type.empty())
+           temp_strm << "\"" << type << "\" ";
+       else 
+           temp_strm << "\"(Type)\" ";
+
+       temp_strm << "\"(Data)\" \"No handle values found\" " 
+                 << immediate << " " << (curr_time + delay_value) << "UL "
+                 << purge_database_limit << "U";
+
+       response.command = temp_strm.str();
+       response_deque.push_back(response);
+
+       return 3;
+
+   }  /* |if (hv_vector.size() == 0)|  */
+
+
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2013.09.12.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+   else if (index > 0 && hv_vector.size() > 1)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "WARNING!  In `Handle_Value_Type::delete_handle_value':"
+            << endl 
+            << "`index' == " << index << " (> 0) and `hv_vector.size() > 1:"
+            << endl
+            << "Multiple handle values found for a single index."
+            << endl
+            << "This shouldn't be possible."
+            << endl 
+            << "Exiting function unsuccessfully with return value 3."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+
+       temp_strm.str("");
+
+       temp_strm << "DELETE HANDLE_VALUE RESPONSE " << GW_HANDLE_VALUE_ERROR << " "
+                 << "\"" << hv_str << "\" " << index << " ";
+     
+       if (!type.empty())
+           temp_strm << "\"" << type << "\" ";
+       else 
+           temp_strm << "\"(Type)\" ";
+
+       temp_strm << "\"(Data)\" \"Multiple handle values found for a single index.  "
+                 << "This shouldn't be possible.\" "
+                 << immediate << " " << (curr_time + delay_value) << "UL "
+                 << purge_database_limit << "U";
+
+       response.command = temp_strm.str();
+       response_deque.push_back(response);
+
+       return 3;
+
+   }  /* |else if|  */
+
+@q ****** (6) @>
+
+@ In this case, \.{HS\_ADMIN} will have been specified in the handle value specifier,
+so all of the handle values of type \.{HS\_ADMIN} will be on |hv_vector|.  Therefore,
+the user must either be a superuser or have the 
+|Scan_Parse_Parameter_Type::DELETE_LAST_HS_ADMIN_HANDLE_VALUE_PRIVILEGE| privilege.
+\initials{LDF 2013.09.12.}
+
+\LOG
+\initials{LDF 2013.09.12.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+   if (   type == "HS_ADMIN" 
+       && index <= 0 
+       && !(   privileges & Scan_Parse_Parameter_Type::SUPERUSER_PRIVILEGE
+            || privileges 
+                & Scan_Parse_Parameter_Type::DELETE_LAST_HS_ADMIN_HANDLE_VALUE_PRIVILEGE))
+   { 
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "WARNING!  In `Handle_Value_Type::delete_handle_value':"
+            << endl 
+            << "`type' == \"HS_ADMIN\" and user `" << username << "' "
+            << "doesn't have the `delete_last_hs_admin_handle_value' privilege."
+            << endl
+            << "Not marking handle value(s) for deletion."
+            << endl 
+            << "Exiting function with return value 3."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       temp_strm.str("");
+
+       temp_strm << "DELETE HANDLE_VALUE RESPONSE " << GW_NO_PRIVILEGE_ERROR << " "
+                 << "\"" << hv_str << "\" ";
+
+       if (hv_vector.size() == 1)
+           temp_strm << hv_vector.back().idx << " ";
+       else
+           temp_strm << "-1 ";
+     
+       temp_strm << "\"HS_ADMIN\" "
+                 << "\"(Data)\" \"WARNING:  Handle value type `HS_ADMIN' was specified,"
+                 << endl 
+                 << "so all handle values of this type would be deleted."
+                 << endl 
+                 << "However, user `" << username << "', "
+                 << "ID " << user_id << ", "
+                 << "doesn't have the `delete_last_hs_admin_handle_value' privilege."
+                 << endl 
+                 << "Handle value(s) not marked for deletion.\" " 
+                 << immediate << " " 
+                 << (curr_time + delay_value) << "UL "
+                 << purge_database_limit << "U";
+
+       response.command = temp_strm.str();
+
+       response_deque.push_back(response);
+
+       return 3;
+
+   }  /* |if|  */
+
+@q ****** (6) |index| was specified and |type == "HS_ADMIN"|.         @>
+@q ****** (6) Check for other handle values of |type == "HS_ADMIN"|.  @>
+
+@ |index| was specified and |type == "HS_ADMIN"|.
+Check for other handle values of |type == "HS_ADMIN"|.
+%
+In this case, there should only be one |Handle_Value_Type| object on |hv_vector|, 
+so there might be more handle values of type \.{HS\_ADMIN} for the handle in question.
+Since the \.{idx} value was specified, they were not retrieved by the \.{SELECT} query
+above, so we have to query for them here.
+\initials{LDF 2013.09.12.}
+
+\LOG
+\initials{LDF 2013.09.12.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+   if (index > 0 && hv_vector.back().type == "HS_ADMIN")
+   {
+@q ******* (7) @>
+
+      sql_strm.str("");
+
+      sql_strm << "select handle_value_id, idx from " << handle_database << ".handles "
+               << "where handle_id = " << hv_vector.back().handle_id << " "
+               << "and type = 'HS_ADMIN' and idx <> " << index;
+
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+      status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, &row_ctr, &field_ctr, 0); 
+
+      if (status != 0)
+      {  
+          lock_cerr_mutex(); 
+          cerr << thread_str << "ERROR!  In `Handle_Value_Type::delete_handle_value':"
+               << endl
+               << "`submit_mysql_query' failed, returning " << status << "."
+               << endl
+               << mysql_error(mysql_ptr)
+               << endl
+               << "Will send failure notice to client."
+               << endl 
+               << "Exiting function unsuccessfully with return value 1."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          if (result)
+             mysql_free_result(result); 
+
+          temp_strm.str("");
+
+          temp_strm << "DELETE HANDLE_VALUE RESPONSE " << GW_SERVER_SIDE_DATABASE_ERROR << " "
+                    << "\"" << hv_str << "\" " << index << " \"HS_ADMIN\" "
+                    << "\"(Data)\" \"Server-side database error:  Query failed.\" " 
+                    << immediate << " " 
+                    << (curr_time + delay_value) << "UL "
+                    << purge_database_limit << "U";
+
+          response.command = temp_strm.str();
+          response_deque.push_back(response);
+
+          return 1;
+
+      }  /* |if (status != 0)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+      else if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          cerr << thread_str << "In `Handle_Value_Type::delete_handle_value':"
+               << endl
+               << "`submit_mysql_query' succeeded, returning 0." 
+               << endl
+               << "`row_ctr' == " << row_ctr
+               << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ******* (7) @>
+
+      if (   row_ctr == 0 
+          && !(   privileges & Scan_Parse_Parameter_Type::SUPERUSER_PRIVILEGE
+               ||   privileges 
+                  & Scan_Parse_Parameter_Type::DELETE_LAST_HS_ADMIN_HANDLE_VALUE_PRIVILEGE))
+      {
+          lock_cerr_mutex(); 
+          cerr << thread_str
+               << "WARNING!  In `Handle_Value_Type::delete_handle_value':"
+               << endl 
+               << "`type' == \"HS_ADMIN\", there are no other `HS_ADMIN' handle values "
+               << "for handle `" << hv_vector.back().handle << "'"
+               << endl
+               << "and user `" << username << "' "
+               << "doesn't have the `delete_last_hs_admin_handle_value' privilege."
+               << endl
+               << "Not marking handle value for deletion."
+               << endl 
+               << "Exiting function with return value 3."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          temp_strm.str("");
+
+          temp_strm << "DELETE HANDLE_VALUE RESPONSE " << GW_NO_PRIVILEGE_ERROR << " "
+                    << "\"" << hv_str << "\" " << index 
+                    << "\"HS_ADMIN\" "
+                    << "\"(Data)\" \"WARNING:  Handle value with index " << index << " "
+                    << "has type `HS_ADMIN',"
+                    << endl 
+                    << "there are no other `HS_ADMIN' handle values "
+                    << "for handle `" << hv_vector.back().handle << "',"
+                    << endl
+                    << "and user `" << username << "', "
+                    << "ID " << user_id << ", "
+                    << "doesn't have the `delete_last_hs_admin_handle_value' privilege."
+                    << endl 
+                    << "Handle value not marked for deletion.\" " 
+                    << immediate << " " 
+                    << (curr_time + delay_value) << "UL "
+                    << purge_database_limit << "U";
+
+          response.command = temp_strm.str();
+
+          response_deque.push_back(response);
+
+          return 3;
+
+      }  /* |if|  */
+
+
+@q ******* (7) @>
+
+
+      mysql_free_result(result); 
+      result = 0;
+
+      sql_strm.str("");
+
+@q ******* (7) @>
+
+   }  /* |if (index > 0 && hv_vector.back().type == "HS_ADMIN")|  */
+
+@q ****** (6) @>    
+@
+Currently, there's no way to distinguish between 
+the \.{DELAY} option not being used at all or \.{DELAY 0}.  It would make 
+sense to use the latter as a synonym for \.{IMMEDIATE}, but I can't just change
+this because the \.{DELAY} option is used in other rules, too.
+@:TODO@> !! TODO:  Look into this.
+\initials{LDF 2013.09.11.}
+
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+   bool found = false;
+
+   string comma_str;
+
+   sql_strm << "update " << handle_database << ".handles "
+            << "set last_modified = from_unixtime(" << curr_time << "), "
+            << "marked_for_deletion = 1, "
+            << "delete_from_database_timestamp = ";
+
+   if (immediate)
+      sql_strm << "timestampadd(second, -31622400, from_unixtime(" << curr_time << ")) ";
+
+   else if (delay_value == 0 || delay_value == 1)  
+   {
+      /* See {\TeX} text, above.  \initials{LDF 2013.09.11.}  */
+
+      sql_strm << "from_unixtime(" << curr_time << ") ";
+   }
+   else
+      sql_strm << "from_unixtime(" << (curr_time + delay_value) << ") ";
+
+   sql_strm << "where handle_value_id in (";
+
+   for (vector<Handle_Value_Type>::iterator iter = hv_vector.begin();
+        iter != hv_vector.end();
+        ++iter)
+   {
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           iter->show("*iter:");
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+       
+@q ******* (7) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+       if (iter->marked_for_deletion)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str
+               << "WARNING!  In `Handle_Value_Type::delete_handle_value':"
+               << endl 
+               << "`Handle_Value_Type' object already marked for deletion."
+               << endl
+               << "Not marking again."
+               << endl 
+               << "Will send response to client and continue."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          temp_strm.str("");
+
+          temp_strm << "DELETE HANDLE_VALUE RESPONSE " 
+                    << GW_HANDLE_VALUE_ALREADY_MARKED_FOR_DELETION << " "
+                    << "\"" << hv_str << "\" ";
+
+          if (iter->idx > 0)
+              temp_strm << iter->idx << " ";
+          else
+              temp_strm << "-1 ";
+     
+          if (!iter->type.empty())
+              temp_strm << "\"" << iter->type << "\" ";
+          else 
+              temp_strm << "\"(Type)\" ";
+
+          temp_strm << "\"(Data)\" \"Handle value already marked for deletion.  "
+                    << "Not marking again.\" " << immediate << " " 
+                    << (curr_time + delay_value) << "UL "
+                    << purge_database_limit << "U";
+
+          response.command = temp_strm.str();
+          response_deque.push_back(response);
+          response.command = "";
+
+          continue;
+
+       }  /* |if (iter->marked_for_deletion)|  */
+
+@q ******* (7) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+       else
+       {
+           found = true;
+
+           sql_strm << comma_str << iter->handle_value_id;
+
+           comma_str = ", ";
+
+       }
+
+@q ******* (7) @>
+
+   }  /* |for|  */
+
+   sql_strm << ")";
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "In `Handle_Value_Type::delete_handle_value':"
+            << endl
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+   if (found)
+   {
+@q ******* (7) @>
+
+       status = submit_mysql_query(sql_strm.str(), 
+                                   result, mysql_ptr, 
+                                   0, 
+                                   0,
+                               &affected_rows, 
+                                   thread_str);
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `Handle_Value_Type::delete_handle_value':"
+                << endl
+                << "`submit_mysql_query' failed, returning " << status << "."
+                << endl
+                << mysql_error(mysql_ptr)
+                << endl
+                << "Will send failure notice to client."
+                << endl 
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           if (result)
+              mysql_free_result(result); 
+
+           temp_strm.str("");
+
+           temp_strm << "DELETE HANDLE_VALUE RESPONSE " << GW_SERVER_SIDE_DATABASE_ERROR << " "
+                     << "\"" << hv_str << "\" ";
+
+           if (index > 0)
+               temp_strm << index << " ";
+           else
+               temp_strm << "-1 ";
+     
+           if (!type.empty())
+               temp_strm << "\"" << type << "\" ";
+           else 
+               temp_strm << "\"(Type)\" ";
+
+           temp_strm << "\"(Data)\" \"(Failure)\"" << immediate << " " 
+                     << (curr_time + delay_value) << "UL "
+                     << purge_database_limit << "U";
+
+           response.command = temp_strm.str();
+           response_deque.push_back(response);
+
+           return 1;
+
+       }  /* |if (status != 0)|  */
+
+@q ******* (7) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Handle_Value_Type::delete_handle_value':"
+                << endl
+                << "`submit_mysql_query' succeeded, returning 0."
+                << endl
+                << "`affected_rows' == " << affected_rows << endl; 
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       mysql_free_result(result); 
+       result = 0;
+
+@q ******* (7) @>
+
+   }  /* |if (found)|  */
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+   bool binary_data = false;
+
+   string temp_str;
+
+@q ****** (6) @>
+
+   if (found)
+   {
+@q ******* (7) @>
+
+       for (vector<Handle_Value_Type>::iterator iter = hv_vector.begin();
+            iter != hv_vector.end();
+            ++iter)
+       {
+
+@q ******** (8) @>
+
+@ These are the handle values that were already marked for deletion
+and therefore not marked again.  Responses were already pushed
+onto |response_deque| for them above.
+\initials{LDF 2013.09.11.}
+
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+           if (iter->marked_for_deletion)  
+           {
+               continue;
+           }
+
+@q ******** (8) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+           temp_str = "";
+
+           binary_data = false;
+
+           temp_strm.str("");
+
+           temp_strm << "DELETE HANDLE_VALUE RESPONSE "
+                     << GW_SUCCESS << " \"" << hv_str << "\" "
+                     << iter->idx << " \"" << iter->type << "\" ";
+
+           if (iter->data_length == 0)
+               temp_strm << "\"(No data)\" ";
+
+@q ******** (8) @>
+
+@ Currently, the size of |string_value| in the (identical) |unions| declared for |yyparse| 
+in \filename{parser.web} and for |zzparse| in \filename{prsrclnt.web} is 1024.  This value
+is used literally in the |union| declaration, i.e., a preprocessor macro is {\it not\/} used.
+(It must certainly be a constant, so a variable cannot be used).  Therefore, making the
+maximum data length here 512 is very conservative.  However, I'm not sure at this time
+whether it's really necessary to send the contents of the data fields to the client at all, 
+so I'm only sending them if they're reasonably short.
+@:TODO@> !! TODO:  Maybe define a preprocessor macro for use in the |union| declarations.
+\initials{LDF 2013.09.11.}
+
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+
+           else if (iter->data_length > 512)
+           {
+               temp_strm << "\"Data: " << iter->data_length << " bytes:  "
+                         << "Exceeds maximum length for this purpose (512 bytes).  "
+                         << "Not sent.\" ";
+           }
+
+@q ******** (8) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+
+           else
+           {
+                 for (int i = 0; i < iter->data_length; ++i)
+                 {
+                     if (!isprint(iter->data[i]))
+                     {
+                         binary_data = true;
+                         break;
+                     }
+
+                 }  /* |for|  */
+
+                 if (binary_data == true)
+                     temp_strm << "\"Binary data.  Not sent.\" ";
+                 else
+                 {
+                 
+                     temp_str.append(iter->data, iter->data_length);
+                     temp_strm << "\"" << temp_str << "\" ";
+                 }
+ 
+           }  /* |else|  */
+
+           temp_strm << "\"Success\"" << immediate << " ";
+
+           if (immediate)
+              temp_strm << "0UL ";
+           else
+              temp_strm << (curr_time + delay_value) << "UL ";
+
+           temp_strm << purge_database_limit << "U";
+ 
+           response.command = temp_strm.str();
+           response_deque.push_back(response);
+       
+           temp_strm.str("");
+   
+
+@q ******** (8) @>
+
+       }  /* |for|  */
+
+@q ******* (7) @>
+
+   }  /* |if (found)|  */
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "WARNING!  In `Handle_Value_Type::delete_handle_value':"
+            << endl
+            << "`found' == `false':  No handle values marked for deletion."
+            << endl
+            << "Continuing."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+   if (found && immediate && purge_database_interval > 0)
+   {
+        
+        pthread_mutex_lock(&purge_server_database_mutex);
+
+        status = pthread_cond_signal(&purge_server_database_cond);
+
+        if (status != 0)
+        {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `Handle_Value_Type::delete_handle_value':"
+                << endl
+                << "`pthread_cond_signal' failed, returning " << status << ":"
+                << endl
+                << "Error:  " << strerror(status)
+                << endl
+                << "Exiting function unsuccessfully with return value 3." 
+                << endl;
+           unlock_cerr_mutex(); 
+
+           pthread_mutex_unlock(&purge_server_database_mutex);
+
+           return 3;
+
+        }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `Handle_Value_Type::delete_handle_value':"
+                 << endl
+                 << "`pthread_cond_signal' succeeded, returning 0."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        pthread_mutex_unlock(&purge_server_database_mutex);
+
+ 
+   }  /* |if (found && immediate && purge_database_interval > 0)|  */
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Value_Type::delete_handle_value':"
+            << endl       
+            << "`found' == `false' and/or `immediate' == `false' "
+            << "and/or `purge_database_interval' == 0:"
+            << endl
+            << "`found'                   == " << found
+            << endl 
+            << "`immediate'               == " << immediate
+            << endl
+            << "`purge_database_interval' == " << purge_database_interval
+            << endl
+            << "Not waking up `purge_server_database' thread."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::delete_handle_value| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+
+       lock_cerr_mutex(); 
+       cerr << "Exiting `Handle_Value_Type::delete_handle_value' "
+            << "successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+   return 0;
+
+}  /* End of |Handle_Value_Type::delete_handle_value| definition  */
+
+@q *** (3) Unmark handle value for deletion (|unmark_handle_value_for_deletion|).  @>
+@ Unmark handle value for deletion (|unmark_handle_value_for_deletion|).
+\initials{LDF 2013.09.11.}
+
+\LOG
+\initials{LDF 2013.09.11.}
+Added this function.
+
+\initials{LDF 2013.09.12.}
+Removed arguments |char *buffer_ptr| and |size_t buffer_size|.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Handle_Value_Type| function declarations@>=
+
+static 
+int 
+unmark_handle_value_for_deletion(MYSQL *&mysql_ptr,
+                                 string hv_str,
+                                 deque<Response_Type> &response_deque,
+                                 int user_id,
+                                 string username,
+                                 unsigned int privileges,
+                                 string thread_str = "");
+
+@q ***** (5) Definition @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+int 
+Handle_Value_Type::unmark_handle_value_for_deletion(MYSQL *&mysql_ptr,
+                                                    string hv_str,
+                                                    deque<Response_Type> &response_deque,
+                                                    int user_id,       
+                                                    string username,
+                                                    unsigned int privileges,
+                                                    string thread_str)
+{
+@q ****** (6) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   stringstream temp_strm;
+
+   int status;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Handle_Value_Type::unmark_handle_value_for_deletion'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+   stringstream sql_strm;
+
+   MYSQL_RES *result  = 0;
+   MYSQL_ROW curr_row;
+
+   unsigned int row_ctr = 0;
+   unsigned int field_ctr = 0;
+   long affected_rows = 0; 
+
+   string prefix;
+   string sub_handle;
+   string handle;
+   int    index = -1;
+   string type;
+
+   Response_Type response;
+   response.type = Response_Type::COMMAND_ONLY_TYPE;
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+   status = extract(hv_str, 
+                    prefix, 
+                    sub_handle, 
+                    handle, 
+                    index, 
+                    type, 
+                    thread_str);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Value_Type::unmark_handle_value_for_deletion':"
+            << endl
+            << "`extract' failed, returning " << status << "."
+            << endl
+            << "Failed to extract fields from handle specifier."
+            << endl
+            << "Will send failure notice to client."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       temp_strm.str("");
+
+       temp_strm << "UNDELETE HANDLE_VALUE RESPONSE " << GW_HANDLE_VALUE_ERROR << " "
+                 << "\"" << hv_str << "\" -1 \"(Type)\" "
+                 << "\"(Data)\" \"(Failure)\"";
+
+       response.command = temp_strm.str();
+       response_deque.push_back(response);
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+   else if (prefix.empty() || sub_handle.empty() || (index <= 0 && type.empty()))
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Value_Type::unmark_handle_value_for_deletion':"
+            << endl
+            << "`extract' failed to extract prefix, non-prefix part of handle, index and/or type."
+            << endl
+            << "Not enough information to query database for handle."
+            << endl
+            << "Will send failure notice to client."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       temp_strm.str("");
+
+       temp_strm << "UNDELETE HANDLE_VALUE RESPONSE " << GW_INVALID_HANDLE_VALUE_SPECIFIER << " "
+                 << "\"" << hv_str << "\" -1 \"(Type)\" "
+                 << "\"(Data)\" \"(Failure)\"";
+
+       response.command = temp_strm.str();
+       response_deque.push_back(response);
+
+       return 1;
+
+   }  /* |else if|  */ 
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {   
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Value_Type::unmark_handle_value_for_deletion':"
+            << endl
+            << "`extract' succeeded, returning 0."
+            << endl
+            << "Extracted fields from handle specifier successfully:"
+            << endl
+            << "`prefix'     == " << prefix
+            << endl 
+            << "`sub_handle' == " << sub_handle
+            << endl 
+            << "`index'      == " << index
+            << endl 
+            << "`handle'     == " << handle
+            << endl 
+            << "`type'       == " << type
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+
+@q ****** (6) @>
+@ 
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+
+   string handle_database = (standalone_handle) ? "handlesystem_standalone" : "handlesystem";
+  
+   sql_strm << "select handle_id, handle_value_id, idx, type, length(data), data, "
+            << "ttl_type, ttl, timestamp, length(refs), refs, admin_read, "
+            << "admin_write, pub_read, pub_write, marked_for_deletion, created, "
+            << "last_modified, handle, created_by_user_id, irods_object_id, "
+            << "delete_from_database_timestamp "
+            << "from " << handle_database << ".handles where handle = "
+            << "'" << prefix << "/" << sub_handle << "' ";
+
+   if (index > 0)
+      sql_strm << "and idx = " << index << " ";
+
+   if (!type.empty())
+      sql_strm << "and type = '" << type << "' ";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Value_Type::unmark_handle_value_for_deletion':"
+            << endl
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+   status = submit_mysql_query(sql_strm.str(), 
+                               result, mysql_ptr, 
+                               &row_ctr, 
+                               &field_ctr, 
+                               0, 
+                               thread_str);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Value_Type::unmark_handle_value_for_deletion':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << mysql_error(mysql_ptr)
+            << endl
+            << "Will send failure notice to client."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+          mysql_free_result(result); 
+
+       temp_strm.str("");
+
+       temp_strm << "UNDELETE HANDLE_VALUE RESPONSE " << GW_SERVER_SIDE_DATABASE_ERROR << " "
+                 << "\"" << hv_str << "\" -1 \"(Type)\" "
+                 << "\"(Data)\" \"(Failure)\"";
+
+       response.command = temp_strm.str();
+       response_deque.push_back(response);
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+  else if (row_ctr == 0)
+  {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Value_Type::unmark_handle_value_for_deletion':"
+            << endl
+            << "`submit_mysql_query' returned 0 rows."
+            << endl
+            << "No matching handle values found in "
+            << handle_database << ".handles database table."
+            << endl
+            << "Will send failure notice to client."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+
+       temp_strm.str("");
+
+       temp_strm << "UNDELETE HANDLE_VALUE RESPONSE " << GW_HANDLE_VALUE_NOT_FOUND << " "
+                 << "\"" << hv_str << "\" ";
+
+       if (index > 0)
+           temp_strm << index << " ";
+       else
+           temp_strm << "-1 ";
+     
+       if (!type.empty())
+           temp_strm << "\"" << type << "\" ";
+       else 
+           temp_strm << "\"(Type)\" ";
+
+       temp_strm << "\"(Data)\" \"No matching handle value\"";
+
+       response.command = temp_strm.str();
+       response_deque.push_back(response);
+
+       return 1;
+
+  }  /* |else if (row_ctr == 0)|  */
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Value_Type::unmark_handle_value_for_deletion':"
+            << endl
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "`row_ctr' == " << row_ctr
+            << endl 
+            << "`field_ctr' == " << field_ctr
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+   Handle_Value_Type hv;
+   vector<Handle_Value_Type> hv_vector;
+
+   for (int i = 0; i < row_ctr; ++i)
+   {
+@q ******* (7) @>
+
+       curr_row = mysql_fetch_row(result);
+
+       if (curr_row == 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str
+               << "ERROR!  In `Handle_Value_Type::unmark_handle_value_for_deletion':"
+               << endl 
+               << "`mysql_fetch_row' failed:"
+               << endl
+               << mysql_error(mysql_ptr)
+               << endl 
+               << "Exiting function unsuccessfully with return value 1."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          mysql_free_result(result); 
+
+          temp_strm.str("");
+
+          temp_strm << "UNDELETE HANDLE_VALUE RESPONSE " << GW_SERVER_SIDE_DATABASE_ERROR << " "
+                    << "\"" << hv_str << "\" ";
+
+          if (index > 0)
+              temp_strm << index << " ";
+          else
+              temp_strm << "-1 ";
+     
+          if (!type.empty())
+              temp_strm << "\"" << type << "\" ";
+          else 
+              temp_strm << "\"(Type)\" ";
+
+          temp_strm << "\"(Data)\" \"Server-side database error\"";
+
+          response.command = temp_strm.str();
+          response_deque.push_back(response);
+
+          return 1;
+
+       }  /* |if (curr_row == 0)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str
+                << "In `Handle_Value_Type::unmark_handle_value_for_deletion':"
+                << endl;
+           if (curr_row[0])
+              cerr << "`curr_row[0]' == " << curr_row[0]
+                   << endl;
+           else
+              cerr << "`curr_row[0]' is NULL." << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       hv.clear();
+
+       status = hv.set(curr_row, field_ctr, handle);
+
+       if (status != 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str
+               << "ERROR!  In `Handle_Value_Type::unmark_handle_value_for_deletion':"
+               << endl 
+               << "`Handle_Value_Type::set' failed, returning " << status << "."
+               << endl
+               << "Failed to set `Handle_Value_Type' object."
+               << endl 
+               << "Exiting function unsuccessfully with return value 1."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          mysql_free_result(result); 
+
+          temp_strm.str("");
+
+          temp_strm << "UNDELETE HANDLE_VALUE RESPONSE " << GW_HANDLE_VALUE_ERROR << " "
+                    << "\"" << hv_str << "\" ";
+
+          if (index > 0)
+              temp_strm << index << " ";
+          else
+              temp_strm << "-1 ";
+     
+          if (!type.empty())
+              temp_strm << "\"" << type << "\" ";
+          else 
+              temp_strm << "\"(Type)\" ";
+
+          temp_strm << "\"(Data)\" \"(Failure)\"";
+
+          response.command = temp_strm.str();
+          response_deque.push_back(response);
+
+          return 1;
+          
+       }  /* |if (status != 0)|  */
+       
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str
+                << "In `Handle_Value_Type::unmark_handle_value_for_deletion':"
+                << endl 
+                << "`Handle_Value_Type::set' succeeded, returning 0:"
+                << endl;
+#if 0 
+           hv.show("hv:");
+#endif 
+
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+       if (   hv.created_by_user_id != user_id
+           && !(privileges & Scan_Parse_Parameter_Type::SUPERUSER_PRIVILEGE))
+       {
+
+          temp_strm << "UNDELETE HANDLE_VALUE RESPONSE " 
+                    << GW_NO_PRIVILEGE_ERROR << " "
+                    << "\"" << hv_str << "\" "
+                    << hv.idx << " \"" << hv.type << "\" "
+                    << "\"(Data)\" \"User `" << username << "', ID " << user_id << ", "
+                    << "didn't create this handle value "
+                    << "and doesn't have `superuser' privilege:"
+                    << endl
+                    << "`created_by_user_id' == " << hv.created_by_user_id << "."
+                    << endl
+                    << "Handle value not unmarked for deletion.\"";
+
+          response.command = temp_strm.str();
+          response_deque.push_back(response);
+          response.command = "";
+
+          continue;
+
+       }  /* |if|  */
+
+
+@q ******* (7) @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+       hv_vector.push_back(hv);
+
+@q ******* (7) @>
+
+   }  /* |for|  */
+
+   mysql_free_result(result); 
+   result = 0;
+
+   sql_strm.str("");
+
+@q ****** (6) @>    
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+   bool found = false;
+
+   string comma_str;
+
+   sql_strm << "update " << handle_database << ".handles "
+            << "set last_modified = now(), marked_for_deletion = 0, "
+            << "delete_from_database_timestamp = 0 "
+            << "where handle_value_id in (";
+
+   for (vector<Handle_Value_Type>::iterator iter = hv_vector.begin();
+        iter != hv_vector.end();
+        ++iter)
+   {
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           iter->show("*iter:");
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+       
+@q ******* (7) @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+       if (iter->marked_for_deletion == false)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str
+               << "WARNING!  In `Handle_Value_Type::unmark_handle_value_for_deletion':"
+               << endl 
+               << "`Handle_Value_Type' object not marked for deletion."
+               << endl
+               << "Not unmarking."
+               << endl 
+               << "Will send response to client and continue."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          temp_strm.str("");
+
+          temp_strm << "UNDELETE HANDLE_VALUE RESPONSE " 
+                    << GW_HANDLE_VALUE_NOT_MARKED_FOR_DELETION << " "
+                    << "\"" << hv_str << "\" ";
+
+          if (iter->idx > 0)
+              temp_strm << iter->idx << " ";
+          else
+              temp_strm << "-1 ";
+     
+          if (!iter->type.empty())
+              temp_strm << "\"" << iter->type << "\" ";
+          else 
+              temp_strm << "\"(Type)\" ";
+
+          temp_strm << "\"(Data)\" \"Handle value not marked for deletion.  "
+                    << "Not unmarking.\"";
+
+          response.command = temp_strm.str();
+          response_deque.push_back(response);
+          response.command = "";
+
+          continue;
+
+       }  /* |if (iter->marked_for_deletion == false)|  */
+
+@q ******* (7) @>
+
+       else
+       {
+           found = true;
+
+           sql_strm << comma_str << iter->handle_value_id;
+
+           comma_str = ", ";
+
+       }
+
+@q ******* (7) @>
+
+   }  /* |for|  */
+
+   sql_strm << ")";
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "In `Handle_Value_Type::unmark_handle_value_for_deletion':"
+            << endl
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+   if (found)
+   {
+@q ******* (7) @>
+
+       status = submit_mysql_query(sql_strm.str(), 
+                                   result, mysql_ptr, 
+                                   0, 
+                                   0,
+                                   &affected_rows, 
+                                   thread_str);
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Handle_Value_Type::unmark_handle_value_for_deletion':"
+                << endl
+                << "`submit_mysql_query' failed, returning " << status << "."
+                << endl
+                << mysql_error(mysql_ptr)
+                << endl
+                << "Will send failure notice to client."
+                << endl 
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           if (result)
+              mysql_free_result(result); 
+
+           temp_strm.str("");
+
+           temp_strm << "UNDELETE HANDLE_VALUE RESPONSE " << GW_SERVER_SIDE_DATABASE_ERROR << " "
+                     << "\"" << hv_str << "\" ";
+
+           if (index > 0)
+               temp_strm << index << " ";
+           else
+               temp_strm << "-1 ";
+     
+           if (!type.empty())
+               temp_strm << "\"" << type << "\" ";
+           else 
+               temp_strm << "\"(Type)\" ";
+
+           temp_strm << "\"(Data)\" \"(Failure)\"";
+
+           response.command = temp_strm.str();
+           response_deque.push_back(response);
+
+           return 1;
+
+       }  /* |if (status != 0)|  */
+
+@q ******* (7) @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `Handle_Value_Type::unmark_handle_value_for_deletion':"
+                << endl
+                << "`submit_mysql_query' succeeded, returning 0."
+                << endl
+                << "`affected_rows' == " << affected_rows << endl; 
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       mysql_free_result(result); 
+       result = 0;
+
+@q ******* (7) @>
+
+   }  /* |if (found)|  */
+
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+   bool binary_data = false;
+
+   string temp_str;
+
+@q ****** (6) @>
+
+   if (found)
+   {
+@q ******* (7) @>
+
+       for (vector<Handle_Value_Type>::iterator iter = hv_vector.begin();
+            iter != hv_vector.end();
+            ++iter)
+       {
+
+@q ******** (8) @>
+
+@ These are the handle values that were not marked for deletion before
+and therefore not unmarked.  Responses were already pushed
+onto |response_deque| for them above.
+\initials{LDF 2013.09.11.}
+
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+           if (iter->marked_for_deletion == false)  
+           {
+               continue;
+           }
+
+@q ******** (8) @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+           temp_str = "";
+
+           binary_data = false;
+
+           temp_strm.str("");
+
+           temp_strm << "UNDELETE HANDLE_VALUE RESPONSE " << GW_SUCCESS << " "
+                     << "\"" << hv_str << "\" "
+                     << iter->idx << " \"" << iter->type << "\" ";
+
+           if (iter->data_length == 0)
+               temp_strm << "\"(No data)\" ";
+
+@q ******** (8) @>
+
+@ Currently, the size of |string_value| in the (identical) |unions| declared for |yyparse| 
+in \filename{parser.web} and for |zzparse| in \filename{prsrclnt.web} is 1024.  This value
+is used literally in the |union| declaration, i.e., a preprocessor macro is {\it not\/} used.
+(It must certainly be a constant, so a variable cannot be used).  Therefore, making the
+maximum data length here 512 is very conservative.  However, I'm not sure at this time
+whether it's really necessary to send the contents of the data fields to the client at all, 
+so I'm only sending them if they're reasonably short.
+@:TODO@> !! TODO:  Maybe define a preprocessor macro for use in the |union| declarations.
+\initials{LDF 2013.09.11.}
+
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+
+           else if (iter->data_length > 512)
+           {
+               temp_strm << "\"Data: " << iter->data_length << " bytes:  "
+                         << "Exceeds maximum length for this purpose (512 bytes).  "
+                         << "Not sent.\" ";
+           }
+
+@q ******** (8) @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+
+           else
+           {
+                 for (int i = 0; i < iter->data_length; ++i)
+                 {
+                     if (!isprint(iter->data[i]))
+                     {
+                         binary_data = true;
+                         break;
+                     }
+
+                 }  /* |for|  */
+
+                 if (binary_data == true)
+                     temp_strm << "\"Binary data.  Not sent.\" ";
+                 else
+                 {
+                 
+                     temp_str.append(iter->data, iter->data_length);
+                     temp_strm << "\"" << temp_str << "\" ";
+                 }
+ 
+           }  /* |else|  */
+
+           temp_strm << "\"Success\"";
+ 
+           response.command = temp_strm.str();
+           response_deque.push_back(response);
+       
+           temp_strm.str("");
+   
+
+@q ******** (8) @>
+
+       }  /* |for|  */
+
+@q ******* (7) @>
+
+   }  /* |if (found)|  */
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "WARNING!  In `Handle_Value_Type::unmark_handle_value_for_deletion':"
+            << endl
+            << "`found' == `false':  No handle values unmarked for deletion."
+            << endl
+            << "Continuing."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+
+       lock_cerr_mutex(); 
+       cerr << "Exiting `Handle_Value_Type::unmark_handle_value_for_deletion' "
+            << "successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+   return 0;
+
+}  /* End of |Handle_Value_Type::unmark_handle_value_for_deletion| definition  */
+
+
+
+@q *** (3) Extract (|extract|).  @>
+
+@ Extract (|extract|).
+\initials{LDF 2013.08.30.}
+
+\LOG
+\initials{LDF 2013.08.30.}
+Added this function.
+
+\initials{LDF 2013.09.11.}
+Added |string &handle| argument.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Handle_Value_Type| function declarations@>=
+static
+int
+extract(string hv_str, 
+        string &prefix, 
+        string &sub_handle, 
+        string &handle,
+        int &index, 
+        string &type, 
+        string thread_str = "");
+
+@q **** (4) Definition  @>
+@
+@<|Handle_Value_Type::extract| definition@>=
+
+int
+Handle_Value_Type::extract(string hv_str, 
+                           string &prefix,     
+                           string &sub_handle, 
+                           string &handle, 
+                           int &index, 
+                           string &type,
+                           string thread_str)
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   string temp_str;
+
+   unsigned long int temp_val = 0L;
+
+   size_t pos = 0;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Handle_Value_Type::extract'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::extract| definition@>=
+
+   pos = hv_str.find("/");
+
+   if (pos == string::npos)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Value_Type::extract':"
+            << endl 
+            << "Failed to find slash in handle specifier:"
+            << endl 
+            << "`hv_str' == " << hv_str
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (pos == string::npos)|  */
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::extract| definition@>=
+
+@q ***** (5) @>
+@ Currently, it's not possible for this case to occur, because a string like |"12345/00001:"| 
+would cause a parse error, since the parser would interpret it as an invalid 
+\<time specification>.
+\initials{LDF 2013.09.10.}
+
+\LOG
+\initials{LDF 2013.09.10.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Value_Type::extract| definition@>=
+
+    if (pos >= hv_str.size() - 1)
+    {
+       cerr << thread_str << "ERROR!  In `Handle_Value_Type::extract':"
+            << endl 
+            << "Slash is last character in  handle specifier:"
+            << endl 
+            << "`hv_str' == " << hv_str
+            << endl
+            << "This isn't permitted."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1; 
+
+    }  /* |if (pos >= hv_str.size() - 1)|  */
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::extract| definition@>=
+
+    prefix = hv_str;
+    prefix.erase(pos);
+
+    hv_str.erase(0, pos + 1);
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Value_Type::extract':"
+            << endl 
+            << "prefix == " << prefix
+            << endl
+            << "hv_str     == " << hv_str
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::extract| definition@>=
+
+
+   pos = hv_str.find(":");
+
+   if (pos == string::npos)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Value_Type::extract':"
+            << endl 
+            << "Failed to find colon in handle value specifier:"
+            << endl 
+            << "`hv_str' == " << hv_str
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (pos == string::npos)|  */
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::extract| definition@>=
+
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Value_Type::extract':"
+            << endl 
+            << "Found colon in handle value specifier."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ***** (5) @>
+@ Currently, it's not possible for this case to occur, because a string like |"12345/00001:"| 
+would cause a parse error, since the parser would interpret it as an invalid 
+\<time specification>.
+\initials{LDF 2013.09.10.}
+
+\LOG
+\initials{LDF 2013.09.10.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Value_Type::extract| definition@>=
+
+    if (pos >= hv_str.size() - 1)
+    {
+       cerr << thread_str << "ERROR!  In `Handle_Value_Type::extract':"
+            << endl 
+            << "Failed to find handle value specifier:"
+            << endl 
+            << "`hv_str' == " << hv_str
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1; 
+
+    }  /* |if (pos >= hv_str.size() - 1)|  */
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::extract| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Value_Type::extract':"
+            << endl
+            << "hv_str == " << hv_str << endl
+            << "pos == " << pos << endl
+            << "hv_str.size() == " << hv_str.size() << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    temp_str = hv_str;
+    
+    temp_str.erase(0, pos + 1);
+
+    hv_str.erase(pos);
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Value_Type::extract':"
+            << endl
+            << "hv_str == " << hv_str << endl
+            << "temp_str == " << temp_str << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::extract| definition@>=
+
+   if (isdigit(temp_str[0]))
+   {
+@q ****** (6) @>
+
+       errno = 0;
+       temp_val = strtoul(temp_str.c_str(), 0, 10);
+
+@q ****** (6) @>
+
+       if (temp_val == ULONG_MAX)
+       {
+           cerr << thread_str << "ERROR!  In `Handle_Value_Type::extract':"
+                << endl 
+                << "`strtoul' failed, returning `ULONG_MAX':"
+                << endl 
+                << strerror(errno)
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1; 
+
+       }
+
+@q ****** (6) @>
+
+       else if (temp_val > INT_MAX)
+       {
+           cerr << thread_str << "ERROR!  In `Handle_Value_Type::extract':"
+                << endl 
+                << "`strtoul' returned " << temp_val << " (> `INT_MAX')."
+                << endl 
+                << "This is not permitted:  Handle index (`idx') exceeds maximum value."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1; 
+
+       }  /* |else if (temp_val > INT_MAX)|  */
+
+@q ****** (6) @>
+
+       else
+       {
+           index = temp_val;
+           type = "";
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "In `Handle_Value_Type::extract':"
+                    << endl 
+                    << "`index' == " << index
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+       }  /* |else|  */
+
+@q ****** (6) @>
+
+   }  /* |if (isdigit(temp_str[0]))|  */
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::extract| definition@>=
+
+   else
+   {
+      type = temp_str;
+      index = 0;
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "In `Handle_Value_Type::extract':"
+                    << endl 
+                    << "`type' == " << type
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   }  /* |else|  */
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::extract| definition@>=
+
+
+   sub_handle = hv_str;
+
+   handle  = prefix;
+   handle += "/";
+   handle += sub_handle;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Value_Type::extract':"
+            << endl 
+            << "`sub_handle' == " << sub_handle
+            << endl
+            << "`handle' == " << handle
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@
+@<|Handle_Value_Type::extract| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Handle_Value_Type::extract' successfully "
+            << "with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |Handle_Value_Type::extract| definition  */
+
+
+
+
+@q *** (3) Clear.  @>
+@ Clear.  
+\initials{LDF 2012.10.12.}
+
+\LOG
+\initials{LDF 2012.10.12.}
+Added this function.
+
+\initials{LDF 2013.02.07.}
+@:BUG FIX@> BUG FIX:  Now setting |data_length| and |refs_length| to 0.
+\ENDLOG
+
+@<|Handle_Value_Type| function declarations@>=
+void 
+clear(void);
+
+@
+@<|Handle_Value_Type::clear| definition@>=
+
+void 
+Handle_Value_Type::clear(void) 
+{
+
+    filename = "";
+
+    handle = "";
+    idx = 0;
+    type = "";
+
+    if (data)
+    {
+       delete[] data;
+       data = 0;
+    }
+
+    data_length = 0;
+
+    ttl_type = 0;
+    ttl = 0;
+    timestamp = 0;
+    
+    if (refs)
+    {
+       delete[] refs;
+       refs = 0;
+    }
+ 
+    refs_length = 0;
+
+    admin_read = true;
+    admin_write = true;
+    pub_read = true;
+    pub_write = false;
+    handle_id = 0;
+    handle_value_id = 0;
+
+    created_by_user_id = 0;
+    irods_object_id = 0UL;
+
+    marked_for_deletion = false;
+    created = static_cast<time_t>(0); 
+    last_modified = static_cast<time_t>(0); 
+    created_str = "";
+    last_modified_str = "";
+
+
+    delete_from_database_timestamp = static_cast<time_t>(0); 
+    delete_from_database_timestamp_str = "";
+
+    return; 
+
+}  /* End of |Handle_Value_Type::clear| definition  */
+
+@q *** (3) Show.  @>
+
+@ Show.
+\initials{LDF 2012.10.12.}
+
+\LOG
+\initials{LDF 2012.10.12.}
+Added this function.
+
+\initials{LDF 2013.01.07.}
+Added optional argument |stringstream *strm = 0|.
+Now calling |stringstream::write| instead of |fwrite|.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Handle_Value_Type| function declarations@>=
+void
+show(string s = "Handle_Value_Type:", stringstream *strm = 0) const;
+
+@q **** (4) Definition  @>
+@
+@<|Handle_Value_Type::show| definition@>=
+void
+Handle_Value_Type::show(string s, stringstream *strm) const
+{
+@q ***** (5) @>
+
+    stringstream temp_strm;
+
+    temp_strm << s << endl;
+
+    temp_strm << "handle                             == " << handle   
+              << endl 
+              << "filename                           == " << filename
+              << endl 
+              << "idx                                == " << idx 
+              << endl 
+              << "type                               == " << type    
+              << endl;
+
+     if (data && data_length > 0 && strlen(data) > 0)
+     {
+        temp_strm << "data                               == ";
+
+        temp_strm.write(data, data_length);
+
+#if 0 
+        fwrite(data, 1, data_length, stderr);
+#endif 
+     }
+     else
+        temp_strm << "data                               == NULL";
+
+     temp_strm << endl
+               << "data_length                        == " << data_length
+               << endl  
+               << "ttl_type                           == " << ttl_type 
+               << endl 
+               << "ttl                                == " << ttl 
+               << endl 
+               << "timestamp                          == " << timestamp;
+
+     if (timestamp > 0)
+          temp_strm << " (" << convert_seconds(timestamp) << ")";
+
+     temp_strm << endl;
+
+     if (refs)
+     {
+        temp_strm << "refs                               == ";
+
+        temp_strm.write(refs, refs_length);
+     }
+     else
+        temp_strm << "refs                               == NULL";          
+
+     temp_strm << endl
+               << "refs_length                        == " << refs_length
+               << endl 
+               << "admin_read                         == " << admin_read 
+               << endl 
+               << "admin_write                        == " << admin_write 
+               << endl 
+               << "pub_read                           == " << pub_read 
+               << endl 
+               << "pub_write                          == " << pub_write 
+               << endl 
+               << "handle_id                          == " << handle_id 
+               << endl  
+               << "handle_value_id                    == " << handle_value_id 
+               << endl 
+               << "created_by_user_id                 == " << created_by_user_id
+               << endl 
+               << "irods_object_id                    == " << irods_object_id
+               << endl 
+               << "marked_for_deletion                == " << marked_for_deletion
+               << endl 
+               << "created                            == " << created
+               << endl 
+               << "created_str                        == " << created_str 
+               << endl 
+               << "last_modified                      == " << last_modified
+               << endl 
+               << "last_modified_str                  == " << last_modified_str
+               << endl 
+               << "delete_from_database_timestamp     == " << delete_from_database_timestamp
+               << endl 
+               << "delete_from_database_timestamp_str == " << delete_from_database_timestamp_str
+               << endl 
+               << endl;
+
+   if (strm == 0)
+       cerr << temp_strm.str();
+   else
+       *strm << temp_strm.str();
+
+   return;
+
+@q ***** (5) @>
+
+}  /* End of |Handle_Value_Type::show|  */
+
+@q **** (4) @>
+
+@q *** (3) Write to database (normally client-side)  @>
+
+@ Write to database (normally client-side)  
+\initials{LDF 2013.04.26.}
+
+\LOG
+\initials{LDF 2013.04.26.}
+Added this function.
+
+\initials{LDF 2013.05.10.}
+Added optional argument |bool replace = false|.  If |replace == true|, 
+the SQL command \.{REPLACE} is used rather than \.{INSERT}.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Handle_Value_Type| function declarations@>=
+int
+write_to_database(MYSQL *mysql_ptr, string database, bool replace = false);
+
+@q **** (4) Definition  @>
+@
+@<|Handle_Value_Type::write_to_database| definition@>=
+int
+Handle_Value_Type::write_to_database(MYSQL *mysql_ptr, string database, bool replace)
+{
+@q ***** (5) @>
+
+   int status = 0;
+
+   int ret_val = 0;
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   stringstream sql_strm;
+
+   MYSQL_RES *result  = 0;
+   long affected_rows = 0; 
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `Handle_Value_Type::write_to_database'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::write_to_database| definition@>=
+
+   status = submit_mysql_query("lock tables gwirdcli.handles write", result, mysql_ptr);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR! In `Handle_Value_Type::write_to_database':"
+            << endl 
+            << "`submit_mysql_query' failed, returning " << status << ":"
+            << endl 
+            << mysql_error(mysql_ptr)
+            << endl 
+            << "Failed to lock table `gwirdcli.handles'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+       {
+           mysql_free_result(result);
+           result = 0;
+       }
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Handle_Value_Type::write_to_database':"
+            << endl 
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl 
+            << mysql_error(mysql_ptr)
+            << endl 
+            << "Locked table `gwirdcli.handles' successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   if (result)
+   {
+      mysql_free_result(result);
+      result = 0;
+   }
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::write_to_database| definition@>=
+
+   string temp_str;
+
+   sql_strm.str("");
+
+   if (replace)
+      sql_strm << "replace ";
+   else
+      sql_strm << "insert ";
+
+   sql_strm << "into gwirdcli.handles (handle, idx, "
+            << "type, data, ttl_type, ttl, timestamp, refs, admin_read, "
+            << "admin_write, pub_read, pub_write, handle_id, handle_value_id, "
+            << "created_by_user_id, irods_object_id, marked_for_deletion, created, "
+            << "last_modified, delete_from_database_timestamp) "
+            << "values ("
+            << "'" << handle << "', "             
+            << idx << ", "                
+            << "'" << type << "', ";
+
+@q ***** (5) @>
+
+   if (data == 0 || data_length == 0 || strlen(data) == 0)
+      sql_strm << "NULL, ";
+
+@q ***** (5) @>
+
+   else 
+   {
+@q ****** (6) @>
+
+        temp_str = "";
+
+        status = hexl_encode(data, data_length, temp_str);
+
+        if (status != 0)
+        {
+             lock_cerr_mutex(); 
+             cerr << "ERROR!  In `Handle_Value_Type::write_to_database':"  
+                  << endl 
+                  << "`hexl_encode' failed, returning " << status << "."
+                  << endl
+                  << "Failed to encode contents of `data' field to a hexadecimal string."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+             ret_val = 1;
+
+             goto UNLOCK_TABLES;
+
+ 
+        }  /* |if (status != 0)|  */
+
+        else if (temp_str.length() == 0)
+        {
+             lock_cerr_mutex(); 
+             cerr << "ERROR!  In `Handle_Value_Type::write_to_database':"  
+                  << endl 
+                  << "`hexl_encode' succeeded, returning 0, but `temp_str.leng()' == 0."
+                  << endl
+                  << "Failed to encode contents of `data' field to a hexadecimal string."
+                  << endl;
+             unlock_cerr_mutex();
+
+             ret_val = 1;
+
+             goto UNLOCK_TABLES; 
+
+        }  /* |else if (temp_str.length() == 0)|  */
+
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+             cerr << "In `Handle_Value_Type::write_to_database':"  
+                  << endl 
+                  << "`hexl_encode' succeeded, returning 0."
+                  << endl
+                  << "`temp_str' == " << temp_str
+                  << endl 
+                  << "Encoded contents of `data' field to a hexadecimal string successfully."
+                  << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+        sql_strm << "X'" << temp_str << "', ";
+
+@q ****** (6) @>
+
+   }  /* |else|  */
+
+@q ***** (5) @>
+
+   sql_strm << ttl_type << ", "           
+            << ttl << ", "                
+            << timestamp << ", ";
+
+@q ***** (5) @>
+
+   if (refs == 0)
+      sql_strm << "NULL, ";
+
+@q ***** (5) @>
+
+   else  /* |refs != 0|  */
+   {
+@q ****** (6) @>
+
+        temp_str = "";
+
+        status = hexl_encode(refs, refs_length, temp_str);
+
+        if (status != 0)
+        {
+             lock_cerr_mutex(); 
+             cerr << "ERROR!  In `Handle_Value_Type::write_to_database':"  
+                  << endl 
+                  << "`hexl_encode' failed, returning " << status << "."
+                  << endl
+                  << "Failed to encode contents of `refs' field to a hexadecimal string."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+             ret_val = 1;
+
+             goto UNLOCK_TABLES;
+
+ 
+        }  /* |if (status != 0)|  */
+
+        else if (temp_str.length() == 0)
+        {
+             lock_cerr_mutex(); 
+             cerr << "ERROR!  In `Handle_Value_Type::write_to_database':"  
+                  << endl 
+                  << "`hexl_encode' succeeded, returning 0, but `temp_str.leng()' == 0."
+                  << endl
+                  << "Failed to encode contents of `refs' field to a hexadecimal string."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+             ret_val = 1;
+
+             goto UNLOCK_TABLES;
+
+
+        }  /* |else if (temp_str.length() == 0)|  */
+
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+             cerr << "In `Handle_Value_Type::write_to_database':"  
+                  << endl 
+                  << "`hexl_encode' succeeded, returning 0."
+                  << endl
+                  << "`temp_str' == " << temp_str
+                  << endl 
+                  << "Encoded contents of `refs' field to a hexadecimal string successfully."
+                  << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+        sql_strm << "X'" << temp_str << "', ";
+
+@q ****** (6) @>
+
+
+   }  /* |else| (|refs != 0|)  */
+
+   sql_strm << admin_read << ", "         
+            << admin_write << ", "        
+            << pub_read << ", "           
+            << pub_write << ", "          
+            << handle_id << ", "          
+            << handle_value_id << ", "    
+            << created_by_user_id << ", " 
+            << irods_object_id << ", " 
+            << marked_for_deletion << ", ";
+   
+   if (created == 0)
+      sql_strm << "0, ";
+   else            
+      sql_strm << "from_unixtime(" << created << "), ";
+
+   if (last_modified == 0)
+      sql_strm << "0, ";
+   else 
+      sql_strm << "from_unixtime(" << last_modified << "), ";
+
+   if (delete_from_database_timestamp == 0)
+      sql_strm << "0";
+   else 
+      sql_strm << "from_unixtime(" << delete_from_database_timestamp << ")";
+
+   sql_strm << ")";      
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Handle_Value_Type::write_to_database':  `sql_strm.str()' == " 
+            << endl
+            << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::write_to_database| definition@>=
+
+
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, &affected_rows);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR! In `Handle_Value_Type::write_to_database':"
+            << endl 
+            << "`submit_mysql_query' failed, returning " << status << ":"
+            << endl 
+            << mysql_error(mysql_ptr)
+            << endl 
+            << "Failed to insert row into `gwirdcli.handles' database table."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+       {
+           mysql_free_result(result);
+           result = 0;
+       }
+
+       ret_val = 1; 
+
+       goto UNLOCK_TABLES;
+
+
+   }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::write_to_database| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Handle_Value_Type::write_to_database':"
+            << endl 
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl 
+            << "Inserted row into `gwirdcli.handles' database table successfully."
+            << endl
+            << "`affected_rows' == " << affected_rows 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   mysql_free_result(result);
+   result = 0;
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::write_to_database| definition@>=
+
+UNLOCK_TABLES:
+
+   status = submit_mysql_query("unlock tables", result, mysql_ptr);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR! In `Handle_Value_Type::write_to_database':"
+            << endl 
+            << "`submit_mysql_query' failed, returning " << status << ":"
+            << endl 
+            << mysql_error(mysql_ptr)
+            << endl 
+            << "Failed to lock table `gwirdcli.handles'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+       {
+           mysql_free_result(result);
+           result = 0;
+       }
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Handle_Value_Type::write_to_database':"
+            << endl 
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl 
+            << mysql_error(mysql_ptr)
+            << endl 
+            << "Locked table `gwirdcli.handles' successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::write_to_database| definition@>=
+
+   if (ret_val != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `Handle_Value_Type::write_to_database' unsuccessfully with return value "
+            << ret_val << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return ret_val;
+
+   }  /* |if (ret_val != 0)|  */
+
+
+@q ***** (5) @>
+@
+@<|Handle_Value_Type::write_to_database| definition@>=
+   
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `Handle_Value_Type::write_to_database' successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |Handle_Value_Type::write_to_database| definition  */
+
+
+@q *** (3) @>
+
+@q ** (2) |struct Handle_Value_Triple| @>
+
+@ \.{struct Handle\_Value\_Triple} declaration.
+\initials{LDF 2013.01.14.}
+
+\LOG
+\initials{LDF 2013.01.14.}
+Added this |struct| declaration.
+
+\initials{LDF 2013.06.16.}
+Added definitions of default constructor, assignment operator, |clear| and |show|
+within class declaration.
+\ENDLOG
+
+@<Declare |struct  Handle_Value_Triple|@>=
+
+struct Handle_Value_Triple
+{
+     int idx;
+     string type;
+     string data_str;
+
+     Handle_Value_Triple(void) { idx = 0;}
+
+     Handle_Value_Triple(int iidx, string ttype, string ddata_str = "") 
+              : idx(iidx), type(ttype), data_str(ddata_str) {}
+
+     const Handle_Value_Triple& operator=(const Handle_Value_Triple &hvt)
+     {
+         idx = hvt.idx;
+         type = hvt.type;
+         data_str = hvt.data_str;
+
+         return hvt;
+
+     }
+
+     void clear(void) { idx = 0; type = data_str = ""; return; }
+
+     int show(string s = "") { if (s.empty())
+                                   s = "Handle_Value_Triple:";
+
+                               cerr << s
+                                    << endl
+                                    << "idx == " << idx
+                                    << endl 
+                                    << "type == " << type
+                                    << endl 
+                                    << "data == " << data_str
+                                    << endl;
+
+                               return 0;
+
+                             }
+
+};
+
+@q *** (3) @>
+
+@q ** (2) Putting Handle_Value_Type together.@>
+
+@ Putting \.{Handle\_Value\_Type} together.
+\initials{LDF 2012.10.12.}
+
+@c
+class Handle_Type;
+class Irods_Object_Type;
+class Response_Type;
+class Scan_Parse_Parameter_Type;
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+typedef void* yyscan_t;
+@<Initialize |static| |Handle_Value_Type| data members@>@;@/
+@<|Handle_Value_Type| constructor definitions@>@;@/
+@<|Handle_Value_Type| destructor definition@>@;@/
+@<|Handle_Value_Type::operator=| definition@>@;@/
+@<|Handle_Value_Type::set| definitions@>@;@/
+@<|Handle_Value_Type::delete_handle_value| definition@>@;@/
+@<|Handle_Value_Type::unmark_handle_value_for_deletion| definition@>@;@/
+@<|Handle_Value_Type::extract| definition@>@;@/
+@<|Handle_Value_Type::clear| definition@>@;@/
+@<|Handle_Value_Type::show| definition@>@;@/
+@<|Handle_Value_Type::initialize_maps| definition@>@;@/
+@<|Handle_Value_Type::write_to_database| definition@>@;@/
+
+@q *** (3) This is what's written to the header file `hndlvltp.h'.  @>
+
+@ This is what's written to the header file \filename{hndlvltp.h}.  
+\initials{LDF 2008.12.05.}
+
+@(hndlvltp.h@>=
+#ifndef HNDLVLTP_H
+#define HNDLVLTP_H 1
+class Irods_Object_Type;
+class Scan_Parse_Parameter_Type;
+class Response_Type;
+typedef void* yyscan_t;
+class Handle_Type;
+@<Declare |struct Handle_Value_Triple|@>@;@/
+@<Declare |class Handle_Value_Type|@>@;@/
+#endif 
+
+
+@q (progn (cweb-mode) (outline-minor-mode))                           @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

@@ -1,0 +1,385 @@
+@q sgnlhndl.web  @>
+@q [...]/Finston/gwrdifpk/src/sgnlhndl.web  @>
+
+@q Created by Laurence D. Finston (LDF) Fri Apr 19 18:37:10 CEST 2013  @>
+
+@q * (1) Top  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+@* Signal handlers.
+\initials{LDF 2013.04.19.}
+
+@q * (1) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#include <stdlib.h>
+#include <stdio.h>
+
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif 
+
+#include <string.h>
+
+#include <sys/types.h>
+#include <pwd.h>
+#include <errno.h>
+#include <grp.h>
+#include <sys/wait.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+#include <time.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <math.h>
+#include <signal.h>
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+#include <string>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <stdarg.h>
+#include <limits.h>
+#include <algorithm>
+#include <fstream>
+#include <iterator>
+
+#include <sstream>   
+
+#include <map>
+#include <vector>
+#include <deque>
+#include <stack>
+#include <set>
+
+#include <pthread.h>
+
+#include <expat.h>
+
+#if HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#include <mysql.h>
+
+#undef NAME_LEN
+#undef LOCAL_HOST
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "cmdlnopt.h++"
+
+#if 0 
+#include "purgfncs.h++"
+#include "hndlvltp.h++"
+#include "hndltype.h++"
+#include "irdsavtp.h++"
+#include "irdsobtp.h++"
+
+#include "parser.h++"  
+#include "scanner.h++"
+#include "rspnstp.h++" 
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+#include "connect.h++"
+#include "listnlcl.h++"
+#include "lstnrmta.h++"
+#include "lstnrmtx.h++"
+
+#endif 
+
+
+@q * (1) |signal_handler|.  @>
+@ |signal_handler|.  
+\initials{LDF 2013.04.19.}
+
+\LOG
+\initials{LDF 2013.04.19.}
+Added this function.
+
+\initials{LDF 2013.04.23.}
+Now checking whether current thread is the main thread, i.e., the one in which |main|
+was called:  If it is, |signal_handler| calls |exit|.  Otherwise, it resends |sig| to 
+the main thread.  This ensures that |exit| isn't called while any thread is doing anything
+that shouldn't be interrupted.
+\ENDLOG
+
+@q ** (2) Declaration  @>
+
+@<|signal_handler| declaration@>=
+
+void
+signal_handler(int sig);
+
+@q ** (2) Definition  @>
+@
+@<|signal_handler| definition@>=
+void
+signal_handler(int sig)
+{
+@q *** (3) @>
+
+   int status = 0;
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   pthread_mutex_lock(&thread_ctr_id_map_mutex);
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `signal_handler'."
+            << endl
+            << "`sig' == " << sig << endl
+            << endl
+            << "`pthread_self' == " << pthread_self()
+            << endl;
+
+       if (sig == SIGINT)
+          cerr << "(SIGINT)";
+       else if (sig == SIGTERM)
+           cerr << "(SIGTERM)";
+
+       cerr << endl;
+
+       cerr << "thread_ctr_id_map.size() == " << thread_ctr_id_map.size() << endl;
+
+       if (thread_ctr_id_map.size() > 0)
+       {
+
+            cerr << "`thread_ctr_id_map.size()' == " << thread_ctr_id_map.size() << " > 0"
+                 << endl
+                 << "Showing `thread_ctr_id_map':"
+                 << endl;
+
+            int i = 0;
+ 
+   
+            for (map<unsigned int, pthread_t>::iterator iter = thread_ctr_id_map.begin();
+                 iter != thread_ctr_id_map.end();
+                 ++iter)
+            {
+                 cerr << "Thread " << iter->first << ", ID:  " << iter->second << endl;
+
+            }
+            
+            cerr << endl;
+
+
+       }  /* |if (thread_ctr_id_map.size() > 0)|  */
+
+       else
+            cerr << "Not showing `thread_ctr_id_map'." << endl;
+
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q *** (3) @>
+@
+@<|signal_handler| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "pthread_self() == " << pthread_self() << endl
+            << "thread_id_ctr_map[" << pthread_self() << "] == " 
+            << thread_id_ctr_map[pthread_self()] << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q *** (3) @>
+@ 
+@<|signal_handler| definition@>=
+
+
+   pthread_t curr_thread_id = pthread_self();
+   unsigned int curr_thread_ctr = thread_id_ctr_map[curr_thread_id];
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "curr_thread_ctr == " << curr_thread_ctr << endl
+            << "curr_thread_id == " << curr_thread_id << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q *** (3) @>
+@ 
+@<|signal_handler| definition@>=
+
+   if (curr_thread_ctr == 0)
+   {
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "curr_thread_ctr == 0." << endl
+                 << "In main thread.  Calling `exit(0)'."
+                 << endl;
+             unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */         
+
+        pthread_mutex_unlock(&thread_ctr_id_map_mutex);
+
+        lock_cout_mutex(); 
+        lock_cerr_mutex(); 
+        cout << "In main thread:  Received signal " << signal_name_map[sig]
+             << " (" << sig << ")."
+             << endl 
+             << "Calling `exit(0)'."
+             << endl;
+        unlock_cerr_mutex(); 
+        unlock_cout_mutex(); 
+             
+        exit(0);
+
+   }  /* |if (curr_thread_ctr == 0)|  */
+
+@q *** (3) @>
+@ 
+@<|signal_handler| definition@>=
+
+
+   else
+   {
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "curr_thread_ctr == " << curr_thread_ctr << " (!= 0)." 
+                 << endl
+                 << "Not in main thread.  Sending signal " << sig << " to main thread."
+                 << endl;
+             unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */         
+
+        pthread_mutex_unlock(&thread_ctr_id_map_mutex);
+
+        lock_cout_mutex(); 
+        lock_cerr_mutex(); 
+        cout << "In thread " << curr_thread_ctr << ":  Received signal " << signal_name_map[sig]
+             << " (" << sig << ")."
+             << endl 
+             << "Resending to main thread."
+             << endl;
+        unlock_cerr_mutex(); 
+        unlock_cout_mutex(); 
+             
+        pthread_kill(thread_ctr_id_map[0], sig);
+
+        return;
+
+   }  /* |else|  */
+
+@q *** (3) @>
+
+}  /* |signal_handler|  */
+
+@q ** (2) @>
+
+@ Putting sgnlhndl together.
+\initials{LDF 2012.06.26.}
+
+@q *** (3) @>
+
+@ This is what's compiled.
+\initials{LDF 2012.06.26.}
+
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+@<|signal_handler| declaration@>@;@/
+@<|signal_handler| definition@>@;@/
+
+@q **** (4) This is what's written to the header file `sgnlhndl.h'.  @>
+
+@ This is what's written to the header file \filename{sgnlhndl.h}.
+\initials{LDF 2012.06.27.}
+
+@(sgnlhndl.h@>=
+#ifndef SGNLHNDL_H
+#define SGNLHNDL_H 1
+using namespace std;
+using namespace gwrdifpk;
+@<|signal_handler| declaration@>@;@/
+#endif 
+
+
+@q Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))     @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

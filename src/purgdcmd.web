@@ -1,0 +1,2640 @@
+@q purgdcmd.web  @>
+@q [...]/gwrdifpk/src/purgdcmd.web  @>
+
+@q Created by Laurence D. Finston (LDF) Thu Nov 21 15:42:45 CET 2013  @>
+
+@q * (1) Top @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+@* Purge function for Dublin Core metadata.
+\initials{LDF 2013.11.21.}
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE         
+#endif 
+
+#include <stdlib.h>  /* Standard Library for C  */
+#include <stdio.h>
+#include <errno.h>
+#include <limits.h>
+
+#include <unistd.h>
+
+#if 0 
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <limits.h>
+#endif 
+
+#include <string.h>
+
+#include <algorithm> /* Standard Template Library (STL) for C++  */
+#include <fstream> 
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <string>
+#include <time.h>
+#include <math.h>
+#include <sstream>  
+#include <deque>
+#include <stack>
+#include <vector>
+#include <set>
+#include <bitset>
+
+#include <pthread.h>  /* POSIX threads  */
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+#include <expat.h>
+
+#include <mysql.h>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif 
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "usrinftp.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+
+@q ** (2) Purge function for Dublin Core metadata.@>
+
+@ Purge function for Dublin Core metadata.
+\initials{LDF 2013.11.21.}
+
+\LOG
+\initials{LDF 2013.11.21.}
+Added this function.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|purge_dc_metadata| declaration@>=
+
+void* 
+purge_dc_metadata(void *v);
+
+@q *** (3) Definition  @>
+@
+@<|purge_dc_metadata| definition@>=
+
+void* 
+purge_dc_metadata(void *v)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */ 
+
+   set_debug_level(DEBUG, 0, 0);
+
+   bool NO_EXECUTE = false;  /* |true|.  Set to |true| for testing (suppress execution).  */
+
+   int status;
+
+   string thread_str;
+
+   stringstream temp_strm;
+
+   unsigned long int temp_val = 0UL;
+
+   temp_strm << "[Thread " << purge_dc_metadata_thread_ctr << "] ";
+
+   thread_str = temp_strm.str();
+
+   temp_strm.str(""); 
+
+   struct timespec timeout;
+
+   time_t went_to_sleep;
+   time_t curr_time;
+
+   bool failed = false;
+
+   bool found_dc_metadata           = false;
+   bool found_file_save_db_entry    = false;
+   bool found_file_no_save_db_entry = false;
+
+   string temp_str;
+
+   Response_Type response;
+ 
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `purge_dc_metadata'." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+@q **** (4) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+   MYSQL *mysql_ptr;
+
+   MYSQL_RES* result = 0;
+   MYSQL_ROW curr_row;
+
+   long int affected_rows;
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+
+   int sql_strm_ctr = 8;
+
+   stringstream sql_strm[sql_strm_ctr];
+   string comma_str[sql_strm_ctr];
+
+   vector<Handle_Type> handle_vector;
+   vector<string> handle_str_vector;
+   vector<unsigned long int> handle_id_vector;
+
+   mysql_ptr = mysql_init(0);
+
+@q **** (4) @>
+
+   if (mysql_ptr)
+   {
+#if DEBUG_COMPILE 
+      if (DEBUG)
+      {
+         lock_cerr_mutex(); 
+         cerr << thread_str << "In purge_dc_metadata:  " 
+              << "`mysql_init' succeeded."
+              << endl;
+         unlock_cerr_mutex();
+
+      }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   }  /* |if (mysql_ptr)| */
+
+@q **** (4) @>
+
+   else
+   {
+      lock_cerr_mutex(); 
+      cerr << thread_str << "ERROR!  In purge_dc_metadata:" 
+           << endl
+           << "`mysql_init' failed.  Exiting thread unsuccessfully with "
+           << "return value 0."
+           << endl;
+      unlock_cerr_mutex();
+ 
+      pthread_exit(0);
+
+   }   
+
+@q **** (4) Set |mysql_socket_filename|.  @>
+@ Set |mysql_socket_filename|.  
+\initials{LDF 2013.07.14.}
+
+@<|purge_dc_metadata| definition@>=
+
+   string mysql_socket_filename;
+
+   errno = 0;
+
+   status = access("/var/run/mysql/mysql.sock", F_OK);
+
+@q ***** (5) @>
+
+   if (status == -1)
+   {  
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In purge_dc_metadata:" 
+                 << endl
+                 << "MySQL server socket file `/var/run/mysql/mysql.sock' doesn't exist:"
+                 << endl 
+                 << "`access' error: " << strerror(errno)
+                 << endl 
+                 << "Trying `/var/run/mysql/mysql.sock'."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+        errno = 0;
+
+        status = access("/var/run/mysqld/mysqld.sock", F_OK);
+
+        if (status == -1)
+        {
+             lock_cerr_mutex(); 
+             cerr << thread_str << "ERROR!  In purge_dc_metadata:" 
+                  << endl
+                  << "MySQL server socket file `/var/run/mysqld/mysqld.sock' doesn't exist:"
+                  << endl 
+                  << "`access' error: " << strerror(errno)
+                  << endl
+                  << "Tested for `/var/run/mysql/mysql.sock' previously."
+                  << endl
+                  << "Exiting thread unsuccessfully with "
+                  << "return value 0."
+                  << endl;
+             unlock_cerr_mutex();
+
+             mysql_close(mysql_ptr); 
+             mysql_ptr = 0;
+ 
+             pthread_exit(0);
+
+        }  /* |if (status == -1)|  */
+
+@q ****** (6) @>
+ 
+        else
+        {
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << thread_str << "In purge_dc_metadata:" 
+                      << endl
+                      << "MySQL server socket file `/var/run/mysqld/mysqld.sock' exists."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             mysql_socket_filename = "/var/run/mysqld/mysqld.sock";
+
+        }  /* |else|  */
+
+@q ****** (6) @>
+
+   }  /* |if (status == -1)|  */
+     
+@q ***** (5) @>
+
+   else
+   {
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In purge_dc_metadata:" 
+                 << endl
+                 << "MySQL server socket file `/var/run/mysql/mysql.sock' exists."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        mysql_socket_filename = "/var/run/mysql/mysql.sock";         
+
+   }  /* |else|  */
+
+@q ***** (5) @>
+
+@q **** (4) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+
+   my_bool reconnect    = 1;
+   unsigned int mysql_timeout = 120;
+
+   mysql_options(mysql_ptr, MYSQL_OPT_RECONNECT, &reconnect); 
+   mysql_options(mysql_ptr, MYSQL_OPT_CONNECT_TIMEOUT, &mysql_timeout); 
+
+   if (!mysql_real_connect(mysql_ptr, 
+                           0, 
+                           mysql_username.c_str(),
+                           mysql_password, 
+                           0,
+                           0, 
+                           mysql_socket_filename.c_str(), 0))
+   {
+      lock_cerr_mutex(); 
+      cerr << thread_str << "ERROR!  In `purge_dc_metadata':" 
+           << endl
+           << "`mysql_real_connect' failed.  "
+           << "Error:  " << mysql_error(mysql_ptr)
+           << endl 
+           << "Error number:  " << mysql_errno(mysql_ptr)
+           << endl 
+           << "Exiting thread unsuccessfully with "
+           << "return value 0."
+           << endl;
+       unlock_cerr_mutex();
+
+       mysql_close(mysql_ptr); 
+       mysql_ptr = 0;
+
+       pthread_exit(0);
+   }
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << thread_str << "In `purge_dc_metadata':"
+           << endl
+           << "`mysql_real_connect' succeeded."
+           << endl; 
+      unlock_cerr_mutex();
+   } 
+
+#endif /* |DEBUG_COMPILE|  */
+
+   string handles_database = (standalone_handle) ? "handlesystem_standalone" : "handlesystem";
+
+
+   for (;;)  /* main |for| loop  */
+   {
+@q ***** (5) @>
+
+        handle_vector.clear();
+        handle_str_vector.clear();
+        handle_id_vector.clear();
+ 
+        timeout.tv_sec = time(0) + purge_dc_metadata_interval;
+        timeout.tv_nsec = 0;
+ 
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "In `purge_dc_metadata':  At start of main loop."
+                 << endl
+                 << "`purge_dc_metadata_interval' == " << purge_dc_metadata_interval
+                 << endl 
+                 << "`purge_dc_metadata_limit' == " << purge_dc_metadata_limit
+                << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ***** (5) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+       pthread_mutex_lock(&sql_lock_tables_mutex);
+
+       sql_strm[0].str("");
+
+       sql_strm[0] << "lock tables " << handles_database << ".handles write, "
+                   << "gwirdsif.Irods_Objects write, gwirdsif.Irods_AVUs write, "
+                   << "gwirdsif.Irods_Objects_Handles write, gwirdsif.Dublin_Core_Metadata write, "
+                   << "gwirdsif.Dublin_Core_Metadata_Sub write, "
+                   << "gwirdsif.Irods_Objects_Dublin_Core_Metadata write, "
+                   << "gwirdsif.Irods_Objects as IO write, gwirdsif.Irods_AVUs as IA write";
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "sql_strm[0].str() == " << sql_strm[0].str() << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       status = submit_mysql_query(sql_strm[0].str(), result, mysql_ptr);
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `purge_dc_metadata':" 
+                << endl
+                << "`submit_mysql_query' failed, returning " << status << ":"
+                << endl 
+                << "Error:  " << mysql_error(mysql_ptr)
+                << endl 
+                << "Error number:  " << mysql_errno(mysql_ptr)
+                << endl 
+                << "Failed to lock tables."
+                << endl 
+                << "Exiting thread unsuccessfully with "
+                << "return value 0."
+                << endl;
+            unlock_cerr_mutex();
+
+            if (result)
+               mysql_free_result(result);
+
+            mysql_close(mysql_ptr); 
+            mysql_ptr = 0;
+
+            pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+            pthread_exit(0);
+
+
+       }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex();
+           cerr << thread_str << "In `purge_dc_metadata':" 
+                << endl
+                << "`submit_mysql_query' succeeded, returning 0."
+                << endl
+                << "Locked tables successfully."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.12.16.}
+Changed  |vector<Dublin_Core_Metadata_Type> dc_metadata_vector| to 
+|map<unsigned long int, Dublin_Core_Metadata_Type> dc_metadata_map|.
+\ENDLOG 
+
+@<|purge_dc_metadata| definition@>=
+
+        map<unsigned long int, Dublin_Core_Metadata_Type> dc_metadata_map;
+        vector<string> irods_object_path_vector;
+        vector<unsigned int> id_vector;
+
+        status = Dublin_Core_Metadata_Type::get_dc_metadata_from_database(mysql_ptr,
+                                                                          response,
+                                                                          dc_metadata_map,
+                                                                          irods_object_path_vector,
+                                                                          id_vector,
+                                                                          true,
+                                                                          purge_dc_metadata_limit,
+                                                                          "gwirdsif", 
+                                                                          thread_str);
+
+@q ***** (5) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+        if (status == 2)
+        {
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `purge_dc_metadata':" 
+                     << endl
+                     << "`Dublin_Core_Metadata_Type::get_dc_metadata_from_database' returned 2:"
+                     << endl
+                     << "No expired Dublin Core metadata entries found."
+                     << endl
+                     << "Continuing."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            goto UNLOCK_TABLES;
+
+        }  /* |if (status == 2)|  */
+
+@q ***** (5) @>
+
+        else if (status != 0)
+        {
+
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  In `purge_dc_metadata':" 
+                 << endl
+                 << "`Dublin_Core_Metadata_Type::get_dc_metadata_from_database' failed, "
+                 << "returning " << status << "."
+                 << endl
+                 << "Failed to retrieve expired Dublin Core metadata entries from the database."
+                 << endl
+                 << "Will try to unlock database tables and exit thread function unsuccessfully "
+                 << "with exit status 0."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            failed = true;
+            goto UNLOCK_TABLES;
+
+        }  /* |else if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_dc_metadata':" 
+                 << endl
+                 << "`Dublin_Core_Metadata_Type::get_dc_metadata_from_database' succeeded, "
+                 << "returning 0."
+                 << endl
+                 << "`dc_metadata_map.size()' == " << dc_metadata_map.size()
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+        if (result)
+        {
+            mysql_free_result(result);
+            result = 0;
+        }
+
+        found_dc_metadata           = false;
+        found_file_no_save_db_entry = false;
+        found_file_save_db_entry    = false;
+
+
+        for (int i = 0; i < sql_strm_ctr; ++i)
+        {
+            sql_strm[i].str("");
+            comma_str[i] = "";
+        }
+
+        sql_strm[0] << "delete from gwirdsif.Dublin_Core_Metadata "
+                    << "where dublin_core_metadata_id in (";
+
+        sql_strm[1] << "update gwirdsif.Irods_Objects set "
+                    << "marked_for_deletion_from_archive = 1, "
+                    << "delete_from_archive_timestamp = timestampadd(second, -31622400, now()), "
+                    << "marked_for_deletion_from_gwirdsif_db = 1, "
+                    << "delete_from_gwirdsif_db_timestamp = "
+                    << "timestampadd(second, -31622400, now()), last_modified = now() "
+                    << "where dublin_core_metadata_id in (";
+
+        sql_strm[2] << "update gwirdsif.Irods_Objects set marked_for_deletion_from_archive = 1, "
+                    << "delete_from_archive_timestamp = timestampadd(second, -31622400, now()), "
+                    << "last_modified = now() "
+                    << "where dublin_core_metadata_id in (";
+       
+        sql_strm[3] << "update gwirdsif.Irods_Objects set dublin_core_metadata_id = 0, "
+                    << "last_modified = now() "
+                    << "where dublin_core_metadata_id in (";
+
+        sql_strm[4] << "update gwirdsif.Dublin_Core_Metadata "
+                    << "set marked_for_deletion = 0, delete_file = 0, "
+                    << "delete_from_database_timestamp = 0, "
+                    << "dc_metadata_irods_object_path = '', "
+                    << "irods_object_self_id = 0, "
+                    << "last_modified = now() "
+                    << "where dublin_core_metadata_id in (";
+
+
+        sql_strm[5] << "update gwirdsif.Dublin_Core_Metadata "
+                    << "set marked_for_deletion = 0, delete_file = 0, "
+                    << "delete_from_database_timestamp = 0, "
+                    << "dc_metadata_irods_object_path = '', "
+                    << "last_modified = now() "
+                    << "where dublin_core_metadata_id in (";
+
+        sql_strm[6] << "delete from gwirdsif.Dublin_Core_Metadata_Sub "
+                    << "where dublin_core_metadata_id in (";
+
+
+        sql_strm[7] << "delete from gwirdsif.Irods_Objects_Dublin_Core_Metadata "
+                    << "where dublin_core_metadata_id in (";
+
+        for (map<unsigned long int, Dublin_Core_Metadata_Type>::iterator iter 
+                = dc_metadata_map.begin();
+             iter != dc_metadata_map.end();
+             ++iter)
+        {
+@q ****** (6) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `purge_dc_metadata':" 
+                     << endl;
+
+                iter->second.show();
+
+                bitset<8> b(iter->second.delete_file);
+
+                cerr << "iter->second.delete_file == " << iter->second.delete_file 
+                     << endl
+                     << "`b' == " << b
+                     << endl 
+                     << "(iter->second.delete_file & 1U && !(iter->second.delete_file & 4U)) == "
+                     << (iter->second.delete_file & 1U && !(iter->second.delete_file & 4U))
+                     << endl 
+                     << "(iter->second.delete_file & 1U && iter->second.delete_file & 4U) == "
+                     << (iter->second.delete_file & 1U && iter->second.delete_file & 4U)
+                     << endl 
+                     << "(iter->second.delete_file & 2U && !(iter->second.delete_file & 4U)) == "
+                     << (iter->second.delete_file & 2U && !(iter->second.delete_file & 4U))
+                     << endl 
+                     << "(iter->second.delete_file & 2U && iter->second.delete_file & 4U) == "
+                     << (iter->second.delete_file & 2U && iter->second.delete_file & 4U)
+                     << endl;
+
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */              
+
+@q ****** (6) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+            if (iter->second.delete_file == 0)  /* Not deleting file  */
+            {
+                 found_dc_metadata = true;
+                 sql_strm[0] << comma_str[0] << iter->second.id;
+                 sql_strm[3] << comma_str[0] << iter->second.id;
+                 sql_strm[6] << comma_str[0] << iter->second.id;
+                 sql_strm[7] << comma_str[0] << iter->second.id;
+                 comma_str[0] = ", ";
+            }
+
+            else if (iter->second.delete_file & 1U && !(iter->second.delete_file & 4U))  
+            {
+                 /* Deleting file and Dublin Core metadata, not saving 
+                    database entry for file (iRODS object)  */
+
+                 found_dc_metadata = true;
+                 sql_strm[0] << comma_str[0] << iter->second.id;
+                 sql_strm[3] << comma_str[0] << iter->second.id;
+                 sql_strm[6] << comma_str[0] << iter->second.id;
+                 sql_strm[7] << comma_str[0] << iter->second.id;
+                 comma_str[0] = ", ";
+
+                 found_file_no_save_db_entry = true;
+                 sql_strm[1] << comma_str[1] << iter->second.id;
+                 comma_str[1] = ", ";
+
+                 sql_strm[4] << comma_str[4] << iter->second.id; 
+                 comma_str[4] = ", ";
+
+
+            }
+            else if (iter->second.delete_file & 1U && iter->second.delete_file & 4U)
+            {
+
+                 /* Deleting file and Dublin Core metadata, saving 
+                    database entry for file (iRODS object)  */
+
+                 found_dc_metadata = true;
+                 sql_strm[0] << comma_str[0] << iter->second.id;
+                 sql_strm[3] << comma_str[0] << iter->second.id;
+                 sql_strm[6] << comma_str[0] << iter->second.id;
+                 sql_strm[7] << comma_str[0] << iter->second.id;
+                 comma_str[0] = ", ";
+
+                 found_file_save_db_entry = true;
+                 sql_strm[2] << comma_str[2] << iter->second.id;
+                 comma_str[2] = ", ";
+
+                 sql_strm[5] << comma_str[5] << iter->second.id; 
+                 comma_str[5] = ", ";
+
+            }
+            else if (iter->second.delete_file & 2U && !(iter->second.delete_file & 4U))
+            {
+
+                 /* Deleting file only, not saving 
+                    database entry for file (iRODS object)  */
+
+                 found_file_no_save_db_entry = true;
+                 sql_strm[1] << comma_str[1] << iter->second.id;
+                 comma_str[1] = ", ";
+
+                 sql_strm[4] << comma_str[4] << iter->second.id; 
+                 comma_str[4] = ", ";
+
+
+            }
+            else if (iter->second.delete_file & 2U && iter->second.delete_file & 4U)
+            {
+
+                 /* Deleting file only, saving 
+                    database entry for file (iRODS object)  */
+
+                 found_file_save_db_entry = true;
+                 sql_strm[2] << comma_str[2] << iter->second.id;
+                 comma_str[2] = ", ";
+
+                 sql_strm[5] << comma_str[5] << iter->second.id; 
+                 comma_str[5] = ", ";
+
+            }
+
+            if (found_dc_metadata)
+               handle_id_vector.push_back(iter->second.handle_id);
+
+@q ****** (6) @>
+
+        }  /* |for|  */
+
+@q ***** (5) @>
+
+        sql_strm[0] << ")";
+
+        sql_strm[1] << ") and irods_object_ref_id > 0";
+
+        sql_strm[2] << ") and irods_object_ref_id > 0";
+
+        sql_strm[3] << ")"; 
+
+        sql_strm[4] << ")";
+
+        sql_strm[5] << ")";
+
+        sql_strm[6] << ")";
+
+        sql_strm[7] << ")";
+
+@q ***** (5) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_dc_metadata':" 
+                 << endl
+                 << "`found_dc_metadata' == " << found_dc_metadata
+                 << endl 
+                 << "`found_file_no_save_db_entry' == " << found_file_no_save_db_entry
+                 << endl 
+                 << "`found_file_save_db_entry' == " << found_file_save_db_entry
+                 << endl 
+                 << "`sql_strm[0].str()'    == " << sql_strm[0].str()
+                 << endl
+                 << "`sql_strm[1].str()'  == " << sql_strm[1].str()
+                 << endl
+                 << "`sql_strm[2].str()'  == " << sql_strm[2].str()
+                 << endl
+                 << "`sql_strm[3].str()'  == " << sql_strm[3].str()
+                 << endl
+                 << "`sql_strm[4].str()'  == " << sql_strm[4].str()
+                 << endl
+                 << "`sql_strm[5].str()'  == " << sql_strm[5].str()
+                 << endl
+                 << "`sql_strm[6].str()'  == " << sql_strm[6].str()
+                 << endl
+                 << "`sql_strm[7].str()'  == " << sql_strm[7].str()
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */         
+
+@q ***** (5) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+        if (NO_EXECUTE)
+        {
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "In `purge_dc_metadata':" 
+                    << endl
+                    << "`NO_EXECUTE' == `true'.  Not calling `submit_mysql_query'."
+                    << endl 
+                    << "Skipping to `UNLOCK_TABLES'."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           goto UNLOCK_TABLES;
+
+
+        }  /* |if (NO_EXECUTE)|  */
+
+
+@q ***** (5) @> 
+@
+@<|purge_dc_metadata| definition@>=
+
+        if (found_dc_metadata)
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `purge_dc_metadata':" 
+                     << endl
+                     << "`found_dc_metadata' == `true'."
+                     << endl 
+                     << "Will delete rows from the `gwirdsif.Dublin_Core_Metadata', "
+                     << "`gwirdsif.Dublin_Core_Metadata_Sub'"
+                     << endl 
+                     << "and `gwirdsif.Irods_Objects_Dublin_Core_Metadata' database tables"
+                     << endl
+                     << "and update rows in the `gwirdsif.Irods_Objects' database table."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+@q ******* (7) @>
+
+            status = submit_mysql_query(sql_strm[0].str(), 
+                                        result, 
+                                        mysql_ptr, 
+                                        0, 
+                                        0, 
+                                        &affected_rows);
+
+            if (status != 0)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `purge_dc_metadata':" 
+                     << endl
+                     << "`submit_mysql_query' failed, returning " << status << ":"
+                     << endl 
+                     << "Error:  " << mysql_error(mysql_ptr)
+                     << endl 
+                     << "Error number:  " << mysql_errno(mysql_ptr)
+                     << endl 
+                     << "`sql_strm[0].str()' =="
+                     << endl 
+                     << sql_strm[0].str()
+                     << endl 
+                     << "Failed to delete rows from the `gwirdsif.Dublin_Core_Metadata' "
+                     << "database table."
+                     << endl 
+                     << "Setting `failed' to `true' and skipping to `UNLOCK_TABLES'."
+                     << endl;
+                 unlock_cerr_mutex();
+
+                 if (result)
+                 {
+                    mysql_free_result(result);
+                    result = 0;
+                 }
+
+                 failed = true;
+                 goto UNLOCK_TABLES;
+
+            }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex();
+                cerr << thread_str << "In `purge_dc_metadata':" 
+                     << endl
+                     << "`submit_mysql_query' succeeded, returning 0."
+                     << endl
+                     << "Deleted rows from the `gwirdsif.Dublin_Core_Metadata' "
+                     << "database table successfully."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+            sql_strm[0].str("");
+            mysql_free_result(result);
+            result = 0;
+
+@q ******* (7) @>
+
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2013.12.04.}
+Added this section.
+@:BUG FIX@> BUG FIX:  Now deleting rows in the \.{gwirdsif.Dublin\_Core\_Metadata\_Sub}
+database table.
+\ENDLOG
+
+@<|purge_dc_metadata| definition@>=
+
+@q ******* (7) @>
+
+            status = submit_mysql_query(sql_strm[6].str(), 
+                                        result, 
+                                        mysql_ptr, 
+                                        0, 
+                                        0, 
+                                        &affected_rows);
+
+            if (status != 0)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `purge_dc_metadata':" 
+                     << endl
+                     << "`submit_mysql_query' failed, returning " << status << ":"
+                     << endl 
+                     << "Error:  " << mysql_error(mysql_ptr)
+                     << endl 
+                     << "Error number:  " << mysql_errno(mysql_ptr)
+                     << endl 
+                     << "`sql_strm[6].str()' =="
+                     << endl 
+                     << sql_strm[6].str()
+                     << endl 
+                     << "Failed to delete rows from the `gwirdsif.Dublin_Core_Metadata_Sub' "
+                     << "database table."
+                     << endl 
+                     << "Setting `failed' to `true' and skipping to `UNLOCK_TABLES'."
+                     << endl;
+                 unlock_cerr_mutex();
+
+                 if (result)
+                 {
+                    mysql_free_result(result);
+                    result = 0;
+                 }
+
+                 failed = true;
+                 goto UNLOCK_TABLES;
+
+            }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex();
+                cerr << thread_str << "In `purge_dc_metadata':" 
+                     << endl
+                     << "`submit_mysql_query' succeeded, returning 0."
+                     << endl
+                     << "Deleted rows from the `gwirdsif.Dublin_Core_Metadata_Sub' "
+                     << "database table successfully."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+            sql_strm[6].str("");
+            mysql_free_result(result);
+            result = 0;
+
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2013.12.05.}
+Added this section.
+Now deleting rows in the \.{gwirdsif.Irods\_Objects\_Dublin\_Core\_Metadata}
+database table, which I've added today.
+\ENDLOG
+
+@<|purge_dc_metadata| definition@>=
+
+@q ******* (7) @>
+
+            status = submit_mysql_query(sql_strm[7].str(), 
+                                        result, 
+                                        mysql_ptr, 
+                                        0, 
+                                        0, 
+                                        &affected_rows);
+
+            if (status != 0)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `purge_dc_metadata':" 
+                     << endl
+                     << "`submit_mysql_query' failed, returning " << status << ":"
+                     << endl 
+                     << "Error:  " << mysql_error(mysql_ptr)
+                     << endl 
+                     << "Error number:  " << mysql_errno(mysql_ptr)
+                     << endl 
+                     << "`sql_strm[7].str()' =="
+                     << endl 
+                     << sql_strm[7].str()
+                     << endl 
+                     << "Failed to delete rows from the "
+                     << "`gwirdsif.Irods_Objects_Dublin_Core_Metadata' "
+                     << "database table."
+                     << endl 
+                     << "Setting `failed' to `true' and skipping to `UNLOCK_TABLES'."
+                     << endl;
+                 unlock_cerr_mutex();
+
+                 if (result)
+                 {
+                    mysql_free_result(result);
+                    result = 0;
+                 }
+
+                 failed = true;
+                 goto UNLOCK_TABLES;
+
+            }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex();
+                cerr << thread_str << "In `purge_dc_metadata':" 
+                     << endl
+                     << "`submit_mysql_query' succeeded, returning 0."
+                     << endl
+                     << "Deleted rows from the `gwirdsif.Irods_Objects_Dublin_Core_Metadata' "
+                     << "database table successfully."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+            sql_strm[7].str("");
+            mysql_free_result(result);
+            result = 0;
+
+@q ******* (7) @>
+
+@q ****** (6) @>
+
+        }  /* |if (found_dc_metadata)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_dc_metadata':" 
+                 << endl
+                 << "`found_dc_metadata' == `false'.  Not deleting rows from the "
+                 << "`gwirdsif.Dublin_Core_Metadata', `gwirdsif.Dublin_Core_Metadata_Sub'"
+                 << endl 
+                 << "and `gwirdsif.Irods_Objects_Dublin_Core_Metadata' database tables,"
+                 << endl 
+                 << "and not updating rows in the `gwirdsif.Irods_Objects' database table."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @> 
+@
+@<|purge_dc_metadata| definition@>=
+
+        if (found_file_no_save_db_entry)
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `purge_dc_metadata':" 
+                     << endl
+                     << "`found_file_no_save_db_entry' == `true'.  Will update rows in the "
+                     << "`gwirdsif.Irods_Objects' database table."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+            status = submit_mysql_query(sql_strm[1].str(), 
+                                        result, 
+                                        mysql_ptr, 
+                                        0, 
+                                        0, 
+                                        &affected_rows);
+
+            if (status != 0)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `purge_dc_metadata':" 
+                     << endl
+                     << "`submit_mysql_query' failed, returning " << status << ":"
+                     << endl 
+                     << "Error:  " << mysql_error(mysql_ptr)
+                     << endl 
+                     << "Error number:  " << mysql_errno(mysql_ptr)
+                     << endl 
+                     << "`sql_strm[1].str()' =="
+                     << endl 
+                     << sql_strm[1].str()
+                     << endl 
+                     << "Failed to update rows in the `gwirdsif.Irods_Objects' database table."
+                     << endl 
+                     << "Setting `failed' to `true' and skipping to `UNLOCK_TABLES'."
+                     << endl;
+                 unlock_cerr_mutex();
+
+                 if (result)
+                 {
+                    mysql_free_result(result);
+                    result = 0;
+                 }
+
+                 failed = true;
+                 goto UNLOCK_TABLES;
+
+            }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex();
+                cerr << thread_str << "In `purge_dc_metadata':" 
+                     << endl
+                     << "`submit_mysql_query' succeeded, returning 0."
+                     << endl
+                     << "Updated rows in the `gwirdsif.Irods_Objects' "
+                     << "database table successfully."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+
+            sql_strm[1].str("");
+            mysql_free_result(result);
+            result = 0;
+
+
+@q ****** (6) @>
+
+        }  /* |if (found_file_no_save_db_entry)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_dc_metadata':" 
+                 << endl
+                 << "`found_file_no_save_db_entry' == `false'.  Not updating rows in the "
+                 << "`gwirdsif.Irods_Objects' database table."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @> 
+@
+@<|purge_dc_metadata| definition@>=
+
+        if (found_file_save_db_entry)
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `purge_dc_metadata':" 
+                     << endl
+                     << "`found_file_save_db_entry' == `true'.  Will update rows in the "
+                     << "`gwirdsif.Irods_Objects' database table."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+            status = submit_mysql_query(sql_strm[2].str(), 
+                                        result, 
+                                        mysql_ptr, 
+                                        0, 
+                                        0, 
+                                        &affected_rows);
+
+            if (status != 0)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `purge_dc_metadata':" 
+                     << endl
+                     << "`submit_mysql_query' failed, returning " << status << ":"
+                     << endl 
+                     << "Error:  " << mysql_error(mysql_ptr)
+                     << endl 
+                     << "Error number:  " << mysql_errno(mysql_ptr)
+                     << endl 
+                     << "`sql_strm[2].str()' =="
+                     << endl 
+                     << sql_strm[2].str()
+                     << endl 
+                     << "Failed to update rows in the `gwirdsif.Irods_Objects' "
+                     << "database table."
+                     << endl 
+                     << "Setting `failed' to `true' and skipping to `UNLOCK_TABLES'."
+                     << endl;
+                 unlock_cerr_mutex();
+
+                 if (result)
+                 {
+                    mysql_free_result(result);
+                    result = 0;
+                 }
+
+                 failed = true;
+                 goto UNLOCK_TABLES;
+
+            }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex();
+                cerr << thread_str << "In `purge_dc_metadata':" 
+                     << endl
+                     << "`submit_mysql_query' succeeded, returning 0."
+                     << endl
+                     << "Updated rows in the `gwirdsif.Irods_Objects' "
+                     << "database table successfully."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+            sql_strm[2].str("");
+            mysql_free_result(result);
+            result = 0;
+
+
+@q ****** (6) @>
+
+        }  /* |if (found_file_save_db_entry)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_dc_metadata':" 
+                 << endl
+                 << "`found_file_save_db_entry' == `false'.  Not updating rows in the "
+                 << "`gwirdsif.Irods_Objects' database table."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.11.28.}
+Added this section.
+\ENDLOG
+
+@<|purge_dc_metadata| definition@>=
+
+        if (found_file_no_save_db_entry)
+        {
+@q ****** (6) @>
+
+            status = submit_mysql_query(sql_strm[4].str(), 
+                                        result, 
+                                        mysql_ptr, 
+                                        0, 
+                                        0, 
+                                        &affected_rows);
+
+
+            if (status != 0)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `purge_dc_metadata':" 
+                     << endl
+                     << "`submit_mysql_query' failed, returning " << status << ":"
+                     << endl 
+                     << "Error:  " << mysql_error(mysql_ptr)
+                     << endl 
+                     << "Error number:  " << mysql_errno(mysql_ptr)
+                     << endl 
+                     << "`sql_strm[4].str()' =="
+                     << endl 
+                     << sql_strm[4].str()
+                     << endl 
+                     << "Failed to update rows in the "
+                     << "`gwirdsif.Dublin_Core_Metadata' database table."
+                     << endl 
+                     << "Setting `failed' to `true' and skipping to `UNLOCK_TABLES'."
+                     << endl;
+                 unlock_cerr_mutex();
+
+                 if (result)
+                 {
+                    mysql_free_result(result);
+                    result = 0;
+                 }
+
+                 failed = true;
+
+                 goto UNLOCK_TABLES;
+
+            }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex();
+                cerr << thread_str << "In `purge_dc_metadata':" 
+                     << endl
+                     << "`submit_mysql_query' succeeded, returning 0."
+                     << endl
+                     << "Updated rows in the `gwirdsif.Irods_Objects' "
+                     << "database table successfully."
+                     << endl
+                     << "`affected_rows' == " << affected_rows
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+            sql_strm[4].str("");
+            mysql_free_result(result);
+            result = 0;
+
+@q ****** (6) @>
+
+        }  /* |if (found_file_no_save_db_entry)|  */
+
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.11.28.}
+Added this section.
+\ENDLOG
+
+@<|purge_dc_metadata| definition@>=
+
+        if (found_file_save_db_entry)
+        {
+@q ****** (6) @>
+
+            status = submit_mysql_query(sql_strm[5].str(), 
+                                        result, 
+                                        mysql_ptr, 
+                                        0, 
+                                        0, 
+                                        &affected_rows);
+
+
+            if (status != 0)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `purge_dc_metadata':" 
+                     << endl
+                     << "`submit_mysql_query' failed, returning " << status << ":"
+                     << endl 
+                     << "Error:  " << mysql_error(mysql_ptr)
+                     << endl 
+                     << "Error number:  " << mysql_errno(mysql_ptr)
+                     << endl 
+                     << "`sql_strm[5].str()' =="
+                     << endl 
+                     << sql_strm[5].str()
+                     << endl 
+                     << "Failed to update rows in the "
+                     << "`gwirdsif.Dublin_Core_Metadata' database table."
+                     << endl 
+                     << "Setting `failed' to `true' and skipping to `UNLOCK_TABLES'."
+                     << endl;
+                 unlock_cerr_mutex();
+
+                 if (result)
+                 {
+                    mysql_free_result(result);
+                    result = 0;
+                 }
+
+                 failed = true;
+
+                 goto UNLOCK_TABLES;
+
+            }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex();
+                cerr << thread_str << "In `purge_dc_metadata':" 
+                     << endl
+                     << "`submit_mysql_query' succeeded, returning 0."
+                     << endl
+                     << "Updated rows in the `gwirdsif.Irods_Objects' "
+                     << "database table successfully."
+                     << endl
+                     << "`affected_rows' == " << affected_rows
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+            sql_strm[5].str("");
+            mysql_free_result(result);
+            result = 0;
+
+@q ****** (6) @>
+
+        }  /* |if (found_file_save_db_entry)|  */
+
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.11.28.}
+Added this section.
+\ENDLOG
+
+@<|purge_dc_metadata| definition@>=
+
+        if (found_dc_metadata)
+        {
+            /* This query must be executed last.  \initials{LDF 2013.11.28.}  */
+
+            status = submit_mysql_query(sql_strm[3].str(), 
+                                        result, 
+                                        mysql_ptr, 
+                                        0, 
+                                        0, 
+                                        &affected_rows);
+
+            if (status != 0)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `purge_dc_metadata':" 
+                     << endl
+                     << "`submit_mysql_query' failed, returning " << status << ":"
+                     << endl 
+                     << "Error:  " << mysql_error(mysql_ptr)
+                     << endl 
+                     << "Error number:  " << mysql_errno(mysql_ptr)
+                     << endl 
+                     << "`sql_strm[3].str()' =="
+                     << endl 
+                     << sql_strm[3].str()
+                     << endl 
+                     << "Failed to update rows in the `gwirdsif.Irods_Objects' database table."
+                     << endl 
+                     << "Setting `failed' to `true' and skipping to `UNLOCK_TABLES'."
+                     << endl;
+                 unlock_cerr_mutex();
+
+                 if (result)
+                 {
+                    mysql_free_result(result);
+                    result = 0;
+                 }
+
+                 failed = true;
+                 goto UNLOCK_TABLES;
+
+            }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex();
+                cerr << thread_str << "In `purge_dc_metadata':" 
+                     << endl
+                     << "`submit_mysql_query' succeeded, returning 0."
+                     << endl
+                     << "Updated rows in the `gwirdsif.Irods_Objects' "
+                     << "database table successfully."
+                     << endl
+                     << "`affected_rows' == " << affected_rows
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+            sql_strm[3].str("");
+            mysql_free_result(result);
+            result = 0;
+
+@q ****** (6) @>
+
+        }  /* |if (found_dc_metadata)|  */
+
+@q ***** (5) Update handles.  @>
+
+@ Update handles.  
+\initials{LDF 2013.11.28.}
+
+@:NOTE@> !! PLEASE NOTE:  A conservative approach is taken to modifying the handles:
+Neither the handles nor the handle values of type \.{DC\_METADATA} 
+or \.{DC\_METADATA\_PID} are deleted!  Instead, handle values of
+type \.{DC\_METADATA\_DELETED} and/or \.{DC\_METADATA\_DELETED\_PID} are added
+to the existing handles.  
+\par
+Since handles are supposed to be ``persistent identifiers'', they should normally not
+be deleted.  However, there is no reason not to delete or {\it handle values}, if the
+information they contain becomes out-of-date.  However, at this time, I think it's 
+better to leave the old handle values and add new ones rather than replacing the old ones.
+They may be useful for searching.  This may change at some future date.
+\initials{LDF 2013.11.28.}
+
+\LOG
+\initials{LDF 2013.11.28.}
+Added this section.
+\ENDLOG
+
+@<|purge_dc_metadata| definition@>=
+
+UPDATE_HANDLES:
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+
+            comma_str[0] = "";
+
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_dc_metadata':" 
+                 << endl
+                 << "`handle_id_vector.size()' == " << handle_id_vector.size()
+                 << endl;
+
+            if (handle_id_vector.size() > 0)
+            {
+                cerr << "`handle_id_vector':"
+                     << endl;
+
+                for (vector<unsigned long int>::iterator iter = handle_id_vector.begin();
+                     iter != handle_id_vector.end();
+                     ++iter)
+                {
+                     cerr << comma_str[0] << *iter;
+                     comma_str[0] = ", ";
+                }
+                cerr << endl;
+                   
+            }
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */           
+
+@q ***** (5) @>
+
+        if (handle_id_vector.size() > 0)
+        {
+@q ****** (6) @>
+
+             status = Handle_Type::fetch_handles_from_database(mysql_ptr, 
+                                                               handle_id_vector, 
+                                                               handle_vector,
+                                                               "DC_METADATA",
+                                                               thread_str);
+
+@q ****** (6) @>
+
+             if (status == 2)
+             {
+                lock_cerr_mutex();
+                cerr << thread_str << "WARNING!  In `purge_dc_metadata':" 
+                     << endl
+                     << "`Handle_Type::fetch_handles_from_database' returned 2:"
+                     << endl
+                     << "No handle values found.  Not adding handle values."
+                     << endl 
+                     << "Skipping to `END_UPDATE_HANDLES'."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                goto END_UPDATE_HANDLES;
+
+             }
+
+@q ****** (6) @>
+
+             else if (status != 0)
+             {
+                lock_cerr_mutex();
+                cerr << thread_str << "ERROR!  In `purge_dc_metadata':" 
+                     << endl
+                     << "`Handle_Type::fetch_handles_from_database' failed, returning "
+                     << status << "."
+                     << endl
+                     << "Setting `failed' to `true'.  Will try to unlock database tables."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                failed = true;
+
+                goto UNLOCK_TABLES;
+
+             }
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+             else if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << thread_str << "In `purge_dc_metadata':" 
+                      << endl
+                      << "`Handle_Type::fetch_handles_from_database' succeeded, returning 0."
+                      << endl
+                      << "`handle_vector.size()' == " << handle_vector.size()
+                      << endl;
+
+
+                 if (handle_vector.size() > 0)
+                 {
+                     cerr << "`handle_vector':"
+                          << endl;
+
+                     for (vector<Handle_Type>::iterator iter = handle_vector.begin();
+                          iter != handle_vector.end();
+                          ++iter)
+                     {
+                         iter->show();
+                     }
+
+                 }
+
+                 unlock_cerr_mutex(); 
+
+             }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+             for (vector<Handle_Type>::iterator iter = handle_vector.begin();
+                  iter != handle_vector.end();
+                  ++iter)
+             {
+@q ******* (7) @>
+
+
+                  if (iter->handle_value_map.size() == 0)
+                  {
+                      lock_cerr_mutex();
+                      cerr << thread_str << "WARNING!  In `purge_dc_metadata':" 
+                           << endl
+                           << "`iter->handle_value_map.size()' == 0:"
+                           << endl 
+                           << "`Handle_Type' object doesn't contain any handle values."
+                           << endl
+                           << "Can't find `user_id'."
+                           << endl 
+                           << "Continuing loop."
+                           << endl;
+                      unlock_cerr_mutex(); 
+
+                      continue;
+
+                  }
+
+@q ******* (7) @>  
+
+                  temp_str = "";
+
+                  temp_str.insert(0, 
+                                  iter->handle_value_map.begin()->second.data, 
+                                  iter->handle_value_map.begin()->second.data_length);
+
+
+                  status = iter->add_value(
+                                      mysql_ptr, 
+                                      Handle_Value_Type::DC_METADATA_DELETED_INDEX,
+                                      "DC_METADATA_DELETED",
+                                      temp_str,
+                                      iter->handle_value_map.begin()->second.created_by_user_id,
+                                      0,
+                                      false);
+
+                  temp_str = "";
+
+@q ******* (7) @>
+
+                  if (status != 0)
+                  {
+                      lock_cerr_mutex();
+                      cerr << thread_str << "ERROR!  In `purge_dc_metadata':" 
+                           << endl
+                           << "`Handle_Type::add_value' failed, returning "
+                           << status << "."
+                           << endl
+                           << "Setting `failed' to `true'.  Will try to unlock database tables."
+                           << endl;
+                      unlock_cerr_mutex(); 
+
+                      failed = true;
+
+                      goto UNLOCK_TABLES;
+
+                  }  /* |if (status != 0)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+                  else if (DEBUG)
+                  {
+                      lock_cerr_mutex(); 
+                      cerr << thread_str << "In `purge_dc_metadata':" 
+                           << endl
+                           << "`Handle_Type::add_value' succeeded, returning 0."
+                           << endl;
+                      unlock_cerr_mutex(); 
+
+                  }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+                  handle_str_vector.push_back(iter->handle);
+
+             }  /* |for|  */
+            
+@q ****** (6) @>                                         
+
+        }  /* |if (handle_id_vector.size() > 0)|  */
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.11.28.}
+Added this section.
+\ENDLOG
+
+@<|purge_dc_metadata| definition@>=
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_dc_metadata':" 
+                 << endl
+                 << "`handle_str_vector.size()' == " << handle_str_vector.size()
+                 << endl;
+
+            if (handle_str_vector.size() > 0)
+            {
+
+                 comma_str[0] = "";
+
+                 cerr << "`handle_str_vector':"
+                      << endl;
+
+                 for (vector<string>::iterator iter = handle_str_vector.begin();
+                      iter != handle_str_vector.end();
+                      ++iter)
+                 {
+
+                     cerr << comma_str[0] << *iter;
+                     comma_str[0] = ", ";
+                    
+                 }
+                 cerr << endl;
+
+            }
+
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */       
+
+@q ***** (5) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+        sql_strm[0].str("");
+        comma_str[0] = "";
+
+        sql_strm[0] << "select handle_id from " << handles_database << ".handles "
+                    << "where type = 'DC_METADATA_PID' and data in (";
+
+        for (vector<string>::iterator iter = handle_str_vector.begin();
+             iter != handle_str_vector.end();
+             ++iter)
+        {
+
+            sql_strm[0] << comma_str[0] << "'" << *iter << "'";
+
+            comma_str[0] = ", ";
+
+        }
+
+        sql_strm[0] << ")";
+
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_dc_metadata':" 
+                 << endl
+                 << "`sql_strm[0].str()' == " 
+                 << endl            
+                 << sql_strm[0].str()
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        status = submit_mysql_query(sql_strm[0].str(), 
+                                    result,
+                                    mysql_ptr,
+                                    &row_ctr,
+                                    &field_ctr);
+           
+
+        if (status != 0)
+        {
+            lock_cerr_mutex();
+            cerr << thread_str << "ERROR!  In `purge_dc_metadata':" 
+                 << endl
+                 << "`submit_mysql_query' failed, returning "
+                 << status << ":"
+                 << endl 
+                 << "Error:  " << mysql_error(mysql_ptr)
+                 << endl 
+                 << "Error number:  " << mysql_errno(mysql_ptr)
+                 << endl
+                 << "Setting `failed' to `true'.  Will try to unlock database tables."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            if (result)
+            {
+               mysql_free_result(result); 
+               result = 0;
+            }
+
+            failed = true;
+
+            goto UNLOCK_TABLES;
+
+        }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex();
+            cerr << thread_str << "In `purge_dc_metadata':" 
+                 << endl
+                 << "`submit_mysql_query' succeeded, returning 0."
+                 << endl
+                 << "`row_ctr' == " << row_ctr
+                 << endl
+                 << "`field_ctr' == " << field_ctr
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        handle_id_vector.clear();
+        handle_vector.clear();
+
+        for (int i = 0; i < row_ctr; ++i)
+        {
+@q ****** (6) @>
+
+            curr_row = mysql_fetch_row(result);
+
+            if (curr_row == 0)
+            {
+                lock_cerr_mutex();
+                cerr << thread_str << "ERROR!  In `purge_dc_metadata':" 
+                     << endl
+                     << "`mysql_fetch_row' failed, returning 0:"
+                     << endl 
+                     << "Error:  " << mysql_error(mysql_ptr)
+                     << endl 
+                     << "Error number:  " << mysql_errno(mysql_ptr)
+                     << endl
+                     << "Setting `failed' to `true'.  Will try to unlock database tables."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                mysql_free_result(result); 
+                result = 0;
+
+                failed = true;
+
+                goto UNLOCK_TABLES;
+            }
+
+
+@q ****** (6) @>
+
+            errno = 0;
+            temp_val = strtoul(curr_row[0], 0, 10);
+
+            if (temp_val == ULONG_MAX)
+            {
+                lock_cerr_mutex();
+                cerr << thread_str << "ERROR!  In `purge_dc_metadata':" 
+                     << endl
+                     << "`strtoul' failed, returning `ULONG_MAX':"
+                     << endl 
+                     << strerror(errno)
+                     << endl 
+                     << "Setting `failed' to `true'.  Will try to unlock database tables."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                mysql_free_result(result); 
+                result = 0;
+
+                failed = true;
+
+                goto UNLOCK_TABLES;
+
+            }
+            
+@q ****** (6) @>
+
+            handle_id_vector.push_back(temp_val);            
+
+@q ****** (6) @>
+
+        }  /* |for|  */
+        
+
+@q ***** (5) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_dc_metadata':" 
+                 << endl
+                 << "`handle_id_vector.size()' == " << handle_id_vector.size()
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+        sql_strm[0].str("");
+        mysql_free_result(result); 
+        result = 0;
+
+        if (handle_id_vector.size() > 0)
+        {
+@q ****** (6) @>
+
+            status = Handle_Type::fetch_handles_from_database(mysql_ptr, 
+                                                              handle_id_vector,
+                                                              handle_vector,
+                                                              "DC_METADATA_PID",
+                                                              thread_str);
+
+            if (status == 2)
+            {
+               lock_cerr_mutex();
+               cerr << thread_str << "WARNING!  In `purge_dc_metadata':" 
+                    << endl
+                    << "`Handle_Type::fetch_handles_from_database' returned 2:"
+                    << endl
+                    << "No handle values found.  Not adding handle values."
+                    << endl 
+                    << "Skipping to `END_UPDATE_HANDLES'."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               goto END_UPDATE_HANDLES;
+
+            }
+
+@q ****** (6) @>
+
+            else if (status != 0)
+            {
+               lock_cerr_mutex();
+               cerr << thread_str << "ERROR!  In `purge_dc_metadata':" 
+                    << endl
+                    << "`Handle_Type::fetch_handles_from_database' failed, returning "
+                    << status << "."
+                    << endl
+                    << "Setting `failed' to `true'.  Will try to unlock database tables."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               failed = true;
+
+               goto UNLOCK_TABLES;
+
+            }
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `purge_dc_metadata':" 
+                     << endl
+                     << "`Handle_Type::fetch_handles_from_database' succeeded, returning 0."
+                     << endl
+                     << "`handle_vector.size()' == " << handle_vector.size()
+                     << endl;
+
+
+                if (handle_vector.size() > 0)
+                {
+                    cerr << "`handle_vector':"
+                         << endl;
+
+                    for (vector<Handle_Type>::iterator iter = handle_vector.begin();
+                         iter != handle_vector.end();
+                         ++iter)
+                    {
+                        iter->show();
+                    }
+
+                }
+
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+            vector<string>::iterator data_iter;
+
+            for (vector<Handle_Type>::iterator iter = handle_vector.begin();
+                 iter != handle_vector.end();
+                 ++iter)
+            {
+@q ******* (7) @>
+                
+                temp_str = "";
+                temp_str.insert(0, 
+                                iter->handle_value_map.begin()->second.data, 
+                                iter->handle_value_map.begin()->second.data_length);
+                
+                data_iter = find(handle_str_vector.begin(), 
+                                 handle_str_vector.end(), 
+                                 temp_str);
+
+                if (data_iter != handle_str_vector.end())
+                {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+                    if (DEBUG)       
+                    {
+                        lock_cerr_mutex(); 
+                        cerr << thread_str << "In `purge_dc_metadata':" 
+                             << endl
+                             << "Found a handle to update:"
+                             << endl 
+                             << "handle == " << iter->handle_value_map.begin()->second.handle
+                             << endl 
+                             << "type   == " << iter->handle_value_map.begin()->second.type
+                             << endl 
+                             << "data   == " << temp_str
+                             << endl;
+                        unlock_cerr_mutex(); 
+
+                    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */                        
+
+@q ******** (8) @>
+
+                    status = iter->add_value(
+                                         mysql_ptr,
+                                         Handle_Value_Type::DC_METADATA_DELETED_PID_INDEX,
+                                         "DC_METADATA_DELETED_PID",
+                                         temp_str,
+                                         iter->handle_value_map.begin()->second.created_by_user_id,
+                                         0,
+                                         false);
+
+                    temp_str = "";
+
+@q ******** (8) @>
+
+
+                    if (status != 0)
+                    {
+                        lock_cerr_mutex();
+                        cerr << thread_str << "ERROR!  In `purge_dc_metadata':" 
+                             << endl
+                             << "`Handle_Type::add_value' failed, returning "
+                             << status << "."
+                             << endl
+                             << "Setting `failed' to `true'.  Will try to unlock database tables."
+                             << endl;
+                        unlock_cerr_mutex(); 
+
+                        failed = true;
+
+                        goto UNLOCK_TABLES;
+
+                    }  /* |if (status != 0)|  */
+
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+                    else if (DEBUG)
+                    {
+                        lock_cerr_mutex(); 
+                        cerr << thread_str << "In `purge_dc_metadata':" 
+                             << endl
+                             << "`Handle_Type::add_value' succeeded, returning 0."
+                             << endl;
+                        unlock_cerr_mutex(); 
+
+                    }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ******** (8) @>
+
+                }  /* |if (data_iter != handle_str_vector.end())|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+                else if (DEBUG)
+                {
+                    lock_cerr_mutex();
+                    cerr << thread_str << "In `purge_dc_metadata':" 
+                         << endl
+                         << "Didn't find a handle to update:"
+                         << endl 
+                         << "handle == " << iter->handle_value_map.begin()->second.handle
+                         << endl 
+                         << "type   == " << iter->handle_value_map.begin()->second.type
+                         << endl 
+                         << "data   == " << temp_str
+                         << endl; 
+                    unlock_cerr_mutex(); 
+
+                }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */            
+
+@q ******* (7) @>
+
+            }  /* |for|  */
+
+
+
+@q ****** (6) @>
+
+
+        }  /* |if (handle_id_vector.size() > 0)|  */
+
+END_UPDATE_HANDLES:
+
+@q ***** (5) Unlock tables.  @>
+
+@ Unlock tables.  
+\initials{LDF 2013.11.22.}
+
+@<|purge_dc_metadata| definition@>=
+
+UNLOCK_TABLES:  
+
+       if (result)
+       {
+           mysql_free_result(result);
+           result = 0;
+       }
+
+       sql_strm[0].str("");
+
+       sql_strm[0] << "unlock tables";
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "sql_strm[0].str() == " << sql_strm[0].str() << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       status = submit_mysql_query(sql_strm[0].str(), result, mysql_ptr);
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `purge_dc_metadata':" 
+                << endl
+                << "`submit_mysql_query' failed, returning " << status << ":"
+                << endl 
+                << "Error:  " << mysql_error(mysql_ptr)
+                << endl 
+                << "Error number:  " << mysql_errno(mysql_ptr)
+                << endl 
+                << "Failed to unlock tables."
+                << endl 
+                << "Exiting thread unsuccessfully with "
+                << "return value 0."
+                << endl;
+            unlock_cerr_mutex();
+
+            if (result)
+               mysql_free_result(result);
+
+            mysql_close(mysql_ptr); 
+            mysql_ptr = 0;
+
+
+            pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+            pthread_exit(0);
+
+       }  /* |if (status != 0)|  */
+
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex();
+           cerr << thread_str << "In `purge_dc_metadata':" 
+                << endl
+                << "`submit_mysql_query' succeeded, returning 0."
+                << endl
+                << "Unlocked tables successfully."
+                << endl;
+           unlock_cerr_mutex(); 
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+       sql_strm[0].str("");
+       mysql_free_result(result);
+       result = 0;
+
+@q ***** (5) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+        if (found_file_no_save_db_entry || found_file_save_db_entry)
+        {
+             
+            pthread_mutex_lock(&purge_irods_archive_mutex);
+
+            status = pthread_cond_signal(&purge_irods_archive_cond);
+
+            if (status != 0)
+            {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "ERROR!  In `purge_dc_metadata':"
+                    << endl
+                    << "`pthread_cond_signal' failed, returning " << status << ":"
+                    << endl
+                    << "Error:  " << strerror(status)
+                    << endl
+                    << "Setting `failed' == `true'."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               failed = true;
+
+            }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `purge_dc_metadata':"
+                     << endl
+                     << "`pthread_cond_signal' succeeded, returning 0."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+            pthread_mutex_unlock(&purge_irods_archive_mutex); 
+
+        }  /* |if (found_file_no_save_db_entry || found_file_save_db_entry)|  */
+
+@q ***** (5) @>
+@
+@<|purge_dc_metadata| definition@>=
+                                          
+       if (failed)
+           break;
+
+@q ***** (5) Go to sleep for |purge_dc_metadata_interval| seconds.  @>
+
+@ Go to sleep for |purge_dc_metadata_interval| seconds, unless another thread 
+wakes this one up in order to perform immediate deletion.  
+\initials{LDF 2013.11.22.}
+
+\LOG
+\initials{LDF 2013.11.22.}
+Added this section.
+\ENDLOG
+
+@<|purge_dc_metadata| definition@>=
+
+        went_to_sleep = time(0);
+
+        pthread_mutex_lock(&purge_dc_metadata_mutex);
+
+        status = pthread_cond_timedwait(&purge_dc_metadata_cond, 
+                                        &purge_dc_metadata_mutex, 
+                                        &timeout);
+
+        curr_time = time(0);
+
+
+        if (status == ETIMEDOUT)
+        {
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `purge_dc_metadata':"
+                     << endl 
+                     << "Timed-out after " << (curr_time - went_to_sleep) << " seconds."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        }
+
+@q ***** (5) @>
+
+        else if (status != 0)
+        {
+             lock_cerr_mutex(); 
+             cerr << thread_str << "ERROR!  In `purge_dc_metadata':"
+                  << endl 
+                  << "`pthread_cond_timedwait' failed, returning " << status << "." 
+                  << endl
+                  << "Error:  " << strerror(status) << endl
+                  << endl
+                  << "Breaking."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+             failed = true;
+
+             pthread_mutex_unlock(&purge_dc_metadata_mutex);
+
+             break;
+        }
+
+@q ***** (5) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_dc_metadata':"
+                 << endl 
+                 << "`pthread_cond_timedwait' succeeded, returning 0."
+                 << endl 
+                 << "Woke up after " << (curr_time - went_to_sleep) << " seconds."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */         
+
+        pthread_mutex_unlock(&purge_dc_metadata_mutex);
+
+@q ***** (5) @>
+
+   }  /* End of main |for| loop  */
+
+@q **** (4) Exit.  This code will normally never be reached.  @>
+
+@ Exit.  This code will normally never be reached.
+\initials{LDF 2013.04.09.}
+
+@<|purge_dc_metadata| definition@>=
+
+   if (failed)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `purge_dc_metadata':"
+            << endl
+            << "`failed' == `true'.  Exiting thread function unsuccessfully "
+            << "with exit status 0." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting thread function `purge_dc_metadata' "
+            << "with exit status 0." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+
+
+@q **** (4) @>
+@
+@<|purge_dc_metadata| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting thread function `purge_dc_metadata' "
+            << "with exit status 0." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+   mysql_close(mysql_ptr);
+   mysql_ptr = 0;
+
+   pthread_exit(0);
+
+}  /* End of |purge_dc_metadata| definition  */
+
+@q *** (3) @>
+
+@q ** (2) Putting purgdcmd together.  @>
+@ Putting purgdcmd together.  
+
+This is what's compiled.
+\initials{LDF 2013.04.09.}
+@c 
+using namespace std;
+typedef void* yyscan_t;
+@<Include files@>@;@/
+using namespace gwrdifpk;
+@<|purge_dc_metadata| definition@>@;@/
+
+@ This is what's written to the header file \filename{purgdcmd.h}.
+\initials{LDF 2013.04.09.}
+
+@(purgdcmd.h@>=
+#ifndef PURGDCMD_H
+#define PURGDCMD_H 1
+using namespace std;
+typedef void* yyscan_t;
+@<|purge_dc_metadata| declaration@>@;@/
+#endif 
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))                          @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+

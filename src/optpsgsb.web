@@ -1,0 +1,1109 @@
+@q optpsgsb.web  @>
+
+@q Created by Laurence D. Finston (LDF) Thu Mar  8 11:42:14 CET 2012  @>
+
+@q * (1) Top @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+@q ** (2) Include header files.  @>
+
+@ Include header files.
+@<Include header files@>=
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+
+#if 0
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif 
+
+#include <getopt.h> 
+#include <limits.h> 
+#include <errno.h> 
+
+#include <string>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <fstream>
+#include <sstream>   
+
+#include <vector>   
+#include <algorithm>   
+
+using namespace std;
+
+@q ** (2) Global variables.  @>
+
+@ Global variables.
+\initials{LDF 2012.03.07.}
+
+@<Global variables@>=
+
+  extern const unsigned int DEFAULT_PASSWD_LEN = 8;
+
+  unsigned int passwd_len = 0;  /* Set to |DEFAULT_PASSWD_LEN| at the beginning of |main|.
+                                   \initials{LDF 2012.03.08.}  */
+
+  int debug_level = 0;
+
+  extern const unsigned int ALPHA_TYPE          =   1;  
+  extern const unsigned int ALPHANUM_TYPE       =   2;
+  extern const unsigned int GRAPH_TYPE          =   4;
+  extern const unsigned int PRINTABLE_TYPE      =   8;
+  extern const unsigned int BLANK_TYPE          =  16;
+  extern const unsigned int SPACE_TYPE          =  32; 
+  extern const unsigned int NO_TABS_TYPE        =  64; 
+  extern const unsigned int NO_START_SPACE_TYPE = 128;
+  extern const unsigned int NO_END_SPACE_TYPE   = 256;
+
+
+  extern const unsigned int MD5_TYPE    = 1;
+  extern const unsigned int SHA1_TYPE   = 2;
+  extern const unsigned int SHA224_TYPE = 3;
+  extern const unsigned int SHA256_TYPE = 4;
+  extern const unsigned int SHA384_TYPE = 5;
+  extern const unsigned int SHA512_TYPE = 6;
+
+  extern const int DEFAULT_MIN_BLOCK_SIZE = 4;
+  extern const int DEFAULT_MAX_BLOCK_SIZE = 8;
+
+  int min_block_size = 0;
+  int max_block_size = 0;
+
+  unsigned int block_ctr = 0;
+
+  bool extra_random = false;
+
+  string delim_start;
+  string delim_end;
+
+  string in_filename;
+
+  vector<char> exclude_char_vector;
+
+  unsigned int checksum_type = 0;
+
+  unsigned int iterations = 1;  
+
+@q *** (3) @>
+@
+@<extern declarations for global variables@>=
+
+  extern const unsigned int DEFAULT_PASSWD_LEN;
+
+  extern unsigned int passwd_len;
+
+  extern int debug_level;
+
+  extern const unsigned int ALPHA_TYPE;
+  extern const unsigned int ALPHANUM_TYPE;
+  extern const unsigned int GRAPH_TYPE;
+  extern const unsigned int PRINTABLE_TYPE;
+  extern const unsigned int BLANK_TYPE;
+  extern const unsigned int SPACE_TYPE;
+  extern const unsigned int NO_TABS_TYPE;
+  extern const unsigned int NO_START_SPACE_TYPE;
+  extern const unsigned int NO_END_SPACE_TYPE;
+
+
+  extern const unsigned int MD5_TYPE;
+  extern const unsigned int SHA1_TYPE;
+  extern const unsigned int SHA224_TYPE;
+  extern const unsigned int SHA256_TYPE;
+  extern const unsigned int SHA384_TYPE;
+  extern const unsigned int SHA512_TYPE;
+
+  extern const int DEFAULT_MIN_BLOCK_SIZE;
+  extern const int DEFAULT_MAX_BLOCK_SIZE;
+
+  extern int min_block_size;
+  extern int max_block_size;
+
+  extern unsigned int block_ctr;
+
+  extern bool extra_random;
+
+  extern string delim_start;
+  extern string delim_end;
+
+  extern string in_filename;
+
+  extern vector<char> exclude_char_vector;
+
+  extern unsigned int checksum_type;
+
+  extern unsigned int iterations;
+
+
+@q ** (2) Handle command-line options.  @>
+
+@ Handle command-line options.
+\initials{LDF 2012.03.07.}
+
+@q *** (3) Declaration  @>
+
+@<|handle_options| declaration@>=
+int
+handle_options(int argc, char *argv[]);
+
+@q *** (3) Definition  @>
+@
+@<|handle_options| definition@>=
+int
+handle_options(int argc, char *argv[])
+{
+   bool DEBUG = false;  /* |true|  */
+
+   const unsigned int ALPHA_INDEX              =  0; 
+   const unsigned int ALPHANUM_INDEX           =  1; 
+   const unsigned int ALNUM_INDEX              =  2; 
+   const unsigned int GRAPH_INDEX              =  3; 
+   const unsigned int PRINTABLE_INDEX          =  4; 
+   const unsigned int BLANK_INDEX              =  5; 
+   const unsigned int SPACE_INDEX              =  6; 
+   const unsigned int NO_TABS_INDEX            =  7; 
+   const unsigned int LENGTH_INDEX             =  8; 
+   const unsigned int HELP_INDEX               =  9;
+   const unsigned int EXTRA_RANDOM_INDEX       = 10;
+   const unsigned int MIN_BLOCK_SIZE_INDEX     = 11;
+   const unsigned int MAX_BLOCK_SIZE_INDEX     = 12;
+   const unsigned int DEBUG_LEVEL_INDEX        = 13;
+   const unsigned int NO_START_SPACE_INDEX     = 14;
+   const unsigned int NO_END_SPACE_INDEX       = 15;
+   const unsigned int DELIMITER_INDEX          = 16;
+   const unsigned int INPUT_FILENAME_INDEX     = 17;
+   const unsigned int EXCLUDE_CHARS_INDEX      = 18;
+   const unsigned int CHECKSUM_INDEX           = 19;
+   const unsigned int ITERATIONS_INDEX         = 20;
+
+
+   int return_val = 0;
+
+   static struct option long_options[] = {
+     {"alpha",  0, 0, 0},
+     {"alphanum",  0, 0, 0},
+     {"alnum",  0, 0, 0},
+     {"graph",  0, 0, 0},
+     {"printable",  0, 0, 0},
+     {"blank",  0, 0, 0},
+     {"space",  0, 0, 0},
+     {"no-tabs",  0, 0, 0},
+     {"length",  1, 0, 0},
+     {"help",  0, 0, 0},
+     {"extra-random",  0, 0, 0},
+     {"min-block-size",  2, 0, 0},
+     {"max-block-size",  2, 0, 0},
+     {"debug-level",  2, 0, 0},
+     {"no-start-space",  0, 0, 0},
+     {"no-end-space",  0, 0, 0},
+     {"delimiters",  2, 0, 0},
+     {"input-filename",  1, 0, 0},
+     {"exclude-chars",  1, 0, 0},
+     {"checksum",  2, 0, 0},
+     {"iterations",  1, 0, 0},
+     {0, 0, 0, 0}
+   };
+
+   int option_ctr = 0;
+
+   int option_index = 0;
+
+   int this_option_optind = optind ? optind : 1;
+
+   while (1) 
+   {
+
+@q **** (4) @>
+
+       option_ctr = getopt_long_only (argc,  
+                                      argv, "",
+                                      long_options, 
+                                      &option_index);
+       if (DEBUG)
+       {
+           cerr << "option_ctr == " << option_ctr << endl
+                << "option_index == " << option_index << endl;
+
+           if (optarg)
+           {
+             cerr << "optarg == " << optarg << endl;
+
+           }  /* |if (optarg)|  */
+
+       }  /* |if (DEBUG)|  */
+
+@q **** (4) @>
+
+       if (option_ctr == -1)
+       {
+           if (DEBUG)
+           {
+              cerr << "No more option arguments." << endl;
+           }
+           break;
+       }
+
+@q **** (4) Option.  @>
+@ Option.  
+\initials{LDF 2012.03.07.}
+
+@<|handle_options| definition@>=
+
+       else if (option_ctr == 0)
+       {
+
+@q ***** (5) @>
+
+          if (DEBUG)
+            {
+              cerr << "option " << long_options[option_index].name;
+
+              if (optarg)
+              {
+                cerr << " with arg " << optarg;
+              }
+
+              cerr << endl;
+            } 
+
+@q ***** (5) alpha:  Alphabetical characters only.  @>
+@ \.{alpha}:  Alphabetical characters only.
+\initials{LDF 2012.03.07.}
+
+@<|handle_options| definition@>=
+
+            if (option_index == ALPHA_INDEX)        
+            {
+
+@q ****** (6) @>
+
+                if (DEBUG) 
+                {
+                   cerr << "`option_index' "
+                        << "== `ALPHA_INDEX'" 
+                        << endl;
+ 
+                }   
+
+@q ****** (6) @>
+
+                return_val |= ALPHA_TYPE; 
+
+            } /* |if (option_index == ALPHA_INDEX)|  */
+
+@q ***** (5) alphanum:  Alphanumerical characters only.@>
+@ \.{alphanum}:  Alphanumerical characters only.
+
+@<|handle_options| definition@>=
+
+            else if (option_index == ALPHANUM_INDEX || option_index == ALNUM_INDEX)
+            {
+       
+                if (DEBUG) 
+                {
+                    cerr << "`option_index' == `ALPHANUM_INDEX' || `ALNUM_INDEX'" 
+                         << endl;
+                }
+
+                return_val |= ALPHANUM_TYPE; 
+
+            } /* |else if (option_index == ALPHANUM_INDEX || option_index == ALNUM_INDEX)|  */
+
+
+@q ***** (5) graph:  Graphical characters only (excluding space).@>
+@ \.{graph}:  Graphical characters only (excluding space).
+
+@<|handle_options| definition@>=
+
+            else if (option_index == GRAPH_INDEX)
+            {
+       
+                if (DEBUG) 
+                {
+                    cerr << "`option_index' == `GRAPH_INDEX'" 
+                         << endl;
+                }
+
+                return_val |= GRAPH_TYPE; 
+
+            } /* |else if (option_index == GRAPH_INDEX)|  */
+
+
+@q ***** (5) printable:  Printable characters (including space).@>
+@ \.{printable}:  Printable characters (including space).
+
+@<|handle_options| definition@>=
+
+            else if (option_index == PRINTABLE_INDEX)
+            {
+       
+                if (DEBUG) 
+                {
+                    cerr << "`option_index' == `PRINTABLE_INDEX'" 
+                         << endl;
+                }
+
+                return_val |= PRINTABLE_TYPE; 
+
+            } /* |else if (option_index == PRINTABLE_INDEX)|  */
+
+@q ***** (5) blank:  Blank characters (space or tab).@>
+@ \.{blank}:  Blank characters (space or tab).
+
+@<|handle_options| definition@>=
+
+            else if (option_index == BLANK_INDEX)
+            {
+       
+                if (DEBUG) 
+                {
+                    cerr << "`option_index' == `BLANK_INDEX'" 
+                         << endl;
+                }
+
+                return_val |= BLANK_TYPE; 
+
+            } /* |else if (option_index == BLANK_INDEX)|  */
+
+
+
+@q ***** (5) space:  Allow spaces.@>
+@ \.{space}:  Allow spaces.  This is meant for use with \.{alpha} 
+or \.{alphanum}.  It's not needed for \.{graph} or \.{print}, because
+\.{print} is equivalent to \.{graph} plus \.{space}.  However, the latter works, 
+too.
+\initials{LDF 2012.03.07.}
+
+@<|handle_options| definition@>=
+
+            else if (option_index == SPACE_INDEX)
+            {
+       
+                if (DEBUG) 
+                {
+                    cerr << "`option_index' == `SPACE_INDEX'" 
+                         << endl;
+                }
+
+                return_val |= SPACE_TYPE; 
+                return_val |= BLANK_TYPE;  /* Allowing space characters implies 
+                                              allowing blank characters.
+                                              \initials{LDF 2012.03.07.}  */
+
+            } /* |else if (option_index == SPACE_INDEX)|  */
+
+
+@q ***** (5) no-tabs:  Don't allow tab characters.@>
+@ \.{--no-tabs}:  Don't allow tab characters.  This is meant for use with \.{--blank}.
+Otherwise, it has no effect.  \.{--blank}, in turn, only has an effect with \.{--alpha}
+and \.{--alphanum}.
+\initials{LDF 2012.03.07.}
+
+@<|handle_options| definition@>=
+
+            else if (option_index == NO_TABS_INDEX)
+            {
+       
+                if (DEBUG) 
+                {
+                    cerr << "`option_index' == `NO_TABS_INDEX'" 
+                         << endl;
+                }
+
+                return_val |= NO_TABS_TYPE; 
+
+            } /* |else if (option_index == NO_TABS_INDEX)|  */
+
+
+@q ***** (5) length.  @>
+@ \.{--length}.
+
+@<|handle_options| definition@>=
+
+            else if (option_index == LENGTH_INDEX)
+            {
+       
+                if (DEBUG) 
+                {
+                    cerr << "`option_index' == `LENGTH_INDEX'" 
+                         << endl;
+                }
+
+                errno = 0;
+                passwd_len = strtoul(optarg, 0, 0);
+
+                if (passwd_len == ULONG_MAX)
+                {
+                    cerr << "ERROR!  In `handle_options':  `strtoul' failed, "
+                         << "returning `ULONG_MAX':"
+                         << endl;
+                    perror("strtoul error:");
+
+                    cerr << "Setting `passwd_len' to " << DEFAULT_PASSWD_LEN 
+                         << ".  Continuing."
+                         << endl;
+
+                    passwd_len = DEFAULT_PASSWD_LEN;
+
+                    
+                }  /* |if (passwd_len == ULONG_MAX)|  */
+
+
+                if (DEBUG) 
+                   cerr << "passwd_len == " << passwd_len << endl;
+
+            } /* |else if (option_index == LENGTH_INDEX)|  */
+
+@q ***** (5) help.  @>
+@ \.{--help}.
+
+@<|handle_options| definition@>=
+
+    else if (option_index == HELP_INDEX)
+    {
+
+        if (DEBUG) 
+        {
+            cerr << "`option_index' == `HELP_INDEX'" 
+                 << endl;
+        }
+
+        cout << "gnpsswdp"
+             << endl 
+             << "Copyright (C) 2012 Gesellschaft fuer "
+             << "wissenschaftliche Datenverarbeitung mbH Goettingen"
+             << endl 
+             << "Author:  Laurence D. Finston"
+             << "Generate password or passphrase"
+             << endl 
+             << "Usage:  optpsgen [OPTIONS] ..."
+             << endl
+             << "Options:"
+             << endl
+             << "--help:                     Print this message and exit"
+             << endl
+             << "--alpha:                    Alphabetical characters only (isalpha)"
+             << endl
+             << "--alphanum:                 Alphanumerical characters only (isalnum)"
+             << endl 
+             << "                            This is the default"
+             << endl
+             << "--alnum                     Alphanumerical characters only (synonym for "
+             << "--alphanum)"
+             << " (isalnum)"
+             << endl
+             << "--graph:                    Graphical characters, i.e., "
+             << "printable characters excluding space characters (isgraph)"
+             << endl
+             << "--printable:                Printable characters including space characters "
+             << "(isprint)"
+             << endl
+             << "--blank:                    Allow blanks (i.e., tab and space characters) "
+             << "(isblank)"
+             << endl 
+             << "                            For use with --alpha and --alphanum"
+             << endl
+             << "--space:                    Allow space"
+             << endl
+             << "                            For use with --alpha and --alphanum"
+             << endl
+             << "--no-tabs:                  Do not use tab characters"
+             << endl
+             << "                            For use with --blank"
+             << endl
+             << "--length ARG:               Set length of password or passphrase to ARG"
+             << endl
+             << "--extra-random:             Read from /dev/random instead of /dev/urandom"
+             << endl 
+             << "                            This provides better quality random bytes, but "
+             << "may block if not enough entropy is present "
+             << endl 
+             << "                            in the system."
+             << endl
+             << "--min-block-size[=ARG]"      
+             << endl 
+             << "--max-block-size[=ARG]:     Minimum or maximum size of blocks, "
+             << "respectively, without intervening space"
+             << endl 
+             << "                            For use with --print or --alpha or --alnum with "
+             << "--blank or --space"
+             << endl 
+             << "                            If no argument is provided, the minimum "
+             << "block size is set to " << DEFAULT_MIN_BLOCK_SIZE
+             << " and the maximum to " << DEFAULT_MAX_BLOCK_SIZE << "."
+             << endl 
+             << "--debug-level [ARG]:        Set debug level.  If ARG not supplied, "
+             << "debug level is set to 1."
+             << "--no-start-space"
+             << endl 
+             << "--no-end-space:             Prevents a space character from appearing at "
+             << "the beginning or end of the password or passphrase"
+             << endl
+             << "--delimiters [ARG]:         Specify delimiters for the password or "
+             << "passphrase, when it's output." 
+             << endl 
+             << "--input-filename ARG        Name of file to use instead of /dev/urandom "
+             << "or /dev/random"
+             << endl 
+             << "                            For testing purposes."
+             << endl 
+             << "--exclude-chars ARG:        ARG is a list of characters to exclude"
+             << endl 
+             << "                            This option may be used multiple times."
+             << endl 
+             << "--checksum [ARG]:           Generate checksum."
+             << endl 
+             << "                            ARG may be md5, sha1, sha224, sha256, sha384 "
+             << "or sha512.  If argument is not provided, sha1 will be used."
+             << endl 
+             << "--iterations INTEGER:       Number of passwords or passphrases to generate"
+             << endl;
+
+         exit(0);
+
+      } /* |else if (option_index == HELP_INDEX)|  */
+
+
+@q ***** (5) extra-random.  @>
+@ \.{--extra-random}.
+
+@<|handle_options| definition@>=
+
+            else if (option_index == EXTRA_RANDOM_INDEX)
+            {
+       
+                if (DEBUG) 
+                {
+                    cerr << "`option_index' == `EXTRA_RANDOM_INDEX'" 
+                         << endl;
+                }
+
+                cerr << "Will read from /dev/random.  This may block, "
+                     << "if not enough entropy is available in the system."
+                     << endl
+                     << "If it does, do some work in another shell, move the mouse, access the "
+                     << "file system, etc.,"
+                     << endl 
+                     << "in order to create more entropy."
+                     << endl; 
+
+                extra_random = true;
+
+            } /* |else if (option_index == EXTRA_RANDOM_INDEX)|  */
+
+
+@q ***** (5) min-block-size.  @>
+@ \.{--min-block-size}.
+
+@<|handle_options| definition@>=
+
+            else if (option_index == MIN_BLOCK_SIZE_INDEX)
+            {
+       
+                if (DEBUG) 
+                {
+                    cerr << "`option_index' == `MIN_BLOCK_SIZE_INDEX'" 
+                         << endl;
+                }
+
+                if (optarg)
+                {
+                   errno = 0;
+                   min_block_size = strtoul(optarg, 0, 0);
+
+                   if (min_block_size == LONG_MAX || min_block_size == LONG_MIN)
+                   {
+                       cerr << "ERROR!  In `handle_options':  `strtoul' failed, "
+                            << "returning ";
+
+                       if (min_block_size > 0)
+                            cerr << "`LONG_MAX':" << endl;
+                       else
+                            cerr << "`LONG_MIN':" << endl;
+
+                       perror("strtoul error:");
+
+                       cerr << "Setting `min_block_size' to " 
+                            << DEFAULT_MIN_BLOCK_SIZE << ".  Continuing."
+                            << endl;
+
+                       min_block_size = DEFAULT_MIN_BLOCK_SIZE;
+
+                   }  /* |if (min_block_size == LONG_MAX || min_block_size == LONG_MIN)|  */
+
+                }  /* |if (optarg)|  */
+
+                else
+                   min_block_size = DEFAULT_MIN_BLOCK_SIZE;
+
+            } /* |else if (option_index == MIN_BLOCK_SIZE_INDEX)|  */
+
+
+@q ***** (5) max-block-size.  @>
+@ \.{--max-block-size}.
+
+@<|handle_options| definition@>=
+
+            else if (option_index == MAX_BLOCK_SIZE_INDEX)
+            {
+       
+                if (DEBUG) 
+                {
+                    cerr << "`option_index' == `MAX_BLOCK_SIZE_INDEX'" 
+                         << endl;
+                }
+
+                if (optarg)
+                {
+                   errno = 0;
+                   max_block_size = strtoul(optarg, 0, 0);
+
+                   if (max_block_size == LONG_MAX || max_block_size == LONG_MIN)
+                   {
+                       cerr << "ERROR!  In `handle_options':  `strtoul' failed, "
+                            << "returning ";
+
+                       if (max_block_size > 0)
+                            cerr << "`LONG_MAX':" << endl;
+                       else
+                            cerr << "`LONG_MIN':" << endl;
+
+                       perror("strtoul error:");
+
+                       cerr << "Setting `max_block_size' to " 
+                            << DEFAULT_MAX_BLOCK_SIZE << ".  Continuing."
+                            << endl;
+
+                       max_block_size = DEFAULT_MAX_BLOCK_SIZE;
+
+                   }  /* |if (max_block_size == LONG_MAX || max_block_size == LONG_MIN)|  */
+
+                }  /* |if (optarg)|  */
+
+                else
+                   max_block_size = DEFAULT_MAX_BLOCK_SIZE;
+
+            } /* |else if (option_index == MAX_BLOCK_SIZE_INDEX)|  */
+
+@q ***** (5) debug-level.  @>
+@ \.{--debug-level}.
+
+@<|handle_options| definition@>=
+
+            else if (option_index == DEBUG_LEVEL_INDEX)
+            {
+       
+                if (DEBUG) 
+                {
+                    cerr << "`option_index' == `DEBUG_LEVEL_INDEX'" 
+                         << endl;
+                }
+
+
+                if (optarg)
+                {
+                   errno = 0;
+                   debug_level = strtol(optarg, 0, 0);
+
+
+                   if (debug_level == LONG_MIN || debug_level == LONG_MAX)
+                   {
+                       cerr << "ERROR!  In `handle_options':  `strtol' failed, "
+                            << "returning ";
+
+
+                       if (debug_level > 0)
+                           cerr << "`LONG_MAX':" << endl;
+                       else
+                           cerr << "`LONG_MIN':" << endl;
+
+                       perror("strtoul error:");
+
+                       cerr << "Setting `debug_level' to 1.  Continuing."
+                            << endl;
+
+                       debug_level = 1;
+
+                   }   /* |if (debug_level == LONG_MIN || debug_level == LONG_MAX)|  */
+
+
+
+                } /* |if (optarg)|  */
+
+                else
+                   debug_level = 1;
+
+                if (DEBUG)
+                {
+                     cerr << "debug_level == " << debug_level << endl;
+                 
+                }  /* |if (DEBUG)|  */ 
+
+                if (debug_level > 0) DEBUG = true;
+
+            } /* |else if (option_index == DEBUG_LEVEL_INDEX)|  */
+
+@q ***** (5) no-start-space.  @>
+@ \.{--no-start-space}.
+
+@<|handle_options| definition@>=
+
+            else if (option_index == NO_START_SPACE_INDEX)
+            {
+       
+                if (DEBUG) 
+                {
+                    cerr << "`option_index' == `NO_START_SPACE_INDEX'" 
+                         << endl;
+                }
+
+                return_val |= NO_START_SPACE_TYPE; 
+
+
+            } /* |else if (option_index == NO_START_SPACE_INDEX)|  */
+
+
+@q ***** (5) no-end-space.  @>
+@ \.{--no-end-space}.
+
+@<|handle_options| definition@>=
+
+            else if (option_index == NO_END_SPACE_INDEX)
+            {
+       
+                if (DEBUG) 
+                {
+                    cerr << "`option_index' == `NO_END_SPACE_INDEX'" 
+                         << endl;
+                }
+
+                return_val |= NO_END_SPACE_TYPE; 
+
+            } /* |else if (option_index == NO_END_SPACE_INDEX)|  */
+
+
+@q ***** (5) delimiters.  @>
+@ \.{--delimiters}.
+
+@<|handle_options| definition@>=
+
+            else if (option_index == DELIMITER_INDEX)
+            {
+       
+                if (DEBUG) 
+                {
+                    cerr << "`option_index' == `DELIMITER_INDEX'" 
+                         << endl;
+                }
+
+                if (optarg && strlen(optarg) > 0)
+                {
+                    delim_start = optarg[0];
+
+                    if (strlen(optarg) > 1)
+                       delim_end   = optarg[1];
+                    else 
+                       delim_end = delim_start;
+                 }
+                 else
+                    delim_start = delim_end = "'";
+
+            } /* |else if (option_index == DELIMITER_INDEX)|  */
+
+
+@q ***** (5) input-filename.  @>
+@ \.{--input-filename}.
+
+@<|handle_options| definition@>=
+
+            else if (option_index == INPUT_FILENAME_INDEX)
+            {
+       
+                if (DEBUG) 
+                {
+                    cerr << "`option_index' == `INPUT_FILENAME_INDEX'" 
+                         << endl;
+                }
+
+                in_filename = optarg;
+                 
+            } /* |else if (option_index == INPUT_FILENAME_INDEX)|  */
+
+@q ***** (5) exclude-chars.  @>
+@ \.{--exclude-chars}.
+
+@<|handle_options| definition@>=
+
+            else if (option_index == EXCLUDE_CHARS_INDEX)
+            {
+       
+                if (DEBUG) 
+                {
+                    cerr << "`option_index' == `EXCLUDE_CHARS_INDEX'" 
+                         << endl;
+                }
+
+                for (int i = 0; i < strlen(optarg); ++i)
+                   exclude_char_vector.push_back(optarg[i]);
+
+            } /* |else if (option_index == EXCLUDE_CHARS_INDEX)|  */
+
+@q ***** (5) checksum.  @>
+@ \.{--checksum}.
+
+@<|handle_options| definition@>=
+
+            else if (option_index == CHECKSUM_INDEX)
+            {
+       
+                if (DEBUG) 
+                {
+                    cerr << "`option_index' == `CHECKSUM_INDEX'" 
+                         << endl;
+                }
+
+                if (optarg == 0 || strlen(optarg) == 0)
+                   checksum_type = SHA1_TYPE;
+                else if (!strcasecmp(optarg, "md5"))
+                   checksum_type = MD5_TYPE;
+                else if (!strcasecmp(optarg, "sha1"))
+                   checksum_type = SHA1_TYPE;
+                else if (!strcasecmp(optarg, "sha224"))
+                   checksum_type = SHA224_TYPE;
+                else if (!strcasecmp(optarg, "sha256"))
+                   checksum_type = SHA256_TYPE;
+                else if (!strcasecmp(optarg, "sha384"))
+                   checksum_type = SHA384_TYPE;
+                else if (!strcasecmp(optarg, "sha512"))
+                   checksum_type = SHA512_TYPE;
+                else
+                {
+                   cerr << "WARNING!  In `handle_options':  "
+                        << "Invalid argument to `--checksum':  "
+                        << optarg
+                        << endl
+                        << "Setting `checksum_type' to `SHA1_TYPE'."
+                        << endl;
+
+                   checksum_type = SHA1_TYPE;
+                }
+
+
+            } /* |else if (option_index == CHECKSUM_INDEX)|  */
+
+@q ***** (5) iterations.  @>
+@ \.{--iterations}.
+
+@<|handle_options| definition@>=
+
+            else if (option_index == ITERATIONS_INDEX)
+            {
+       
+                if (DEBUG) 
+                {
+                    cerr << "`option_index' == `ITERATIONS_INDEX'" 
+                         << endl;
+                }
+
+                errno = 0;
+                iterations = strtoul(optarg, 0, 0);
+
+                if (iterations == LONG_MAX || iterations == LONG_MIN)
+                {
+                    cerr << "ERROR!  In `handle_options':  `strtoul' failed, "
+                         << "returning ";
+
+                    if (iterations > 0)
+                         cerr << "`LONG_MAX':" << endl;
+                    else
+                         cerr << "`LONG_MIN':" << endl;
+
+                    perror("strtoul error:");
+
+                    cerr << "Setting `iterations' to 1.  Continuing."
+                         << endl;
+
+                    iterations = 1;
+
+                }  /* |if (iterations == LONG_MAX || iterations == LONG_MIN)|  */
+
+            } /* |else if (option_index == ITERATIONS_INDEX)|  */
+
+
+@q ***** (5) Invalid option_index value.@>
+@ Invalid {\tt option\_index} value.
+
+@<|handle_options| definition@>=
+
+            else 
+            {
+                cerr << "WARNING!  In `handle_options':"
+                     << endl 
+                     << "`option_index' has invalid value: "
+                     << option_index << endl
+                     << "Will try to continue." 
+                     << endl;
+
+            }   
+@q ***** (5) @>
+
+       }  /* |else if (option_ctr == 0)|  */
+
+@q **** (4) Ambiguous option.@>
+@ Ambiguous option.
+\initials{LDF 2012.03.07.}
+
+@<|handle_options| definition@>=
+
+      else if (option_ctr == '?')
+      {
+
+          cerr << "WARNING! In `handle_options':"
+               << endl
+               << "`getopt_long_only' returned ambiguous match.  "
+               << "Breaking."
+               << endl;
+
+          break;
+
+      }  /* |else if (option_ctr == '?')|  */
+
+@q **** (4) Invalid option.@>
+@ Invalid option.
+
+@<|handle_options| definition@>=
+
+      else
+      {
+          if (DEBUG) 
+          {
+
+             cerr << "`getopt_long_only' returned invalid option."
+                  << endl;
+          }
+      } 
+
+@q **** (4) End of while loop.@>
+@ End of while loop.
+
+@<|handle_options| definition@>=
+
+
+      if (DEBUG) 
+      {
+         cerr << "End of option processing" << endl;
+      } 
+
+
+@q **** (4) @>
+
+   } /* |while|  */
+  
+   if (optind < argc)
+   {
+     if (DEBUG)
+     {
+        cerr << "Non-option ARGV-elements: ";
+     
+        int j = optind;
+
+        for (int i = 0; j < argc;  ++i, ++j)
+        {
+
+               cerr << "argv[" << j << "] == " << argv[j] << endl
+                    << "strlen(argv[j]) == " << strlen(argv[j]) << endl;
+
+        }  /* |for| */ 
+
+     }  /* |if (DEBUG)|  */ 
+     
+   }  /* |if|  */
+
+@q **** (4) @>
+@
+@<|handle_options| definition@>=
+  
+   if (DEBUG)
+   {
+       cerr << "Exiting `handle_options' successfully with return value "
+            << return_val << "." << endl;
+
+   }  /* |if (DEBUG)|  */ 
+
+   return return_val;
+
+@q **** (4) @>
+
+}  /* End of |handle_options| definition  */
+
+
+
+@ Putting \.{optpsgsb.web} together.
+\initials{LDF 2012.03.07.}
+@c
+@<Include header files@>@;@/
+@<Global variables@>@;@/
+@<|handle_options| declaration@>@;@/
+@<|handle_options| definition@>@;@/
+
+@
+@(optpsgsb.h@>=
+@<extern declarations for global variables@>@;@/
+@<|handle_options| declaration@>@;@/
+
+@q * (1) @>
+
+
+@q (progn (cweb-mode) (outline-minor-mode))                                @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

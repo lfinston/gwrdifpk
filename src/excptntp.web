@@ -1,0 +1,146 @@
+@q excptntp.web @>
+
+@q Created by Laurence D. Finston (LDF) Fri Jul 13 09:25:49 CEST 2012  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q * (1) Exception Types (excptntp.web).  @>
+@*  Exception Types (excptntp\PERIOD web).
+
+\LOG
+\initials{LDF 2012.07.13.}
+Added this file.
+\ENDLOG
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif 
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stddef.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+
+#include <sys/types.h>
+#include <dirent.h>
+#include <string.h>
+#include <pwd.h>
+#include <errno.h>
+
+#include <pthread.h>
+
+#include <fstream>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <string>
+#include <sstream>  
+#include <deque>    
+#include <map>   
+#include <vector>   
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+
+
+@q ** (2) |struct Initialize_Exception_Type|.  @>
+@*1 {\bf struct Initialize\_Exception\_Type}.
+
+\LOG
+\initials{LDF 2012.07.13.}
+Added this |struct| declaration.
+\ENDLOG 
+
+@<Declare |struct Initialize_Exception_Type|@>=
+
+struct Initialize_Exception_Type
+{};
+
+
+@q *** (3) @>
+
+@q ** (2) Putting Exception Types together.@>
+
+@ Putting utility functions  together.
+\initials{LDF 2008.12.05.}
+
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+@<Declare |struct Initialize_Exception_Type|@>@;@/
+
+
+@q *** (3) This is what's written to the header file `excptntp.h'.  @>
+
+@ This is what's written to the header file \filename{excptntp.h}.  
+\initials{LDF 2008.12.05.}
+
+@(excptntp.h@>=
+#ifndef EXCPTNTP_H
+#define EXCPTNTP_H 1
+using namespace std;
+using namespace gwrdifpk;
+@<Declare |struct Initialize_Exception_Type|@>@;@/
+#endif 
+
+
+@q (progn (cweb-mode) (outline-minor-mode))                           @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

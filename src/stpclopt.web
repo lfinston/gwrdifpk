@@ -1,0 +1,1137 @@
+@q stpclopt.web @>
+@q [...]/gwrdifpk/src/stpclopt.web  @>
+
+@q Created by Laurence D. Finston (LDF) Tue Sep  3 16:57:20 CEST 2013  @>
+
+@q * (1) Top @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+@q ** (2) Include files@>
+
+@ Include files.
+\initials{LDF 2013.09.02.}
+
+@<Include files@>=
+
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <pthread.h>  /* POSIX threads  */
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
+
+#include <mysql.h>
+
+#include <expat.h>
+
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <fstream>
+#include <sstream>   
+#include <string>
+#include <getopt.h>
+
+#include <map>
+#include <vector>
+#include <deque>
+#include <set>
+#include <stack>
+#include <utility>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif 
+
+
+#include "rspercds.h++"
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "helper.h++"
+#include "tanfncs.h++"
+#include "pidfncs.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "usrinftp.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+
+@q ** (2) Global variables.  @>
+@ Global variables.
+\initials{LDF 2013.09.02.}
+
+\LOG
+\initials{LDF 2013.09.04.}
+Added |bool standalone_handle = true|,
+|set<pair<string, string> > institute_set|,
+|set<pair<string, int> > user_set|
+and 
+|ofstream out_strm|.
+
+\initials{LDF 2013.09.05.}
+Changed the |sets| |user_set|, |prefix_set| and |institute_set| to |vectors|
+because I don't want the elements to be sorted.
+
+\initials{LDF 2013.09.05.}
+Added |ifstream license_strm| and |vector<string> group_vector|.
+
+\initials{LDF 2013.09.06.}
+Changed type of |user_vector| from |vector<pair<string, int> >| to 
+|vector<string>|. Added |vector<string> admin_vector|.
+
+\initials{LDF 2013.09.06.}
+Added |int irods_server_port = 1247|, 
+|string nas_table_create_str|,
+|string handles_table_create_str|,
+|string Users_table_create_str|,
+|string nas_table_insert_str|,
+|string Users_table_insert_str|
+and
+|string handles_table_alter_str[2]|.
+
+\initials{LDF 2013.09.06.}
+Removed |bool standalone_handles = true|.  |bool standalone_handle| 
+(without trailing ``s'') is already declared in \filename{glblvrbl.web}.
+\ENDLOG 
+
+@q *** (3) Code  @>
+
+@<setupdbs global variables@>=
+
+   string handles_database_name  = "handlesystem_standalone";
+   string gwirdsif_database_name = "gwirdsif";
+   string gwirdcli_database_name = "gwirdcli";
+
+   bool handles_database_exists  = false;
+   bool gwirdsif_database_exists = false;
+   bool gwirdcli_database_exists = false;
+
+
+   bool handles_database_created  = false;
+   bool gwirdsif_database_created = false;
+   bool gwirdcli_database_created = false;
+
+   bool drop = false; /* |true|  */;
+
+   vector<string> prefix_vector;
+
+   vector<pair<string, string> > institute_vector;
+
+   vector<string> admin_vector;
+   vector<string> user_vector;
+
+
+   vector<string> group_vector;
+
+   ofstream out_strm;
+
+   ifstream license_strm;
+
+   int irods_server_port = 1247;
+
+   string nas_table_create_str;
+   string handles_table_create_str;
+   string Users_table_create_str;
+
+   string handles_table_alter_str[2];
+
+   string nas_table_insert_str;
+   string Users_table_insert_str;
+
+
+@q *** (3) |extern| declarations for global variables.  @>
+
+@ |extern| declarations for global variables
+\initials{LDF 2013.09.03.}
+
+\LOG
+\initials{LDF 2013.09.03.}
+Added this section.
+\ENDLOG
+
+@<setupdbs |extern| declarations for global variables@>=
+
+   extern string handles_database_name;
+   extern string gwirdsif_database_name;
+   extern string gwirdcli_database_name;
+
+   extern bool handles_database_exists;
+   extern bool gwirdsif_database_exists;
+   extern bool gwirdcli_database_exists;
+
+   extern bool handles_database_created;
+   extern bool gwirdsif_database_created;
+   extern bool gwirdcli_database_created;
+
+   extern bool drop;
+
+   extern vector<string> prefix_vector;
+   extern vector<pair<string, string> > institute_vector;
+    
+   extern vector<string> admin_vector;
+   extern vector<string> user_vector;
+
+   extern vector<string> group_vector;
+
+   extern ofstream out_strm;
+   extern ifstream license_strm;
+
+   extern int irods_server_port;
+
+   extern string nas_table_create_str;
+   extern string handles_table_create_str;
+   extern string Users_table_create_str;
+
+   extern string handles_table_alter_str[2];
+
+   extern string nas_table_insert_str;
+   extern string Users_table_insert_str;
+
+
+
+@q ** (2) Process command line options  @>
+
+@ Process command line options.
+\initials{LDF 2013.09.02.}
+
+@q *** (3) Declaration @>
+
+@<setupdbs |process_command_line_options| declaration@>=
+
+int
+process_command_line_options(int argc, char* argv[]);
+
+
+@q *** (3) Definition  @>
+@
+@<setupdbs |process_command_line_options| definition@>==
+int
+process_command_line_options(int argc, char* argv[])
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+
+   int status = 0;
+
+   int option_ctr;
+   int digit_optind = 0;
+
+@q **** (4) Index constants.@>
+@ Index constants.
+\initials{LDF 2013.09.02.}
+
+\LOG
+\initials{LDF 2013.09.03.}
+Added code for the \.{--prefix} option.
+
+\initials{LDF 2013.09.04.}
+Added code for the \.{--no-standalone-handle} option.
+
+\initials{LDF 2013.09.06.}
+Added code for the \.{--irods-server-port} option.
+\ENDLOG 
+
+@<setupdbs |process_command_line_options| definition@>==
+
+  const unsigned short VERSION_INDEX                =  0;
+  const unsigned short HELP_INDEX                   =  1;
+  const unsigned short DROP_INDEX                   =  2;
+  const unsigned short ADMIN_INDEX                  =  3; 
+  const unsigned short USER_INDEX                   =  4; 
+  const unsigned short GROUP_INDEX                  =  5; 
+  const unsigned short HANDLES_DATABASE_NAME_INDEX  =  6;
+  const unsigned short SERVER_DATABASE_NAME_INDEX   =  7;
+  const unsigned short GWIRDSIF_DATABASE_NAME_INDEX =  8;
+  const unsigned short CLIENT_DATABASE_NAME_INDEX   =  9;
+  const unsigned short GWIRDCLI_DATABASE_NAME_INDEX = 10;
+  const unsigned short PREFIX_INDEX                 = 11;
+  const unsigned short INSTITUTE_INDEX              = 12;
+  const unsigned short NO_STANDALONE_HANDLE_INDEX   = 13; 
+  const unsigned short IRODS_SERVER_PORT_INDEX      = 14; 
+
+
+@q **** (4) Option struct.@>
+@ Option struct.
+\initials{LDF 2012.07.02.}
+
+@<setupdbs |process_command_line_options| definition@>==
+
+  static struct option long_options[] = {
+    {"version", 0, 0, 0},
+    {"help", 0, 0, 0},
+    {"drop", 0, 0, 0},
+    {"admin", 1, 0, 0},
+    {"user", 1, 0, 0},
+    {"group", 1, 0, 0},
+    {"handles-database-name",  1, 0, 0},
+    {"server-database-name",   1, 0, 0},
+    {"gwirdsif-database-name", 1, 0, 0},
+    {"client-database-name",   1, 0, 0},
+    {"gwirdcli-database-name", 1, 0, 0},
+    {"prefix", 1, 0, 0},
+    {"institute", 1, 0, 0},
+    {"no-standalone-handle", 0, 0, 0},
+    {"irods-server-port", 1, 0, 0},
+    {0, 0, 0, 0}
+  };
+
+  int option_index = 0;
+
+  int this_option_optind = optind ? optind : 1;
+
+@q **** (4) @>
+
+  while (1) 
+  {
+@q ***** (5) @>
+
+    option_ctr = getopt_long_only (argc,  
+                                   argv, "",
+                                   long_options, 
+                                   &option_index);
+
+#if DEBUG_COMPILE 
+    if (DEBUG)
+    {
+        cerr << "option_ctr == " << option_ctr << endl
+             << "option_index == " << option_index << endl;
+
+        if (optarg)
+        {
+          cerr << "optarg == " << optarg << endl;
+
+        }  /* |if (optarg)|  */
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+    if (option_ctr == -1)
+      {
+#if DEBUG_COMPILE 
+        if (DEBUG)
+        {
+           cerr << "No more option arguments." << endl;
+        }
+#endif  /* |DEBUG_COMPILE|  */ 
+        break;
+      }
+
+@q ***** (5) Option.  @>
+@ Option.  
+\initials{LDF 2013.09.02.}
+
+@<setupdbs |process_command_line_options| definition@>==
+
+    else if (option_ctr == 0)
+    {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+      if (DEBUG)
+        {
+          cerr << "option " << long_options[option_index].name;
+
+          if (optarg)
+          {
+            cerr << " with arg " << optarg;
+          }
+
+          cerr << endl;
+
+        }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) version.  @>
+@ \.{version}.
+\initials{LDF 2013.09.04.}
+
+\LOG
+\initials{LDF 2013.09.04.}
+Added this section.
+\ENDLOG
+
+@<setupdbs |process_command_line_options| definition@>==
+
+        if (option_index == VERSION_INDEX)        
+        {
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               cerr << "`option_index' "
+                    << "== `VERSION_INDEX'" 
+                    << endl;
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            cout << "setupdbs " << PACKAGE_VERSION 
+                 << endl 
+                 << "setupdbs is part of " << PACKAGE_NAME << " " << PACKAGE_VERSION 
+                 << endl 
+                 << "Copyright (C) 2014 "
+                 << "Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen, Germany"
+                 << endl
+                 << "Author:  Laurence D. Finston"
+                 << endl;
+
+            exit(0);
+ 
+ 
+@q ******* (7) @>
+
+        } /* |if (option_index == VERSION_INDEX)|  */
+
+@q ****** (6) help.  @>
+@ \.{help}.
+\initials{LDF 2013.09.04.}
+
+\LOG
+\initials{LDF 2013.09.04.}
+Added this section.
+\ENDLOG
+
+@<setupdbs |process_command_line_options| definition@>==
+
+        if (option_index == HELP_INDEX)        
+        {
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               cerr << "`option_index' "
+                    << "== `HELP_INDEX'" 
+                    << endl;
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+            cout << "setupdbs sets up the databases needed for " 
+                 << PACKAGE_NAME << " " << PACKAGE_VERSION
+                 << endl 
+                 << "Usage: setupdbs [OPTION ...]"
+                 << endl 
+                 << "--version:  Print out the package name and version and exit"
+                 << endl
+                 << "--help:  Print out this help message and exit"
+                 << endl
+                 << "--drop:  Databases will be dropped and recreated, if they already exist"
+                 << endl 
+                 << "--admin USERNAME:  USERNAME will have administrative privileges "
+                 << "for the databases"
+                 << endl 
+                 << "--user USERNAME:  USERNAME will be an ordinary database user"
+                 << endl 
+                 << "--group STRING:  Group STRING will be created"
+                 << endl 
+                 << "--handles-database-name STRING:  Name for handles database"
+                 << endl 
+                 << "--                        (default:  \"handlesystem_standalone\" for "
+                 << "--standalone handle service"
+                 << endl 
+                 << "                          or \"handlesystem\" for "
+                 << "non-standalone handle service)"
+                 << endl
+                 << "--server-database-name:  Name for server-side database "
+                 << "(default:  gwirdsif)"
+                 << endl
+                 << "--gwirdsif-database-name:  Synonym for previous option"
+                 << endl
+                 << "--client-database-name:  Name for client-side database (default:  gwirdcli)"
+                 << endl
+                 << "--gwirdcli-database-name:  Synonym for previous option"
+                 << endl
+                 << "--prefix STRING:  Handle prefix (default:  12345)"
+                 << endl
+                 << "--institute:  STRING:STRING, e.g., \"ZZZZ:Test Institute\""
+                 << endl
+                 << "--no-standalone-handle:  Create database for a handle service "
+                 << "registered with CNRI"
+                 << "                         (Corporation for National Research Initiatives)"
+                 << endl 
+                 << "--irods-server-port INTEGER:  Contact the iRODS server through port INTEGER"
+                 << endl;
+
+            exit(0);
+ 
+@q ******* (7) @>
+
+        } /* |if (option_index == HELP_INDEX)|  */
+
+@q ****** (6) drop.  @>
+@ \.{drop}.
+\initials{LDF 2013.09.02.}
+
+\LOG
+\initials{LDF 2013.09.02.}
+Added this section.
+\ENDLOG
+
+@<setupdbs |process_command_line_options| definition@>==
+
+        else if (option_index == DROP_INDEX)        
+        {
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               cerr << "`option_index' "
+                    << "== `DROP_INDEX'" 
+                    << endl;
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            drop = true;
+ 
+@q ******* (7) @>
+
+        } /* |else if (option_index == DROP_INDEX)|  */
+
+@q ****** (6) admin.  @>
+@ \.{admin}.
+\initials{LDF 2013.09.04.}
+
+\LOG
+\initials{LDF 2013.09.04.}
+Added this section.
+\ENDLOG
+
+@<setupdbs |process_command_line_options| definition@>==
+
+        else if (option_index == ADMIN_INDEX)        
+        {
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               cerr << "`option_index' "
+                    << "== `ADMIN_INDEX'" 
+                    << endl
+                    << "optarg == " << optarg << endl;
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            admin_vector.push_back(string(optarg));
+ 
+@q ******* (7) @>
+
+        } /* |else if (option_index == ADMIN_INDEX)|  */
+
+@q ****** (6) user.  @>
+@ \.{user}.
+\initials{LDF 2013.09.04.}
+
+\LOG
+\initials{LDF 2013.09.04.}
+Added this section.
+\ENDLOG
+
+@<setupdbs |process_command_line_options| definition@>==
+
+        else if (option_index == USER_INDEX)        
+        {
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               cerr << "`option_index' "
+                    << "== `USER_INDEX'" 
+                    << endl
+                    << "optarg == " << optarg << endl;
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            user_vector.push_back(string(optarg));
+ 
+@q ******* (7) @>
+
+        } /* |else if (option_index == USER_INDEX)|  */
+
+@q ****** (6) group.  @>
+@ \.{group}.
+\initials{LDF 2013.09.05.}
+
+\LOG
+\initials{LDF 2013.09.05.}
+Added this section.
+\ENDLOG
+
+@<setupdbs |process_command_line_options| definition@>==
+
+        else if (option_index == GROUP_INDEX)        
+        {
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               cerr << "`option_index' "
+                    << "== `GROUP_INDEX'" 
+                    << endl
+                    << "optarg == " << optarg << endl;
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            group_vector.push_back(string(optarg));
+ 
+@q ******* (7) @>
+
+        } /* |else if (option_index == GROUP_INDEX)|  */
+
+@q ****** (6) handles-database-name.  @>
+@ \.{handles-database-name}.
+\initials{LDF 2013.09.02.}
+
+\LOG
+\initials{LDF 2013.09.02.}
+Added this section.
+\ENDLOG
+
+@<setupdbs |process_command_line_options| definition@>==
+
+        else if (option_index == HANDLES_DATABASE_NAME_INDEX)        
+        {
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               cerr << "`option_index' "
+                    << "== `HANDLES_DATABASE_NAME_INDEX'" 
+                    << endl;
+ 
+               if (optarg)
+                  cerr << "optarg == " << optarg << endl;
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            handles_database_name = optarg;
+ 
+@q ******* (7) @>
+
+        } /* |else if (option_index == HANDLES_DATABASE_NAME_INDEX)|  */
+
+
+@q ****** (6) server-database-name or gwirdsif-database-name.  @>
+@ \.{server-database-name} or \.{gwirdsif-database-name}.
+\initials{LDF 2013.09.02.}
+
+\LOG
+\initials{LDF 2013.09.02.}
+Added this section.
+\ENDLOG
+
+@<setupdbs |process_command_line_options| definition@>==
+
+        else if (   option_index == SERVER_DATABASE_NAME_INDEX
+                 || option_index == GWIRDSIF_DATABASE_NAME_INDEX)        
+        {
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               cerr << "`option_index' "
+                    << "== `SERVER_DATABASE_NAME_INDEX' or " 
+                    << "== `GWIRDSIF_DATABASE_NAME_INDEX'." 
+                    << endl;
+ 
+               if (optarg)
+                  cerr << "optarg == " << optarg << endl;
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            gwirdsif_database_name = optarg;
+ 
+@q ******* (7) @>
+
+        } /* |else if|  */
+
+@q ****** (6) client-database-name or gwirdcli-database-name.  @>
+@ \.{client-database-name} or \.{gwirdcli-database-name}.
+\initials{LDF 2013.09.02.}
+
+\LOG
+\initials{LDF 2013.09.02.}
+Added this section.
+\ENDLOG
+
+@<setupdbs |process_command_line_options| definition@>==
+
+        else if (   option_index == CLIENT_DATABASE_NAME_INDEX
+                 || option_index == GWIRDCLI_DATABASE_NAME_INDEX)                
+        {
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               cerr << "`option_index' "
+                    << "== `CLIENT_DATABASE_NAME_INDEX' or "
+                    << "`GWIRDCLI_DATABASE_NAME_INDEX'."
+                    << endl;
+ 
+               if (optarg)
+                  cerr << "optarg == " << optarg << endl;
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            gwirdcli_database_name = optarg;
+ 
+@q ******* (7) @>
+
+        } /* |else if|  */
+
+@q ****** (6) prefix.  @>
+@ \.{prefix}.
+\initials{LDF 2013.09.03.}
+
+\LOG
+\initials{LDF 2013.09.03.}
+Added this section.
+\ENDLOG
+
+@<setupdbs |process_command_line_options| definition@>==
+
+        else if (option_index == PREFIX_INDEX)
+        {
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               cerr << "`option_index' "
+                    << "== `PREFIX_INDEX'."
+                    << endl;
+ 
+               if (optarg)
+                  cerr << "optarg == " << optarg << endl;
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            prefix_vector.push_back(string(optarg));
+ 
+@q ******* (7) @>
+
+        } /* |else if (option_index == PREFIX_INDEX)|  */
+
+@q ****** (6) institute.  @>
+@ \.{institute}.
+\initials{LDF 2013.09.03.}
+
+\LOG
+\initials{LDF 2013.09.03.}
+Added this section.
+\ENDLOG
+
+@<setupdbs |process_command_line_options| definition@>==
+
+        else if (option_index == INSTITUTE_INDEX)
+        {
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               cerr << "`option_index' "
+                    << "== `INSTITUTE_INDEX'."
+                    << endl;
+ 
+               if (optarg)
+                  cerr << "optarg == " << optarg << endl;
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+ 
+            string temp_str = optarg;
+            string temp_str_1;
+            string temp_str_2;
+
+            size_t pos = temp_str.find(":");
+
+            if (pos == string::npos || pos == 0 || pos == temp_str.size() - 1)
+            {
+                cerr << "[setupdbs] WARNING!  Invalid argument to `--institute' option:  "
+                     << optarg
+                     << endl
+                     << "Not adding institute."
+                     << endl 
+                     << "Usage:  --institute STRING:STRING"
+                     << endl
+                     << "Continuing."
+                     << endl;
+            }
+            else
+            {
+
+                temp_str_1 = temp_str;
+                temp_str_1.erase(0, pos + 1);
+
+                temp_str.erase(pos);
+
+#if DEBUG_COMPILE
+                if (DEBUG)   
+                {
+                     cerr << "temp_str == " << temp_str << endl
+                          << "temp_str_1 == " << temp_str_1 << endl;
+
+                }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+                pos = temp_str.find(":");
+
+                if (pos == string::npos)
+                   pos = temp_str_1.find(":");
+
+                if (pos != string::npos)
+                   cerr << "[setupdbs] WARNING!  Invalid argument to `--institute' option:  "
+                        << optarg
+                        << endl
+                        << "Not adding institute."
+                        << endl 
+                        << "Usage:  --institute STRING:STRING"
+                        << endl
+                        << "Continuing."
+                        << endl;
+                else
+                {
+                    institute_vector.push_back(make_pair(temp_str, temp_str_1));
+
+                }
+
+            }  /* |else|  */
+ 
+@q ******* (7) @>
+
+        } /* |else if (option_index == INSTITUTE_INDEX)|  */
+
+@q ****** (6) no-standalone-handle.  @>
+@ \.{no-standalone-handle}.
+\initials{LDF 2013.09.04.}
+
+\LOG
+\initials{LDF 2013.09.04.}
+Added this section.
+\ENDLOG
+
+@<setupdbs |process_command_line_options| definition@>==
+
+        else if (option_index == NO_STANDALONE_HANDLE_INDEX)
+        {
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               cerr << "`option_index' "
+                    << "== `NO_STANDALONE_HANDLE_INDEX'."
+                    << endl;
+             }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            standalone_handle = false;
+ 
+@q ******* (7) @>
+
+        } /* |else if (option_index == NO_STANDALONE_HANDLE_INDEX)|  */
+
+@q ****** (6) irods-server-port.  @>
+@ \.{irods-server-port}.
+\initials{LDF 2013.09.06.}
+
+\LOG
+\initials{LDF 2013.09.06.}
+Added this section.
+\ENDLOG
+
+@<setupdbs |process_command_line_options| definition@>==
+
+        else if (option_index == IRODS_SERVER_PORT_INDEX)
+        {
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+               cerr << "`option_index' "
+                    << "== `IRODS_SERVER_PORT_INDEX'."
+                    << endl;
+ 
+               if (optarg)
+                  cerr << "optarg == " << optarg << endl;
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+ 
+            irods_server_port = atoi(optarg);
+
+ 
+@q ******* (7) @>
+
+        } /* |else if (option_index == IRODS_SERVER_PORT_INDEX)|  */
+
+
+
+
+
+@q ****** (6) Invalid option_index value.@>
+@ Invalid {\tt option\_index} value.
+\initials{LDF 2013.09.02.}
+
+@<setupdbs |process_command_line_options| definition@>==
+
+        else 
+        {
+          cerr << "WARNING!  In `process_command_line_options':"
+               << endl 
+               << "`option_index' has invalid value: "
+               << option_index << endl
+               << "Will try to continue." 
+               << endl;
+
+        }
+
+@q ****** (6) @>
+
+      }  /* |else if (option_ctr == 0)|  */
+
+@q ***** (5) Ambiguous option.@>
+@ Ambiguous option.
+\initials{LDF 2013.09.02.}
+
+@<setupdbs |process_command_line_options| definition@>==
+
+    else if (option_ctr == '?')
+    {
+        cerr << "WARNING! In `process_command_line_options':"
+             << endl
+             << "`getopt_long_only' returned ambiguous match.  "
+             << "Breaking."
+             << endl;
+
+        break;
+
+    }  /* |else if (option_ctr == '?')|  */
+
+@q ***** (5) Invalid option.@>
+@ Invalid option.
+\initials{LDF 2013.09.02.}
+
+@<setupdbs |process_command_line_options| definition@>==
+
+    else
+    {
+#if DEBUG_COMPILE
+        if (DEBUG) 
+        {
+           cerr << "`getopt_long_only' returned invalid option."
+                << endl;
+        }
+#endif  /* |DEBUG_COMPILE|  */
+
+    }
+
+@q ***** (5) @>
+
+  } /* |while|  */
+
+  return 0; 
+
+}  /* End of |process_command_line_options| definition   */
+
+
+
+@q ** (2) @>
+
+@q ** (2) Delete pointers and clear vectors (|delete_and_clear|).  @>
+
+@ Delete pointers and clear vectors (|delete_and_clear|).
+\initials{LDF 2013.09.04.}
+
+\LOG
+\initials{LDF 2013.09.04.}
+Added this function.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|delete_and_clear| declaration@>=
+void
+delete_and_clear(MYSQL_RES **result_array,
+                 size_t result_array_size, 
+                 vector<unsigned int *> &row_ctr_vector,
+                 vector<unsigned int *> &field_ctr_vector,
+                 vector<long int *> &affected_rows_vector,
+                 vector<string> &query_vector);
+ 
+ 
+
+
+@q *** (3) Definition  @>
+@
+@<|delete_and_clear| definition@>=
+void
+delete_and_clear(MYSQL_RES **result_array, 
+                 size_t result_array_size, 
+                 vector<unsigned int *> &row_ctr_vector,
+                 vector<unsigned int *> &field_ctr_vector,
+                 vector<long int *> &affected_rows_vector,
+                 vector<string> &query_vector)
+{
+   for (int i = 0; i < result_array_size; ++i)
+   {
+      if (result_array[i])
+      {
+          mysql_free_result(result_array[i]);
+          result_array[i] = 0;
+      }
+   }
+
+   for (vector<unsigned int *>::iterator iter = row_ctr_vector.begin();
+        iter != row_ctr_vector.end();
+        ++iter)
+   {
+        delete *iter;
+        *iter = 0;
+   }
+   row_ctr_vector.clear();
+
+   for (vector<unsigned int *>::iterator iter = field_ctr_vector.begin();
+        iter != field_ctr_vector.end();
+        ++iter)
+   {
+        delete *iter;
+        *iter = 0;
+   }
+   field_ctr_vector.clear();
+
+   for (vector<long int *>::iterator iter = affected_rows_vector.begin();
+        iter != affected_rows_vector.end();
+        ++iter)
+   {
+        delete *iter;
+        *iter = 0;
+   }
+   affected_rows_vector.clear();
+
+   query_vector.clear();
+
+   return;
+
+}  /* End of |delete_and_clear| definition  */
+
+
+
+
+@q ** (2) This is what's compiled.  @>
+
+@ This is what's compiled.  
+\initials{LDF 2013.09.03.}
+
+@c
+using namespace std;
+@<Include files@>@;@/
+using namespace gwrdifpk;
+@<setupdbs global variables@>@;@/
+@<setupdbs |process_command_line_options| definition@>@;@/
+@<|delete_and_clear| definition@>@;@/
+
+
+@q ** (2) This is what's written to the header file `stpclopt.h'.  @>
+
+@ This is what's written to the header file \filename{stpclopt.h}.
+\initials{LDF 2013.09.03.}
+
+@(stpclopt.h@>=
+#ifndef STPCLOPT_H
+#define STPCLOPT_H 1
+@<setupdbs |process_command_line_options| declaration@>@;@/
+@<setupdbs |extern| declarations for global variables @>@;@/
+@<|delete_and_clear| declaration@>@;@/
+#endif
+
+@q (progn (cweb-mode) (outline-minor-mode))                                @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

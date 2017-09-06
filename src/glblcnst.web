@@ -1,0 +1,228 @@
+@q glblcnst.web  @>
+@q Created by Laurence D. Finston (LDF) Thu Jun  6 08:49:16 CEST 2013  @>
+
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q ** (2)  Global constants.  (glblcnst.web)  @>
+@* Global constants.  (\filename{glblcnst.web})
+\initials{LDF 2013.06.06.}
+
+\LOG
+\initials{LDF 2013.06.06.}
+Added this file.  Removed the global constant declarations and initializations 
+from \filename{glblvrbl.web} to this file.  It became necessary to separate them 
+after starting to use \.{libtool} to generate a shared library:  There must be
+copies of all the global variables for each instance of each program, whereas the 
+global constants may be shared.
+\ENDLOG
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+#include <stdlib.h>
+#include <stdio.h>
+#include <fstream>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <limits.h>
+#include <map>
+#include <string>
+#include <time.h>
+#include <math.h>
+#include <sstream>   
+#include <pthread.h>
+#include <signal.h>
+
+
+#include <map>
+#include <vector>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+@q * (1) Global Constants.  @>
+@ Global Constants.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.09.21.}
+Renamed |extern const string DEFAULT_PORT_STR| and
+|extern const int DEFAULT_PORT_NUM| to 
+|DEFAULT_PORT_STR_ANON| and
+|DEFAULT_PORT_NUM_ANON|, respectively.
+Added |DEFAULT_PORT_STR_X_509 = "5557"| and 
+|DEFAULT_PORT_NUM_X_509 = 5557|.  
+
+\initials{LDF 2013.04.10.}
+Added |const string DEFAULT_SOCKET_DIRECTORY = "/tmp"|.
+
+\initials{LDF 2013.09.24.}
+Added |extern const size_t MYSQL_PASSWORD_LENGTH = 256|. 
+
+\initials{LDF 2013.09.26.}
+Added |extern const string DEFAULT_MYSQL_PASSWORD_FILENAME = "mysql_password.gpg.asc"|.
+
+\initials{LDF 2014.01.27.}
+Added |extern const string DEFAULT_LISTEN_CLIENT_PORT_STR = "5558"|
+and |extern const int DEFAULT_LISTEN_CLIENT_PORT = 5558|.
+
+\initials{LDF 2014.01.31.}
+Added |int DEFAULT_PULL_REQUEST_INTERVAL = 259200|.
+\ENDLOG 
+
+@<Global Constants@>=
+
+   extern const string DEFAULT_PORT_STR_ANON   = "5556";  
+   extern const int DEFAULT_PORT_NUM_ANON      =  5556;  
+
+   extern const string DEFAULT_PORT_STR_X_509  = "5557";  
+   extern const int DEFAULT_PORT_NUM_X_509     =  5557;  
+
+   extern const string DEFAULT_LISTEN_CLIENT_PORT_STR = "5558";
+   extern const int DEFAULT_LISTEN_CLIENT_PORT        =  5558;
+
+   int DEFAULT_PULL_REQUEST_INTERVAL = 259200;  /* Three days in seconds 
+                                                   \initials{LDF 2014.01.31.} */
+
+   extern const string DEFAULT_SOCKET_DIRECTORY = "/tmp";
+
+   extern const size_t MYSQL_PASSWORD_LENGTH = 256;
+
+   extern const string DEFAULT_MYSQL_PASSWORD_FILENAME = "mysql_password.gpg.asc";
+
+
+@
+@<|extern| declarations for global constants@>=
+
+   extern const string DEFAULT_PORT_STR_ANON;
+   extern const int DEFAULT_PORT_NUM_ANON;
+
+   extern const string DEFAULT_PORT_STR_X_509;
+   extern const int DEFAULT_PORT_NUM_X_509;
+
+   extern const string DEFAULT_LISTEN_CLIENT_PORT_STR;
+   extern const int DEFAULT_LISTEN_CLIENT_PORT;
+
+   extern int DEFAULT_PULL_REQUEST_INTERVAL;
+
+   extern const string DEFAULT_SOCKET_DIRECTORY;
+
+   extern const size_t MYSQL_PASSWORD_LENGTH;
+
+   extern const string DEFAULT_MYSQL_PASSWORD_FILENAME;
+   
+@q * (1) Forward declarations.  @>
+@ Forward declarations.
+\initials{LDF 2012.07.02.}
+
+@<Forward declarations@>=
+
+   class Scan_Parse_Parameter_Type;
+
+@q ** (2) Putting `glblcnst.web' together.  @>
+
+@ Putting {\tt glblcnst\PERIOD web} together.
+
+@q *** (3) This is what's compiled.  @>
+
+This is what's compiled.  
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF Undated.}
+Now defining the preprocessor macro |_GNU_SOURCE| in the compiled code 
+and in the header file.  It's needed for |pthread_timedjoin_np|.
+\ENDLOG 
+
+@c
+@<Include files@>@;@/
+
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif 
+
+using namespace std;
+namespace gwrdifpk
+{
+@<Global Constants@>@;@/
+};
+#if 0 
+@<Forward declarations@>@;@/
+#endif 
+
+@q *** (3) This is what's written to the header file.  @>
+
+@ This is what's written to the header file.  
+\initials{LDF 2012.07.02.}
+
+@(glblcnst.h@>=
+
+#ifndef GLBLCNST_H
+#define GLBLCNST_H 1
+
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif 
+
+using namespace std;
+namespace gwrdifpk
+{
+@<|extern| declarations for global constants@>@;@/
+};
+@<Forward declarations@>@;@/
+#endif 
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode) (abbrev-mode t))           @>
+
+@q * (1) Local variables for Emacs @>
+
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode: t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

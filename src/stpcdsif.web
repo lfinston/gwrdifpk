@@ -1,0 +1,1321 @@
+@q stpcdsif.web @>
+@q [...]/gwrdifpk/src/stpcdsif.web  @>
+
+@q Created by Laurence D. Finston (LDF) Wed Sep  4 11:50:25 CEST 2013  @>
+
+@q * (1) Top @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+@q ** (2) Include files@>
+
+@ Include files.
+\initials{LDF 2013.09.04.}
+
+@<Include files@>=
+
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <pthread.h>  /* POSIX threads  */
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
+
+#include <mysql.h>
+
+#include <expat.h>
+
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <fstream>
+#include <sstream>   
+#include <string>
+#include <getopt.h>
+
+#include <map>
+#include <vector>
+#include <deque>
+#include <set>
+#include <stack>
+#include <utility>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif 
+
+
+#include "rspercds.h++"
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "helper.h++"
+#include "tanfncs.h++"
+#include "pidfncs.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "usrinftp.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+
+#include "stpclopt.h++"
+
+@q ** (2) Create server-side database tables (gwirdsif).  @>
+
+@ Create server-side database tables (gwirdsif).
+\initials{LDF 2013.09.04.}
+
+@q *** (3) Declaration  @>
+
+@<|create_tables_gwirdsif| declaration@>=
+
+int
+create_tables_gwirdsif(Scan_Parse_Parameter_Type &param);
+
+
+@q *** (3) Definition @>
+@
+@<|create_tables_gwirdsif| definition@>=
+
+int
+create_tables_gwirdsif(Scan_Parse_Parameter_Type &param)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status;
+   stringstream sql_strm;
+
+   stringstream temp_strm;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+         cerr << "Entering `create_tables_gwirdsif'."
+              << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   MYSQL_RES* result = 0;
+   MYSQL_ROW curr_row;
+
+   size_t result_array_size = 32;
+
+   MYSQL_RES *result_array[32] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+   unsigned int row_ctr   = 0;
+   unsigned int field_ctr = 0;
+   long int affected_rows = 0;
+
+   vector<string> query_vector;
+
+   vector<unsigned int *> row_ctr_vector;
+   vector<unsigned int *> field_ctr_vector;
+   vector<long int *>     affected_rows_vector;
+
+   vector<string> comment_vector;
+
+   string comma_str;
+
+@q **** (4) @>
+
+       sql_strm << "use " << gwirdsif_database_name;
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+@q **** (4) @>
+
+       sql_strm.str("");
+
+       sql_strm << "create table Institutes ("
+                << "institute_id int primary key, "
+                << "contact int references Users(user_id),"
+                << endl 
+                << "abbreviation char(4) unique not null, "
+                << "name varchar(128) unique not null,"
+                << endl 
+                << "enabled boolean not null default 1)";
+
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+       sql_strm.str("");
+
+@q **** (4) @>
+
+       sql_strm << "insert into Institutes (institute_id, contact, "
+                << "abbreviation, name, enabled)"
+                << endl 
+                << "values"
+                << endl 
+                << "(0, 0, '0000', 'NULL INSTITUTE', 1)";
+
+       
+      if (institute_vector.size() > 0)
+      {
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+          if (DEBUG)
+          {
+              cerr << "institute_vector.size() == " << institute_vector.size() << endl;
+
+              for (vector<pair<string, string> >::iterator iter = institute_vector.begin();
+                   iter != institute_vector.end();
+                   ++iter)
+              {
+                  cerr << iter->first << ":  " << iter->second << endl;
+
+              }  /* |for|  */
+
+              cerr << endl;
+
+          }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */           
+
+@q ***** (5) @>
+
+          comma_str = ",\n";
+
+          int i = 1;
+
+          for (vector<pair<string, string> >::iterator iter = institute_vector.begin();
+               iter != institute_vector.end();
+               ++iter)
+          {
+
+              sql_strm << comma_str << "(" << i++ << ", 1, '" << iter->first << "', "
+                       << "'" << iter->second << "', 1)";
+
+
+          }  /* |for|  */
+
+          comma_str = "";
+
+@q ***** (5) @>
+
+
+      }  /* |if (institute_vector.size() > 0)|  */
+
+@q **** (4) @>
+
+      query_vector.push_back(sql_strm.str());
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(new long int(0L));
+      comment_vector.push_back("insert Institutes");
+      sql_strm.str("");
+
+@q **** (4) Prefixes.  @>
+
+@ Prefixes.  
+\initials{LDF 2013.09.04.}
+
+\LOG
+\initials{LDF 2013.09.04.}
+Added this section.
+\ENDLOG
+
+@<|create_tables_gwirdsif| definition@>=
+
+      sql_strm << "create table Prefixes"
+               << endl 
+               <<"("
+               << endl 
+               << "prefix_id int primary key,"
+               << endl 
+               << "prefix varchar(16) unique not null,"
+               << endl
+               << "enabled boolean not null default 1"
+               << endl 
+               << ")";
+
+      query_vector.push_back(sql_strm.str());
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(0);
+      sql_strm.str("");
+
+@q **** (4) @>
+@
+@<|create_tables_gwirdsif| definition@>=
+
+     sql_strm << "insert into Prefixes (prefix_id, prefix, enabled)"
+              << endl 
+              << "values"
+              << endl
+              << "(0, 'NULL_PREFIX', 0)";
+
+     comma_str = ",\n";
+
+     int i = 1;
+
+     for (vector<string>::iterator iter = prefix_vector.begin();
+          iter != prefix_vector.end();
+          ++iter)
+     {
+          sql_strm << comma_str << "(" << i++ << ", '" << *iter << "', 1)";
+          
+
+     }
+
+      query_vector.push_back(sql_strm.str());
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(new long int(0L));
+      comment_vector.push_back("insert Prefixes");
+      sql_strm.str("");
+
+
+@q **** (4) @>
+@
+@<|create_tables_gwirdsif| definition@>=
+
+      sql_strm << "create table Users"
+               << endl 
+               << "("        
+               << endl
+               << "user_id int primary key,"
+               << endl 
+               << "username varchar(128) unique not null,"
+               << endl 
+               << "irods_password_encrypted varchar(2048),  /* 2048 == 2^11  */"
+               << endl 
+               << "irods_password_encrypted_timestamp timestamp default 0,"
+               << endl 
+               << "Distinguished_Name varchar(256),"
+               << endl 
+               << "irods_homedir varchar(128),"
+               << endl 
+               << "irods_zone varchar(128),"
+               << endl 
+               << "irods_default_resource varchar(128),"
+               << endl 
+               << "handle_username varchar(128) default '',"
+               << endl 
+               << "handle_password_encrypted varchar(32) default '',"
+               << endl 
+               << "default_institute_id int references Institutes(institute_id),"
+               << endl 
+               << "default_prefix_id int references Prefixes(prefix_id),"
+               << endl 
+               << "gpg_key_id char(8) not null default ''"
+               << ")"
+               << endl << endl; 
+
+      Users_table_create_str = sql_strm.str();
+
+      query_vector.push_back(sql_strm.str());
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(0);
+      sql_strm.str("");
+
+@q **** (4) @>
+@
+@<|create_tables_gwirdsif| definition@>=
+ 
+      sql_strm << "insert into Users"
+               << endl 
+               << "(user_id, "    
+               << "username, "
+               << "irods_password_encrypted, "
+               << "irods_password_encrypted_timestamp, "
+               << "Distinguished_Name,"
+               << endl
+               << "irods_homedir, "
+               << "irods_zone, "
+               << "irods_default_resource, "
+               << "handle_username,"
+               << endl
+               << "handle_password_encrypted, "
+               << "default_institute_id, "
+               << "default_prefix_id, "
+               << "gpg_key_id)"
+               << endl 
+               << "values"
+               << endl 
+               << "("               
+               << "0, 'NULL_USER', 'NULL_IRODS_PASSWORD_ENCRYPTED',"
+               << endl
+               << " 0, 'NULL_DISTINGUISHED_NAME', 'NULL_IRODS_HOMEDIR', 'NULL_IRODS_ZONE',"
+               << endl
+               << " 'NULL_DEFAULT_RESOURCE', 'NULL_HANDLE_USER', "
+               << "'NULL_HANDLE_PASSWORD_ENCRYPTED', "
+               << endl 
+               << " 0, 0, '00000000')";
+
+      i = 1;
+
+      comma_str =",\n";
+
+      for (vector<string>::iterator iter = admin_vector.begin();
+           iter != admin_vector.end();
+           ++iter)
+      {
+
+          /* |gpg_key_id| will have to be added later, by hand.  
+             \initials{LDF 2013.09.20.}
+          */
+
+          sql_strm << comma_str << "(" 
+                   << i++ << ", "                  /* |user_id| */
+                   << "'" << *iter << "', "        /* |username| */
+                   << "'', "                       /* |irods_password_encrypted| */
+                   << "0, "                        /* |irods_password_encrypted_timestamp| */
+                   << "'',"                        /* |Distinguished_Name| */
+                   << "'/tempZone/home/"           /* |irods_homedir| */
+                   << *iter << "', "          
+                   << "'tempZone', "               /* |irods_zone| */
+                   << "'demoResc', "               /* |irods_default_resource| */
+                   << "'" << *iter << "', "        /* |handle_username| */
+                   << "'', "                       /* |handle_password_encrypted| */
+                   << "0, "                        /* |default_institute_id| */
+                   << "0, "                        /* |default_prefix_id| */
+                   << "'')";                       /* |gpg_key_id| */
+
+      }  /* |for|  */
+
+@q **** (4) @>
+
+@ If there are no admins, set |i = 2| so that an admin with |user_id == 1| can
+be added by hand later.  There's no particular need for this, but I think it's a
+useful convention.
+\initials{LDF 2013.09.06.}
+
+\LOG
+\initials{LDF 2013.09.06.}
+Added this section.
+\ENDLOG
+
+@<|create_tables_gwirdsif| definition@>=
+
+      if (i == 1)  
+         ++i;
+
+@q **** (4) @>
+@
+@<|create_tables_gwirdsif| definition@>=
+
+      for (vector<string>::iterator iter = user_vector.begin();
+           iter != user_vector.end();
+           ++iter)
+      {
+
+          /* |gpg_key_id| will have to be added later, by hand.  
+             \initials{LDF 2013.09.20.}
+          */
+
+          sql_strm << comma_str << "(" 
+                   << i++ << ", "                  /* |user_id| */
+                   << "'" << *iter << "', "        /* |username| */
+                   << "'', "                       /* |irods_password_encrypted| */
+                   << "0, "                        /* |irods_password_encrypted_timestamp| */
+                   << "'',"                        /* |Distinguished_Name| */
+                   << "'/tempZone/home/"           /* |irods_homedir| */
+                   << *iter << "', "          
+                   << "'tempZone', "               /* |irods_zone| */
+                   << "'demoResc', "               /* |irods_default_resource| */
+                   << "'" << *iter << "', "        /* |handle_username| */
+                   << "'', "                       /* |handle_password_encrypted| */
+                   << "0, "                        /* |default_institute_id| */
+                   << "0, "                        /* |default_prefix_id| */
+                   << "'')";                       /* |gpg_key_id| */
+
+      }  /* |for|  */
+
+      Users_table_insert_str = sql_strm.str();
+
+      query_vector.push_back(sql_strm.str());
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(new long int(0L));
+      comment_vector.push_back("insert Users");
+      sql_strm.str("");
+
+@q **** (4) Users_Prefixes.  @>
+
+@ \.{Users\_Prefixes}.
+\initials{LDF 2013.09.04.}
+
+\LOG
+\initials{LDF 2013.09.04.}
+Added this section.
+\ENDLOG
+
+@<|create_tables_gwirdsif| definition@>=
+
+      sql_strm << "create table Users_Prefixes"
+               << endl 
+               << "("
+               << endl 
+               << " user_id int references Users(user_id),"
+               << endl 
+               << " prefix_id int references Prefixes(prefix_id))";
+
+      query_vector.push_back(sql_strm.str());
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(0);
+      sql_strm.str("");
+
+@q ***** (5) @>
+
+      sql_strm << "insert into Users_Prefixes (user_id, prefix_id)"
+               << endl 
+               << "values"
+               << endl 
+               << "(0, 0)";
+
+@q ***** (5) @>
+
+@ If at least one user and at least one prefix has been specified, assign the first prefix 
+to the first user.
+\initials{LDF 2013.09.04.}
+
+@<|create_tables_gwirdsif| definition@>=
+
+      if (admin_vector.size() > 0 && prefix_vector.size() > 0)
+      {
+
+          sql_strm << comma_str << "(1, 1)";
+      }
+
+@q ***** (5) @>
+@
+@<|create_tables_gwirdsif| definition@>=
+
+      query_vector.push_back(sql_strm.str());
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(new long int(0L));
+      comment_vector.push_back("insert Users_Prefixes");
+
+      sql_strm.str("");
+
+@q **** (4) Certificates.  @>
+@ \.{Certificates}.
+\initials{LDF 2013.09.05.}
+
+\LOG
+\initials{LDF 2013.09.05.}
+Added this section.
+\ENDLOG
+
+@<|create_tables_gwirdsif| definition@>=
+
+      sql_strm << "create table Certificates"
+               << endl
+               << "("
+               << "certificate_id int primary key, "
+               << "user_id int references Users(user_id),"
+               << endl
+               << "issuer_cert_id int references Certificates(certificate_id), "
+               << "is_ca boolean not null, "    
+               << "is_proxy boolean not null," 
+               << endl
+               << "serialNumber bigint unsigned,"
+               << endl;
+
+      /* Fields from here on use names from the X.509 specifications  */
+      /* LDF 2009.12.23.                                              */
+
+     sql_strm << "organization varchar(64),"
+              << "organizationalUnitName varchar(64),"
+              << "commonName varchar(64),"           
+              << "countryName char(2),"          
+              << "localityName varchar(64),"         
+              << "stateOrProvinceName varchar(64),"
+              << "Validity_notBefore datetime," 
+              << "Validity_notAfter datetime"
+              << endl
+              << ")";
+
+
+      query_vector.push_back(sql_strm.str());
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(0);
+
+      sql_strm.str("");
+
+@q ***** (5) @>
+@
+@<|create_tables_gwirdsif| definition@>=
+
+      sql_strm << "insert into Certificates"
+               << endl
+               << "("
+               << endl
+               << "certificate_id, "           
+               << "user_id, "
+               << "issuer_cert_id, "
+               << "is_ca, "              
+               << "is_proxy,"
+               << endl              
+               << "serialNumber, "             
+               << "organization, "             
+               << "organizationalUnitName, "   
+               << "commonName, "               
+               << "countryName,"
+               << endl                            
+               << "localityName, "             
+               << "stateOrProvinceName, "
+               << "Validity_notBefore, "
+               << "Validity_notAfter"
+               << endl
+               << ")"      
+               << "values"     
+               << "("
+               << "0, "      
+               << "0, "      
+               << "NULL, "
+               << "false,"  
+               << endl
+               << "false, "  
+               << "0, "      
+               << "NULL, "   
+               << "NULL, "   
+               << "NULL,"
+               << endl                 
+               << "NULL, "   
+               << "NULL, "                 
+               << "NULL, "   
+               << "NULL, "   
+               << "NULL"   
+               << endl
+               << ")";
+
+      query_vector.push_back(sql_strm.str());
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(new long int(0L));
+      comment_vector.push_back("insert Certificates");
+
+      sql_strm.str("");
+
+@q **** (4) Privileges.  @>
+@ \.{Privileges}.
+\initials{LDF 2013.09.05.}
+
+\LOG
+\initials{LDF 2013.09.05.}
+Added this section.
+\ENDLOG
+
+@<|create_tables_gwirdsif| definition@>=
+
+
+      sql_strm << "create table Privileges"
+               << endl
+               << "("
+               << endl
+               << "   user_id int primary key unique not null references Users(user_id),"
+               << endl
+               << "   superuser boolean not null default 0,"
+               << endl
+               << "   delegate boolean not null default 0,"
+               << endl
+               << "   add_groups boolean not null default 0,"
+               << endl
+               << "   delete_groups boolean not null default 0,"
+               << endl
+               << "   delete_handles boolean not null default 0,"
+               << endl
+               << "   delete_handle_values boolean not null default 0,"
+               << endl
+               << "   delete_hs_admin_handle_values boolean not null default 0,"
+               << endl
+               << "   delete_last_hs_admin_handle_value boolean not null default 0,"
+               << endl
+               << "   undelete_handle_values boolean not null default 0,"
+               << endl 
+               << "   show_user_info boolean not null default 0,"
+               << endl
+               << "   show_groups boolean not null default 0,"
+               << endl
+               << "   show_certificates boolean not null default 0,"
+               << endl
+               << "   show_distinguished_names boolean not null default 0,"
+               << endl
+               << "   show_privileges boolean not null default 0"
+               << endl
+               << ")";
+
+      query_vector.push_back(sql_strm.str());
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(0);
+      sql_strm.str("");
+
+@q ***** (5) @>
+@
+@<|create_tables_gwirdsif| definition@>=
+
+      if (admin_vector.size() == 0 && user_vector.size() == 0)
+      {
+          cerr << "NOTICE:  In `create_tables_gwirdsif':"
+               << endl 
+               << "No admins or users specified.  Not inserting into `Privileges' table."
+               << endl;
+
+      }
+      else
+      {
+@q ****** (6) @>
+
+          sql_strm << "insert into Privileges (user_id, superuser, delegate, show_user_info,"
+                   << endl
+                   << "show_groups, "
+                   << "add_groups, "
+                   << "delete_groups,"
+                   << endl 
+                   << "delete_handles, "
+                   << "delete_handle_values, "
+                   << "delete_hs_admin_handle_values, "
+                   << "delete_last_hs_admin_handle_value, "
+                   << "undelete_handle_values,"
+                   << endl
+                   << "show_certificates, "
+                   << "show_distinguished_names, "
+                   << "show_privileges)"
+                   << endl
+                   << "values"
+                   << endl;
+
+@q ****** (6) @>
+
+          comma_str = "";
+
+          int i = 1;
+
+          for (vector<string>::iterator iter = admin_vector.begin();
+               iter != admin_vector.end();
+               ++iter)
+          {
+              sql_strm << comma_str << "(" << i << ", "
+                            << "true, true, true, true, true, true, "
+                            << "true, true, true, true, true, true, true, true)";
+
+              comma_str = ",\n";
+
+              ++i;
+
+          }  /* |for|  */
+
+
+@q ****** (6) @>
+
+@ If there are no admins, the first user, if any, has |user_id == 2|.
+See explanation for this above (insert into \.{Users} table).  
+\initials{LDF 2013.09.06.}
+
+\LOG
+\initials{LDF 2013.09.06.}
+Added this section.
+\ENDLOG
+
+@<|create_tables_gwirdsif| definition@>=
+
+          if (i == 1)  
+             i = 2;
+
+@q ****** (6) @>
+@
+@<|create_tables_gwirdsif| definition@>=
+
+          for (vector<string>::iterator iter = user_vector.begin();
+               iter != user_vector.end();
+               ++iter)
+          {
+               sql_strm << comma_str << "(" << i << ", "
+                        << "false, false, false, false, false, false, "
+                        << "false, false, false, false, false, false, false, false)";
+
+               comma_str = ",\n";
+
+               ++i;
+
+          }  /* |for|  */
+
+@q ****** (6) @>
+
+          query_vector.push_back(sql_strm.str());
+
+          row_ctr_vector.push_back(0);
+          field_ctr_vector.push_back(0);
+          affected_rows_vector.push_back(new long int(0L));
+          comment_vector.push_back("insert Privileges");
+
+          sql_strm.str("");
+
+@q ****** (6) @>
+
+      }  /* |else|  */
+ 
+@q ***** (5) @>
+
+
+
+@q **** (4) User_Info.  @>
+@ \.{User\_Info}.
+\initials{LDF 2013.09.05.}
+
+\LOG
+\initials{LDF 2013.09.05.}
+Added this section.
+\ENDLOG
+
+@<|create_tables_gwirdsif| definition@>=
+
+      sql_strm << "create view User_Info as select"
+               << endl 
+               << "U.user_id, U.username, "
+               << "C.certificate_id, C.serialNumber, C.commonName, C.organization,"
+               << endl
+               << "C.organizationalUnitName, "
+               << "P.superuser, P.delegate, P.show_user_info, P.show_groups,"
+               << endl
+               << "P.show_certificates, P.show_distinguished_names, "
+               << "P.show_privileges"
+               << endl
+               << "from Users as U, Certificates as C, Privileges as P"
+               << endl
+               << "where U.user_id = C.user_id and U.user_id = P.user_id"
+               << endl
+               << "order by U.user_id";
+
+      query_vector.push_back(sql_strm.str());
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(0);
+
+      sql_strm.str("");
+
+@q **** (4) TANs.  @>
+@ \.{TANs}.
+\initials{LDF 2013.09.05.}
+
+\LOG
+\initials{LDF 2013.09.05.}
+Added this section.
+\ENDLOG
+
+@<|create_tables_gwirdsif| definition@>=
+
+      sql_strm << "create table TANs"
+               << endl
+               << "("
+               << endl
+               << "    user_id int default 0 references Users(user_id),"
+               << endl
+               << "    TAN varchar(64) primary key,"
+               << endl
+               << "    expiration timestamp default 0"
+               << endl
+               << ")";
+
+
+      query_vector.push_back(sql_strm.str());
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(0);
+
+      sql_strm.str("");
+
+@q ***** (5) @>
+@
+@<|create_tables_gwirdsif| definition@>=
+
+      sql_strm << "insert into TANs (TAN) "
+               << endl
+               << "values"
+               << endl
+               << "('xEzo 9Xd9 jBWt F0zJ K0Fs Ssmt'),"
+               << endl
+               << "('gQpg vz5B xBPR wB2p WQNJ gjgv'),"
+               << endl
+               << "('Etku 40cQ DA1w gGXN Wrcm tN2Z'),"
+               << endl
+               << "('8TRf OdsX UdP5 ZFh1 tRuY aTMi'),"
+               << endl
+               << "('6gGs ZWm8 yKgg 2o3U NvZZ lFle'),"
+               << endl
+               << "('bqq6 Lczp KV2T pSqu hNbb JBCg'),"
+               << endl
+               << "('zJtG lwJb Reww 11fg tgtD SeIk'),"
+               << endl
+               << "('QioT R4za 6ZCp MGEZ v7z0 TZ8y')";
+
+      query_vector.push_back(sql_strm.str());
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(new long int(0L));
+      comment_vector.push_back("insert TANs");
+
+      sql_strm.str("");
+
+@q **** (4) Session_Data.  @>
+@ \.{Session\_Data}.
+\initials{LDF 2013.09.05.}
+
+\LOG
+\initials{LDF 2013.09.05.}
+Added this section.
+\ENDLOG
+
+@<|create_tables_gwirdsif| definition@>=
+
+      sql_strm << "create table Session_Data"
+               << endl
+               << "("
+               << endl
+               << "session_id varchar(256) not null, "
+               << "user_id int not null references Users(user_id),"
+               << endl
+               << "effective_user_id int references Users(user_id), "
+               << "user_name varchar(128) references Users(user_name),"
+               << endl
+               << "effective_user_name varchar(128) references Users(user_name),"
+               << "timestamp timestamp default 0"
+               << endl
+               << ")";
+
+      query_vector.push_back(sql_strm.str());
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(0);
+
+      sql_strm.str("");
+
+
+@q **** (4) Groups.  @>
+@ \.{Groups}.
+\initials{LDF 2013.09.05.}
+
+\LOG
+\initials{LDF 2013.09.05.}
+Added this section.
+\ENDLOG
+
+@<|create_tables_gwirdsif| definition@>=
+
+      sql_strm << "create table Groups"
+               << endl
+               << "("
+               << endl
+               << "    group_id int primary key unique not null,"
+               << endl
+               << "    creator_id int not null references Users(user_id),"
+               << endl
+               << "    name varchar(64) unique not null,"
+               << endl
+               << "    created datetime"
+               << endl
+               << ")";
+
+      query_vector.push_back(sql_strm.str());
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(0);
+      sql_strm.str("");
+
+
+@q ***** (5) @>
+
+      sql_strm << "insert into Groups (group_id, creator_id, name, created)"
+               << endl
+               << "values"
+               << endl
+               << "(0, 0, 'NULL_GROUP', 0)";
+
+
+      comma_str = ",\n";
+
+      i = 1;
+
+      for (vector<string>::iterator iter = group_vector.begin();
+           iter != group_vector.end();
+           ++iter)
+      {
+          sql_strm << comma_str << "(" << i++ << ", 1, '" << *iter << "', now())";
+
+      }
+
+      query_vector.push_back(sql_strm.str());
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(new long int(0L));
+      comment_vector.push_back("insert Groups");
+
+      sql_strm.str("");
+
+@q **** (4) @>
+@
+@<|create_tables_gwirdsif| definition@>=
+
+      sql_strm << "create table Groups_Users"
+               << endl
+               << "("
+               << endl
+               << "    group_id int not null references Groups(group_id),"
+               << endl
+               << "    user_id  int not null references Users(user_id),"
+               << endl
+               << "    add_user_priv boolean not null default 0,"
+               << endl
+               << "    delete_user_priv  boolean not null default 0,"
+               << endl
+               << "    delete_group_priv boolean not null default 0"
+               << endl
+               << ")";
+
+      query_vector.push_back(sql_strm.str());
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(0);
+
+      sql_strm.str("");
+
+@q ***** (5) @>
+@
+@<|create_tables_gwirdsif| definition@>=
+
+      sql_strm << "insert into Groups_Users (group_id, user_id, "
+               << "add_user_priv, delete_user_priv, delete_group_priv)"
+               << endl
+               << "values"
+               << endl
+               << "(0, 0, 0, 0, 0)";
+
+      query_vector.push_back(sql_strm.str());
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(new long int(0L));
+      comment_vector.push_back("insert Groups_Users");
+
+      sql_strm.str("");
+
+@q **** (4) @>
+
+      sql_strm << "create view Group_Info as select"
+               << endl
+               << "   GU.group_id, G.name as group_name,"
+               << endl
+               << "   GU.user_id, U.username as 'username',"
+               << endl
+               << "   GU.add_user_priv, GU.delete_user_priv, GU.delete_group_priv,"
+               << endl
+               << "   G.creator_id, UU.username as creator_name, G.created"
+               << endl
+               << "from Groups as G, Users as U, Groups_Users as GU, Users as UU"
+               << endl
+               << "where G.group_id = GU.group_id and U.user_id = GU.user_id"
+               << endl
+               << "and G.creator_id = UU.user_id"
+               << endl
+               << "order by G.group_id, GU.user_id";
+
+      query_vector.push_back(sql_strm.str());
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(0);
+
+      sql_strm.str("");
+
+@q **** (4) @>
+@
+@<|create_tables_gwirdsif| definition@>=
+
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          cerr << "query_vector.size() == " << query_vector.size() << endl;
+
+          for (vector<string>::iterator iter = query_vector.begin();
+               iter != query_vector.end();
+               ++iter)
+          {
+              cerr << *iter << endl;
+
+          }  /* |for|  */
+
+          cerr << endl;
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */           
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2013.09.04.}
+Added this section.
+\ENDLOG
+
+@<|create_tables_gwirdsif| definition@>=
+
+      for (vector<string>::iterator iter = query_vector.begin();
+           iter != query_vector.end();
+           ++iter)
+      {
+
+          out_strm << *iter << ";" << endl << endl;
+
+      }
+
+@q **** (4) @>
+@
+@<|create_tables_gwirdsif| definition@>=
+
+      status = param.submit_mysql_queries(query_vector, 
+                                           result_array,
+                                           row_ctr_vector, 
+                                           field_ctr_vector, 
+                                           affected_rows_vector, 
+                                           false);
+
+      if (status != 0)
+      {
+           cerr << "ERROR!  In `create_tables_gwirdsif':  `submit_mysql_queries' failed, "
+                << "returning " << status << "."
+                << endl
+                << "Exiting `create_tables_gwirdsif' unsuccessfully with return value 1."
+                << endl;
+
+           delete_and_clear(result_array, 
+                            result_array_size, 
+                            row_ctr_vector, 
+                            field_ctr_vector,
+                            affected_rows_vector,
+                            query_vector);
+
+
+           out_strm << "/* Failed  */" 
+                    << endl << endl
+                    << "/* ***************************************"
+                    << "****************************** */"
+                << endl << endl;
+
+           return 1;
+
+      }  /* |if (status != 0)|  */
+
+@q **** (4) @>
+@
+@<|create_tables_gwirdsif| definition@>=
+
+#if DEBUG_COMPILE
+      else if (DEBUG)
+      {
+          cerr << "In `create_tables_gwirdsif':  `submit_mysql_queries' succeeded, returning 0."
+               << endl
+               << "Created tables in `" << gwirdsif_database_name << "' database successfully."
+               << endl;
+
+          int i = 0;
+          int j = 0;
+
+          for (vector<long int *>::iterator iter = affected_rows_vector.begin();
+               iter != affected_rows_vector.end();
+                ++iter)
+          {
+               if (*iter != 0)
+               {
+ 
+                  temp_strm.str("");
+                  temp_strm << "[" << i << "]";
+
+                  cerr << "*affected_rows_vector" << setw(4) << left << temp_strm.str() 
+                       << " == " 
+                       << *affected_rows_vector[i];
+
+                   if (comment_vector.size() > j)
+                      cerr  << "  " << comment_vector[j++];
+
+                   cerr << endl;
+               }
+
+               ++i;
+
+
+          }  /* |for|  */
+
+          temp_strm.str("");
+
+          cerr << endl;
+
+      }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|create_tables_gwirdsif| definition@>=
+
+       out_strm << "/* Succeeded  */" 
+                << endl << endl
+                << "/* ********************************************************************* */"
+                << endl << endl
+                << "/* !! TODO: Assign prefixes to users by inserting rows "
+                << "into the `Users_Prefixes' table.  "
+                << endl 
+                << "            Assign groups to users by inserting rows into the "
+                << "`Groups_Users' table."
+                << endl 
+                << "            Assign privileges by inserting rows into the "
+                << "`Privileges' table.  "
+                << "*/"
+                << endl << endl;
+
+       delete_and_clear(result_array, 
+                        result_array_size, 
+                        row_ctr_vector, 
+                        field_ctr_vector,
+                        affected_rows_vector,
+                        query_vector);
+
+       sql_strm.str("");
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+         cerr << "Exiting `create_tables_gwirdsif' successfully with return value 0."
+              << endl;
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       return 0;
+
+}  /* End of |create_tables_gwirdsif| definition  */
+
+@q ** (2) Garbage@>
+
+@ Garbage.  This section needs to exist, because it's included below.
+It can be used for temporarily (or permanently) commenting-out code.
+\initials{LDF 2013.09.05.}
+
+@<Garbage@>=
+#if 0
+   /* Empty  */
+#endif 
+
+@q ** (2) This is what's compiled.  @>
+
+@ This is what's compiled.  
+\initials{LDF 2013.09.03.}
+
+@c
+using namespace std;
+@<Include files@>@;@/
+using namespace gwrdifpk;
+@<|create_tables_gwirdsif| definition@>@;@/
+
+#if 0 
+@<Garbage@>@;@/
+#endif 
+
+@q ** (2) This is what's written to the header file `stpcdsif.h'.  @>
+
+@ This is what's written to the header file \filename{stpcdsif.h}.
+\initials{LDF 2013.09.03.}
+
+@(stpcdsif.h@>=
+#ifndef STPCDSIF_H
+#define STPCDSIF_H 1
+@<|create_tables_gwirdsif| declaration@>@;@/
+#endif 
+
+@q (progn (cweb-mode) (outline-minor-mode))                                @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+
+

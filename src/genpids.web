@@ -1,0 +1,1123 @@
+@q genpids.web @>
+@q [...]/Finston/gwrdifpk/src/genpids.web  @>
+
+@q Created by Laurence D. Finston (LDF) Tue Jul 17 12:06:33 CEST 2012  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q * (1) Generate PIDs (genpids.web).  @>
+
+@*  Generate PIDs (genpids\PERIOD web).
+
+\LOG
+\initials{LDF 2012.07.17.}
+Created this file.
+\ENDLOG 
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif 
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <string.h>
+#include <errno.h>
+#include <ctype.h>
+#include <limits.h>
+#include <sys/types.h>
+#include <pwd.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+#include <fstream>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <iterator>
+#include <string>
+#include <sstream>  
+#include <deque>  
+#include <map>  
+#include <set>
+#include <vector>  
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#include <mysql.h>
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "hndlvltp.h++"
+
+#include "rspnstp.h++"
+#include "irdsavtp.h++"
+#include "irdsobtp.h++"
+
+#include "hndltype.h++"
+#include "pidfncs.h++"
+#include "gpcmlopt.h++"
+
+@q * (1) Finish (exit handler).  @>
+@ Finish (exit handler).
+\initials{LDF 2012.07.17.}
+
+\LOG
+\initials{LDF 2012.07.17.}
+Added this function.
+
+\initials{LDF 2013.09.19.}
+Added code for unlocking the memory for |gpg_key_id| and |gpg_passphrase| 
+and deleting them.
+\ENDLOG
+
+@q ** (2) Definition  @>
+
+@<|finish| definition@>=
+void
+finish(void)
+{
+
+    bool DEBUG = false;  /* |true|  */
+    set_debug_level(DEBUG, 0, 0);
+
+    int status;
+
+#if DEBUG_COMPILE 
+    if (DEBUG) 
+    {
+        cerr << "[genpids] Entering `finish'." << endl;
+    }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ** (2) @>
+
+   if (gpg_key_id != 0)
+   {
+       memset(gpg_key_id, 0, 10); 
+       munlock(gpg_key_id, 10);
+       delete[] gpg_key_id;
+       gpg_key_id = 0;
+        
+   }
+
+   if (gpg_passphrase != 0)
+   {
+       memset(gpg_passphrase, 0, gpg_passphrase_length);
+       munlock(gpg_passphrase, gpg_passphrase_length);
+       delete[] gpg_passphrase;
+       gpg_passphrase = 0;
+        
+   }
+
+   if (mysql_password != 0)
+   {
+       memset(mysql_password, 0, MYSQL_PASSWORD_LENGTH);
+       munlock(mysql_password, MYSQL_PASSWORD_LENGTH);
+       delete[] mysql_password;
+       mysql_password = 0;
+       
+   }
+
+   pthread_mutex_destroy(&cerr_mutex);
+
+#if DEBUG_COMPILE 
+   if (DEBUG) 
+   {
+       cerr << "[genpids] Exiting `finish'." << endl;
+   }
+#endif  /* |DEBUG_COMPILE|  */ 
+   return;
+
+}   /* End of |finish| definition  */
+
+@q *** (3) Global variables.  @>
+
+@ Global variables.
+\initials{LDF 2013.10.30.}
+
+\LOG
+\initials{LDF 2013.10.30.}
+Added this section.
+\ENDLOG
+
+@<genpids global variables@>=
+
+string pid_str;
+string prefix_str;
+string institute_str;
+string suffix_additional_str;
+string fifo_pathname;
+long int user_id = -1;
+string username; 
+unsigned int number_of_pids = 1;
+vector<Handle_Value_Triple> hvt_vector;
+Handle_Value_Triple hvt;
+bool query_database = false;
+
+@q *** (3) Main definition.  @>
+
+@ Main definition.
+\initials{LDF 2012.07.13.}
+
+@<|main| definition@>=
+int
+main(int argc, char *argv[])
+{
+@q **** (4) @>
+
+   int status;
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0);
+
+   MYSQL *mysql_ptr = 0;
+
+   stringstream sql_strm;
+
+   stringstream temp_strm;
+
+   MYSQL_RES* result      = 0;
+   MYSQL_ROW curr_row;
+
+   unsigned int row_ctr   = 0;
+   unsigned int field_ctr = 0;
+
+
+   pthread_mutex_init(&cerr_mutex, 0);  
+
+
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2013.02.22.}
+Added this section.
+\ENDLOG
+
+@<|main| definition@>=
+
+   Handle_Value_Type::initialize_maps();
+
+@q **** (4) @>
+@
+@<|main| definition@>=
+
+     status = process_command_line_options_genpids(argc, argv, mysql_ptr); 
+
+     if (status != 0)
+     {
+         cerr << "[genpids] ERROR!  In `main':  `process_command_line_options_genpids' "
+              << "failed, returning " << status << "."
+              << endl
+              << "Exiting `genpids' unsuccessfully with exit status 1."
+              << endl;
+
+          mysql_close(mysql_ptr); 
+          mysql_library_end();
+
+          exit(1);
+
+     }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+     else if (DEBUG)
+     {
+         cerr << "[genpids] In `main':  `process_command_line_options_genpids' "
+              << "succeeded, returning 0."
+              << endl;
+
+     }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q **** (4) @>
+@
+@<|main| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       cerr << "[genpids] In `process_command_line_options_genpids':  " << endl
+            << "Variables set by means of command-line arguments or otherwise:"
+            << endl 
+            << "pid_str               == " << pid_str << endl
+            << "prefix_str            == " << prefix_str << endl 
+            << "institute_str         == " << institute_str << endl 
+            << "suffix_additional_str == " << suffix_additional_str << endl 
+            << "number_of_pids        == " << number_of_pids << endl 
+            << "fifo_pathname         == " << fifo_pathname << endl 
+            << "user_id               == " << user_id << endl 
+            << "username              == " << username << endl
+            << "suppress_prompt       == " << suppress_prompt 
+            << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+   if (!pid_str.empty() && !suffix_additional_str.empty())
+   {
+       cerr << "[genpids] WARNING!  In `main':  `pid_str' and `suffix_str_additional' are "
+            << "both non-empty."
+            << endl
+            << "Ignoring `suffix_str_additional'.  Continuing."
+            << endl;
+   }
+
+   if (!pid_str.empty() && number_of_pids > 1)
+   {
+       cerr << "[genpids] WARNING!  In `main':  `pid_str' is non-empty and `number_of_pids' == "
+            << number_of_pids << " (> 1)"
+            << endl
+            << "Ignoring `number_of_pids'.  Will only create one PID.  Continuing."
+            << endl;
+   }
+
+
+@q **** (4) Query for MySQL password.  @>
+
+@ Query for MySQL password.  
+\initials{LDF 2013.10.29.}
+
+
+@:NOTE@> !! PLEASE NOTE:  This code is rather simple-minded without
+any of the possible refinements.  The MySQL password may be typed in in response 
+to the query below, but this is not particulary secure, since it will be echoed 
+on the terminal. However, it may also be passed to \.{genpids} through a pipe.
+This isn't any more secure, if its just ``echoed'', but \.{gpg} may be used to 
+decrypt an encrypted password.  Then, the decrypted password may be passed to \.{genpids}
+from the standard output of \.{gpg}.
+\par
+The query will still be printed to standard output, because there is currently 
+no way to suppress it.
+\par
+This program isn't intended for intensive use, so I don't see any reason to implement too
+many refinements at the present time.
+\initials{LDF 2013.10.29.}
+       
+\LOG
+\initials{LDF 2013.10.29.}
+Added this section.
+\ENDLOG
+
+@<|main| definition@>=
+
+   string temp_str;
+
+   mysql_password = new char[MYSQL_PASSWORD_LENGTH];
+   memset(mysql_password, 0, MYSQL_PASSWORD_LENGTH);
+   mlock(mysql_password, MYSQL_PASSWORD_LENGTH);
+
+   if (suppress_prompt == 0U)
+      cout << "Enter MySQL password:  ";
+
+   cin >> mysql_password;
+
+   cout << endl;
+
+@q **** (4) Initialize the MySQL library.  @>
+
+@ Initialize the MySQL library.  
+\initials{LDF 2012.07.13.}
+
+@<|main| definition@>=
+
+    if (mysql_library_init(0, NULL, NULL)) 
+    {
+        cerr << "[genpids] In `main':  ERROR!  In `main':  Failed to initialize the MySQL library."
+             << endl
+             << "Exiting `genpids' unsuccessfully with exit status 1."
+             << endl;
+        exit(1);
+
+    }
+#if DEBUG_COMPILE 
+    else if (DEBUG)
+    {
+        cerr << "[genpids] In `main':  mysql_library_init succeeded." << endl;
+    }  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|main| definition@>=
+
+      mysql_ptr = mysql_init(0);
+
+      if (mysql_ptr)
+      {
+#if DEBUG_COMPILE 
+         if (DEBUG)
+         {
+            cerr << "[genpids] In `main':  `mysql_init' succeeded."
+                 << endl;
+         }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+      }  /* |if (mysql_ptr)| */
+
+      else
+      {
+         cerr << "[genpids] ERROR!  In `main':"
+              << endl
+              << "`mysql_init' failed.  Exiting `genpids' unsuccessfully with "
+              << "exit status 1."
+              << endl;
+         mysql_library_end(); 
+         exit(1);
+
+      }
+
+@q **** (4) Connect to the database server.  @>
+
+@ Connect to the database server.  
+\initials{LDF 2012.07.13.}
+
+@<|main| definition@>=
+
+     if (!mysql_real_connect(mysql_ptr, 
+                             0, 
+                             "root", 
+                             mysql_password,
+                             0,
+                             0, 
+                             "/var/run/mysql/mysql.sock", 0))
+      {
+         cerr << "[genpids] ERROR!  In `main':" 
+              << endl
+              << "`mysql_real_connect' failed.  "
+              << "Error:  " << mysql_error(mysql_ptr)
+              << endl 
+              << "Exiting `genpids' unsuccessfully with exit status 1."
+              << endl;
+          mysql_close(mysql_ptr); 
+          mysql_library_end();
+          exit(1);
+
+      }
+#if DEBUG_COMPILE 
+      else if (DEBUG)
+      {
+         cerr << "[genpids] In `main':  `mysql_real_connect' succeeded."
+              << endl; 
+      } 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q **** (4) If |username.empty()|, get system username. @>
+@ If |username.empty()|, get system username.
+\initials{LDF 2013.02.27.}
+
+\LOG
+\initials{LDF 2013.02.27.}
+Added this section.
+\ENDLOG
+
+@<|main| definition@>=
+
+   if (username.empty())
+   {
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           cerr << "[genpids] In `main':  `username' is empty.  Will call `getpwuid_r' "
+                << "to get username."
+                << endl;
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+       struct passwd pwd;
+       struct passwd *res;
+       char *buf;
+       size_t bufsize;
+       int s;
+
+       bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+
+       if (bufsize == -1)          /* Value was indeterminate */
+           bufsize = 16384;        /* Should be more than enough */
+
+       errno = 0;
+       buf = static_cast<char*>(malloc(bufsize)); 
+
+       if (buf == 0) 
+       {
+           cerr << "[genpids] ERROR!  In `main':  `malloc' failed:"
+                << endl 
+                << strerror(errno)
+                << endl 
+                << "Failed to set `username'.  Exiting `genpids' unsuccessfully with "
+                << "exit status 1."
+                << endl;
+
+            mysql_close(mysql_ptr); 
+            mysql_library_end(); 
+
+            exit(1);
+
+       }  /* |if (buf == NULL) |  */
+
+@q ***** (5) @>
+
+       errno = 0;
+       s = getpwuid_r(getuid(), &pwd, buf, bufsize, &res);
+   
+       if (res == 0) 
+       {
+           if (s == 0)
+           {
+               cerr << "[genpids] ERROR!  In `main':  `getpwuid_r' set `res' to 0."
+                    << endl 
+                    << "Failed to set `username'.  Exiting `genpids' unsuccessfully with "
+                    << "exit status 1."
+                    << endl;
+
+           }
+           else 
+           {
+               cerr << "[genpids] ERROR!  In `main':  `getpwuid_r' failed, returning " << s << ":"
+                    << endl 
+                    << strerror(errno)
+                    << endl 
+                    << "Exiting `genpids' unsuccessfully with "
+                    << "exit status 1."
+                    << endl;
+           }
+
+           mysql_close(mysql_ptr); 
+           mysql_library_end(); 
+
+           exit(1);
+
+       }  /* |if (res == 0)|  */
+
+@q ***** (5) @>
+
+       if (pwd.pw_name == 0 || strlen(pwd.pw_name) == 0)
+       {
+           cerr << "[genpids] ERROR!  In `main':  `pwd.pw_name' is NULL or empty."
+                << endl 
+                << "Failed to set `username'.  "
+                << "Exiting `genpids' unsuccessfully with "
+                << "exit status 1."
+                << endl;
+
+           mysql_close(mysql_ptr); 
+           mysql_library_end(); 
+
+           exit(1);
+
+       }  /* |if (pwd.pw_name == 0 || strlen(pwd.pw_name))|  */
+
+@q ***** (5) @>
+@
+@<|main| definition@>=
+
+       username = pwd.pw_name;
+
+       free(buf);
+       buf = 0;
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           cerr << "`username' == " << username << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+   }  /* |if (username.empty())|  */
+
+@q **** (4) If |user_id <= 0|, look up |user_id| in `gwirdsif.Users' database table.  @>
+
+@ If |user_id <= 0|, look up |user_id| in `gwirdsif.Users' database table.  
+\initials{LDF 2013.02.27.}
+
+\LOG
+\initials{LDF 2013.02.27.}
+Added this section.
+\ENDLOG
+
+@<|main| definition@>=
+
+   if (user_id <= 0)
+   {
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           cerr << "[genpids] In `main':  `user_id' == " << user_id << " (<= 0)"
+                << endl 
+                << "Will look up `user_id' for `username' == `" << username << "'."
+                << endl;
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|main| definition@>=
+
+       sql_strm << "select user_id from gwirdsif.Users where username = '" << username << "'";
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+       status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, &row_ctr, &field_ctr);
+
+       if (status != 0)
+       {
+           cerr << "[genpids] ERROR!  In `main':  `submit_mysql_query' failed, returning "
+                << status << "."
+                << endl 
+                << "Failed to retrieve `user_id' for `username' == `" << username << "' "
+                << "from `gwirdsif.Users' database table."
+                << endl
+                << "Exiting `genpids' unsuccessfully with "
+                << "exit status 1."
+                << endl;
+
+           if (result)
+           {
+               mysql_free_result(result);
+           }
+
+           mysql_close(mysql_ptr); 
+           mysql_library_end(); 
+
+           exit(1);
+
+       }  /* |if (status != 0)|  */
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           cerr << "[genpids] In `main':  `submit_mysql_query' succeeded, returning 0."
+                << endl;
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|main| definition@>=
+
+      if (row_ctr == 0)
+      {
+           cerr << "[genpids] ERROR!  In `main':  `submit_mysql_query' returned 0 rows."
+                << endl 
+                << "Failed to retrieve `user_id' for `username' == `" << username << "' "
+                << "from `gwirdsif.Users' database table."
+                << endl
+                << "Exiting `genpids' unsuccessfully with "
+                << "exit status 1."
+                << endl;
+
+           mysql_free_result(result);
+
+           mysql_close(mysql_ptr); 
+           mysql_library_end(); 
+
+           exit(1);
+
+      }  /* |if (row_ctr == 0)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+      else if (DEBUG)
+      {
+          cerr << "[genpids] In `main':  `submit_mysql_query' returned " << row_ctr << " rows."
+               << endl;
+
+      }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|main| definition@>=
+
+      curr_row = mysql_fetch_row(result);
+
+      if (curr_row == 0)
+      {
+          cerr << "[genpids] ERROR!  In `main':"
+               << endl
+               << "`mysql_fetch_row' failed, returning NULL:"
+               << endl
+               << "MySQL error:  " << mysql_error(mysql_ptr)
+               << endl
+               << "Exiting `genpids' unsuccessfully with exit status 1."
+               << endl;
+
+          
+          mysql_free_result(result);
+
+          mysql_close(mysql_ptr); 
+          mysql_library_end(); 
+  
+          exit(1);
+
+
+      }  /* |if (curr_row == 0)|  */
+
+
+@q ***** (5) @>
+@
+@<|main| definition@>=
+
+#if DEBUG_COMPILE
+      else if (DEBUG) 
+      {
+          cerr << "[genpids] In `main':"
+               << endl
+               << "`mysql_fetch_row' succeeded."
+               << endl
+               << "`curr_row[0]' == " << curr_row[0]
+               << endl;
+
+      }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|main| definition@>=
+
+      errno = 0;
+      user_id = strtol(curr_row[0], 0, 10);
+
+      if (user_id == LONG_MIN || user_id == LONG_MAX)
+      {
+          cerr << "[genpids] ERROR!  In `main':"
+               << endl
+               << "`strtol' failed, returning ";
+
+          if (user_id == LONG_MIN)
+             cerr << "`LONG_MIN':" << endl;
+          else 
+             cerr << "`LONG_MAX':" << endl;
+
+          cerr << strerror(errno)
+               << endl
+               << "Exiting `genpids' unsuccessfully with exit status 1."
+               << endl;
+          
+          mysql_free_result(result);
+
+          mysql_close(mysql_ptr); 
+          mysql_library_end(); 
+  
+          exit(1);
+
+      }  /* |if (user_id == LONG_MIN || user_id == LONG_MAX)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+      else if (DEBUG)
+      {
+          cerr << "[genpids] In `main':"
+               << endl
+               << "`strtol' succeeded.  `user_id' == " << user_id << "."
+               << endl;
+      }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+
+      mysql_free_result(result);
+      result = 0;
+
+   }  /* |if (user_id <= 0)|  */
+
+@q **** (4) @>
+@
+@<|main| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       cerr << "[genpids] In `main':  `user_id' == " << user_id << " (> 0)"
+            << endl 
+            << "Not looking up `user_id' for `username' == `" << username << "'."
+            << endl;
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|main| definition@>=
+
+   if (prefix_str.empty() && pid_str.find("/") == string::npos)
+   {
+      char *temp_str = 0;
+
+      temp_str = getenv("HOSTNAME");
+
+      if (temp_str == 0 || strncmp(temp_str, "pcfinston", strlen("pcfinston")) == 0)
+         prefix_str = "12345"; 
+      else
+         prefix_str = "00001";
+
+   }  /* |if (prefix_str.empty() && pid_str.find("/") == string::npos)|  */
+
+
+@q **** (4) Generate PIDs.  @>
+@ Generate PIDs.  
+\initials{LDF 2012.09.28.}
+
+\LOG
+\initials{LDF 2012.09.28.}
+Added this section.
+
+\initials{LDF 2013.01.28.}
+Now writing |pid_str| to |cout|.
+
+\initials{LDF 2013.02.15.}
+Now passing |string fifo_pathname| to |generate_pids| as an argument.
+
+\initials{LDF 2013.02.22.}
+Now passing |long int user_id| and |string username| to |generate_pids| as arguments.
+\ENDLOG
+
+@<|main| definition@>=
+
+     vector<string> pid_vector;
+
+     vector<Handle_Type> handle_vector;
+
+     bool standalone_hs = true; /* |false|  
+                                    |true| for use with standalone handle server,
+                                    otherwise |false|.  
+                                    \initials{LDF 2012.09.28.}  */
+
+     status = generate_pids(mysql_ptr, 
+                            prefix_str,
+                            pid_str, 
+                            &pid_vector,
+                            number_of_pids,
+                            0,
+                            0, 
+                            standalone_hs,
+                            institute_str, 
+                            suffix_additional_str,
+                            &handle_vector,
+                            fifo_pathname,
+                            user_id,
+                            username);
+
+     if (status != 0)
+     {
+         cerr << "[genpids] ERROR!  In `main':  `generate_pids' failed, returning "
+                  << status << "." 
+                  << endl
+                  << "Exiting `genpids' unsuccessfully with exit status 1."
+                  << endl;
+         mysql_close(mysql_ptr); 
+         mysql_library_end();
+         exit(1);
+
+     }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+        cerr << "[genpids] In `main':  `generate_pids' succeeded, returning 0."
+             << endl
+             << "`pid_str' == " << pid_str << "."
+             << endl
+             << "`pid_vector.size()' == " << pid_vector.size()
+             << endl;
+
+         for (int i = 0; i < pid_vector.size(); ++i)
+         {
+              
+             cerr << "pid_vector[" << i << "] == " << pid_vector[i] << endl;
+         }
+
+         cerr << endl;
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   if (pid_vector.size() > 0)
+   {
+
+       for (int i = 0; i < pid_vector.size(); ++i)
+       {
+           cout << pid_vector[i] << endl;
+       }   
+
+   }
+   else 
+   {
+      cout << pid_str << endl;
+   }
+
+@q **** (4) @>
+@
+\LOG
+\initials{LDF 2013.02.22.}
+Added this section.
+\ENDLOG
+
+@<|main| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+        cerr << "[genpids] In `main':"
+             << endl
+             << "`handle_vector.size()' == " << handle_vector.size()
+             << endl;
+
+         for (int i = 0; i < handle_vector.size(); ++i)
+         {
+             cerr << "`handle_vector['" << i << "]:"
+                  << endl;
+ 
+             handle_vector[i].show();
+         }
+
+         cerr << endl;
+
+         cerr << "`hvt_vector.size()':  " << hvt_vector.size() << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+   if (handle_vector.size() > 0 && hvt_vector.size() > 0)
+   {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           cerr << "[genpids] In `main':"
+                << endl
+                << "`handle_vector.size()' == " << handle_vector.size() << " (> 0) and"
+                << endl 
+                << "`hvt_vector.size()'    == " << hvt_vector.size() << " (> 0)"
+                << endl
+                << "Will call `Handle_Type::add_values' on the members of "
+                << "`handle_vector'."
+                << endl
+                << "`user_id' == " << user_id << endl;
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+       for(vector<Handle_Type>::iterator iter = handle_vector.begin();
+           iter != handle_vector.end();
+           ++iter)
+       {
+@q ******* (7) @>
+
+           status = iter->add_values(mysql_ptr, hvt_vector, user_id);
+
+           if (status != 0)
+           {
+               cerr << "[genpids] ERROR!  In `main':"
+                    << endl
+                    << "`Handle_Type::add_values' failed, returning " << status << "."
+                    << endl 
+                    << "Failed to add handle values to handle `" << iter->handle << "'."
+                    << endl
+                    << "Exiting `genpids' unsuccessfully with exit status 1."
+                    << endl;
+
+               mysql_close(mysql_ptr); 
+               mysql_library_end();
+               exit(1);
+
+           }  /* |if (status != 0)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+           else if (DEBUG)
+           {
+               cerr << "[genpids] In `main':"
+                    << endl
+                    << "`Handle_Type::add_values' succeeded, returning 0."
+                    << endl 
+                    << "Added handle values to handle `" << iter->handle << "' successfully."
+                    << endl;
+
+           }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+       }  /* |for|  */
+
+@q ****** (6) @>
+
+   }  /* |if (handle_vector.size() > 0 && hvt_vector.size() > 0)|  */
+
+@q ***** (5) @>
+@
+@<|main| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       cerr << "[genpids] In `main':"
+            << endl
+            << "`hvt_vector.size()' == " << hvt_vector.size() << " and"
+            << endl 
+            << "`hvt_vector.size()' == " << hvt_vector.size() << "."
+            << endl
+            << "Either `handle_vector' or `hvt_vector' or both are empty."
+            << endl 
+            << "Not calling `Handle_Type::add_values' on the "
+            << "members (if any) of `handle_vector'."
+            << endl;
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+@q **** (4) @>
+@
+@<|main| definition@>=
+
+   if (query_database && pid_vector.size() > 0 )
+   {
+       temp_strm.str();
+
+       temp_strm << "echo \"select * from handlesystem";
+
+       if (standalone_hs)
+           temp_strm << "_standalone";
+
+       temp_strm << ".handles where handle in (";
+
+       string comma_str;
+
+       for (int i = 0; i < pid_vector.size(); ++i)
+       {
+           temp_strm << comma_str << "'" << pid_vector[i] << "'";
+
+           comma_str = ", ";
+       }
+
+       temp_strm << ") order by handle_id\\G\" | mysql --user=root --password="
+                 << mysql_password;
+
+       system(temp_strm.str().c_str());
+           
+   }  /* |if (query_database && pid_vector.size() > 0 )|  */
+
+@q **** (4) @>
+@
+@<|main| definition@>=
+
+   mysql_close(mysql_ptr); 
+   mysql_library_end();
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       cerr << "[genpids] In `main':  Exiting `genpids' successfully with exit status 0."
+            << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   exit(0);
+
+}  /* End of |main| definition  */
+
+
+@q ** (2) Putting Generate PIDs together.  @>
+
+@ Putting Generate PIDs together.  
+\initials{LDF 2012.07.13.}
+
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+@<|finish| definition@>@;@/
+@<genpids global variables@>@;@/
+@<|main| definition@>@;@/
+
+@q (progn (cweb-mode) (outline-minor-mode))                           @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

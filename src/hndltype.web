@@ -1,0 +1,4517 @@
+@q hndltype.web @>
+
+@q Created by Laurence D. Finston (LDF) Fri Oct 12 13:06:29 CEST 2012  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q * (1) Handle_Type (hndltype.web).  @>
+
+@*  \.{Handle\_Type} (hndltype\PERIOD web).
+
+\LOG
+\initials{LDF 2012.10.12.}
+Added this file.
+\ENDLOG
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif 
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stddef.h>
+#include <unistd.h>
+#include <limits.h>
+
+#if 0 
+#include <sys/stat.h>
+#include <sys/time.h>
+#endif 
+
+#include <time.h>
+
+#include <sys/types.h>
+
+#if 0 
+#include <dirent.h>
+#endif 
+
+#include <string.h>
+#if 0 
+#include <pwd.h>
+#endif 
+
+#include <errno.h>
+
+#include <pthread.h>
+
+#include <fstream>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <string>
+#include <sstream>  
+#include <deque>    
+#include <map>   
+#include <set>   
+#include <vector>   
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+#include <mysql.h>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#undef NAME_LEN
+#undef LOCAL_HOST
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "rspercds.h++"
+#include "utilfncs.h++"
+
+#include "parser.h++"
+#include "scanner.h++"
+#include "hndlvltp.h++"
+#include "rspnstp.h++"
+#include "irdsavtp.h++"
+#include "irdsobtp.h++"
+
+@q ** (2) |class Handle_Type|.  @>
+@ |class Handle_Type|.
+\initials{LDF 2013.02.27.}
+
+\LOG
+\initials{LDF 2013.02.27.}
+Added this class declaration.  I have renamed the previous |class Handle_Type| 
+to |Handle_Value_Type| (see above).
+
+\initials{LDF 2013.08.12.}
+Added |friend| declaration for |Irods_Object_Type::mark_for_deletion|.
+
+\initials{LDF 2013.08.14.}
+Added |friend| declaration for |Irods_Object_Type::delete_from_gwirdsif_db|.
+
+\initials{LDF 2013.08.15.}
+Added |friend| declaration for |Irods_Object_Type::add_handle_value|.
+
+\initials{LDF 2013.08.22.}
+Added |bool marked_for_deletion|.
+
+\initials{LDF 2013.11.28.}
+Added |friend| declaration for |purge_dc_metadata|.
+\ENDLOG
+
+@<Declare |class Handle_Type|@>=
+
+class Handle_Type
+{
+
+    friend class Scan_Parse_Parameter_Type;
+
+    friend int main(int argc, char *argv[]);
+
+    friend int generate_pids(MYSQL *mysql_ptr,
+                             string prefix_str,
+                             string &pid_str,
+                             vector<string> *pid_vector_ptr,
+                             unsigned int number_of_pids,
+                             vector<unsigned long int> *handle_id_vector_ptr,
+                             vector<unsigned long int> *handle_value_id_vector_ptr,
+                             bool standalone_hs,
+                             string institute_str,
+                             string suffix_str,
+                             vector<Handle_Type> *handle_vector,
+                             string fifo_pathname,
+                             long int user_id,
+                             string username);
+
+    friend int exchange_data_with_client (Scan_Parse_Parameter_Type &param);
+
+    friend int Irods_Object_Type::mark_for_deletion(
+                                                vector<Irods_Object_Type> &irods_object_vector,
+                                                MYSQL *&mysql_ptr, 
+                                                Response_Type &response,
+                                                int user_id,
+                                                string irods_env_filename,
+                                                time_t &save_delay,
+                                                string thread_str,
+                                                bool wake_purge_thread);
+
+    friend int Irods_Object_Type::delete_from_archive(MYSQL *&mysql_ptr, 
+                                                      string thread_str);
+
+
+    friend int Irods_Object_Type::delete_from_gwirdsif_db(MYSQL *&mysql_ptr, 
+                                                          string thread_str);
+
+
+    friend int Irods_Object_Type::add_handle_value(Handle_Type &handle,
+                                                   MYSQL *&mysql_ptr,
+                                                   string old_type_str,
+                                                   string path, 
+                                                   unsigned int index,
+                                                   string new_type_str,
+                                                   string data_str,
+                                                   string thread_str);
+
+
+    friend void *purge_dc_metadata(void *v);
+
+    string handle;
+    unsigned long int handle_id;
+
+    map<unsigned long int, Handle_Value_Type> handle_value_map;
+
+    public:
+
+    @<|class Handle_Type| function declarations@>@;
+
+};
+
+@q *** (3) |class Handle_Type| functions  @>
+@ |class Handle_Type| functions.
+
+@q **** (4) Default constructor.  @>
+@ Default constructor. 
+\initials{LDF 2013.02.27.}
+
+\LOG
+\initials{LDF 2013.02.27.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration @>
+
+@<|class Handle_Type| function declarations@>=
+
+Handle_Type(void);
+
+@q ***** (5) Definition  @>
+@
+@<|Handle_Type| constructor definitions@>=
+
+Handle_Type::Handle_Type(void)
+{
+
+    handle_id = 0;
+
+    return;
+
+}
+
+@q **** (4) Copy constructor.  @>
+@ Copy constructor. 
+\initials{LDF 2013.02.27.}
+
+\LOG
+\initials{LDF 2013.02.27.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration @>
+
+@<|class Handle_Type| function declarations@>=
+
+Handle_Type(const Handle_Type &h);
+
+@q ***** (5) Definition  @>
+@
+@<|Handle_Type| constructor definitions@>=
+
+Handle_Type::Handle_Type(const Handle_Type &h)
+{
+
+    bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `Handle_Type' copy constructor." << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+    operator=(h);
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `Handle_Type' copy constructor." << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    
+    return;
+
+}
+
+@q **** (4) Assignment operator.  @>
+@ Assignment operator.
+\initials{LDF 2013.02.27.}
+
+\LOG
+\initials{LDF 2013.02.27.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration @>
+
+@<|class Handle_Type| function declarations@>=
+
+void
+operator=(const Handle_Type &h);
+
+@q ***** (5) Definition  @>
+@
+@<|Handle_Type::operator=| definition@>=
+
+void
+Handle_Type::operator=(const Handle_Type &h)
+{
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `Handle_Type' assignment operator." << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    handle = h.handle;
+    handle_id = h.handle_id;
+
+    unsigned long int idx;
+    Handle_Value_Type handle_value;
+
+    for (map<unsigned long int, Handle_Value_Type>::const_iterator iter 
+            = h.handle_value_map.begin();
+         iter != h.handle_value_map.end();
+         ++iter)
+    {
+
+        handle_value.clear();
+    
+        idx = iter->first;
+        handle_value = iter->second;
+
+        handle_value_map.insert(make_pair(idx, handle_value));
+
+    }
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `Handle_Type' assignment operator." << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    
+    return;
+
+}  /* End of |Handle_Type::operator=| definition  */
+
+
+@q **** (4) Clear  @>
+@ Clear.
+\initials{LDF 2013.02.27.}
+
+\LOG
+\initials{LDF 2013.02.27.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|class Handle_Type| function declarations@>=
+
+void
+clear(void);
+
+@q ***** (5) Definition  @>
+@
+@<|Handle_Type::clear| definition@>=
+
+void
+Handle_Type::clear(void)
+{
+    handle = "";
+    handle_id = 0;
+    handle_value_map.clear();
+}
+
+@q **** (4) Show  @>
+@ Show.
+\initials{LDF 2013.02.27.}
+
+\LOG
+\initials{LDF 2013.02.27.}
+Added this function.
+
+\initials{LDF 2013.03.07.}
+Added optional argument |stringstream *strm = 0|.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|class Handle_Type| function declarations@>=
+
+void
+show(string s = "Handle_Type:", stringstream *strm = 0) const;
+
+@q ***** (5) Definition  @>
+@
+@<|Handle_Type::show| definition@>=
+
+void
+Handle_Type::show(string s, stringstream *strm) const
+{
+
+    stringstream temp_strm;
+    stringstream temp_strm_1;
+
+    temp_strm << s << endl 
+              << "handle ==                  " << handle
+              << endl 
+              << "handle_id ==               " << handle_id
+              << endl 
+              << "handle_value_map.size() == " << handle_value_map.size() 
+              << endl;
+
+    int i = 0;
+  
+    for (map<unsigned long int, Handle_Value_Type>::const_iterator iter 
+            = handle_value_map.begin();
+         iter != handle_value_map.end();
+         ++iter)
+    {
+         temp_strm_1.str("");
+
+         temp_strm_1 << "Handle_Value_Type " << i++ << ":";
+
+         iter->second.show(temp_strm_1.str(), &temp_strm);
+    }
+
+    if (strm)
+       *strm << temp_strm.str();
+    else
+      cerr << temp_strm.str();
+        
+    return;
+        
+
+}  /* End of |Handle_Type::show| definition  */
+
+@q *** (3) Add handle value (|add_value|).  @>
+@ Add handle value (|add_value|)
+\initials{LDF 2013.02.27.}
+
+\LOG
+\initials{LDF 2013.02.27.}
+Added this function.
+
+\initials{LDF 2013.07.03.}
+Added optional argument |Handle_Value_Triple *return_hvt = 0|.
+
+\initials{LDF 2013.11.28.}
+Added optional argument |bool lock_tables = true|.  This function is called
+in |purge_dc_metadata|, which also locks database tables.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|class Handle_Type| function declarations@>=
+int
+add_value(MYSQL *mysql_ptr, 
+          int iidx, 
+          string ttype, 
+          string ddata_str, 
+          int user_id, 
+          Handle_Value_Triple *return_hvt = 0,
+          bool lock_tables = true);
+
+@q **** (4) Definition  @>
+@
+@<|Handle_Type::add_value| definition@>=
+int
+Handle_Type::add_value(MYSQL *mysql_ptr, 
+                             int iidx, 
+                             string ttype, 
+                             string ddata_str, 
+                             int user_id,
+                             Handle_Value_Triple *return_hvt,
+                             bool lock_tables)
+{
+@q ***** (5) @>
+    
+
+     bool DEBUG = false;  /* |true|  */
+     set_debug_level(DEBUG, 0, 0); 
+
+     int status;
+
+#if DEBUG_COMPILE
+     if (DEBUG)
+     {
+         lock_cerr_mutex(); 
+         cerr << "Entering `Handle_Type::add_value'."
+              << endl;
+    
+         show("*this:");
+
+         unlock_cerr_mutex(); 
+
+     }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+     Handle_Value_Triple hvt;
+     vector<Handle_Value_Triple> hvt_vector;
+
+     vector<Handle_Value_Triple> return_hvt_vector;
+
+     hvt.idx = iidx;
+     hvt.type = ttype;
+     hvt.data_str = ddata_str;
+
+     hvt_vector.push_back(hvt);
+
+     status = add_values(mysql_ptr, hvt_vector, user_id, &return_hvt_vector, lock_tables);
+
+     if (status != 0)
+     {
+         lock_cerr_mutex(); 
+         cerr << "ERROR!  In `Handle_Type::add_value':  "
+              << "`Handle_Type::add_values' failed, "
+              << "returning " << status << "."
+              << endl
+              << "Exiting function unsuccessfully with return value " << status << "."
+               << endl;
+         unlock_cerr_mutex(); 
+
+     }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+
+     else  /* |status == 0|  */
+     {
+@q ****** (6) @>
+
+         if (return_hvt)
+         {
+             *return_hvt = return_hvt_vector.back();
+
+         }  /* |if (return_hvt)|  */
+ 
+#if DEBUG_COMPILE
+        if (DEBUG)
+         {
+             lock_cerr_mutex(); 
+             cerr << "In `Handle_Type::add_value':  `Handle_Type::add_values' succeeded, "
+                  << "returning 0."
+                  << endl;
+ 
+             if (return_hvt)
+                return_hvt->show("*return_hvt:");
+             else
+                cerr << "`return_hvt' is NULL."
+                     << endl;
+ 
+             cerr << "Exiting function successfully with return value 0."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+         }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+     }  /* |else| (|status == 0|)  */
+
+@q ***** (5) @>
+
+     return status;  
+
+}  /* End of |Handle_Type::add_value| definition   */
+
+@q *** (3) Add handle values (|add_values|).  @>
+@ Add handle values (|add_values|)
+\initials{LDF 2013.02.27.}
+
+\LOG
+\initials{LDF 2013.02.27.}
+Added this function.
+
+\initials{LDF 2013.02.28.}
+Revised this function.  It now replaces |Handle_Value_Type::add_values|.  It contains
+slightly modified code from the latter function.
+
+\initials{LDF 2013.07.03.}
+Added optional argument |vector<Handle_Value_Triple> *return_hvt_vector = 0|.
+
+\initials{LDF 2013.11.28.}
+Added optional argument |bool lock_tables = true|.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|class Handle_Type| function declarations@>=
+int
+add_values(MYSQL *mysql_ptr, 
+           vector<Handle_Value_Triple> hvt_vector, 
+           int user_id,
+           vector<Handle_Value_Triple> *return_hvt_vector = 0,
+           bool lock_tables = true);
+
+@q **** (4) Definition  @>
+@
+@<|Handle_Type::add_values| definition@>=
+int
+Handle_Type::add_values(MYSQL *mysql_ptr, 
+                        vector<Handle_Value_Triple> hvt_vector, 
+                        int user_id,
+                        vector<Handle_Value_Triple> *return_hvt_vector,
+                        bool lock_tables)
+{
+
+@q ***** (5) @>
+    
+   bool DEBUG = false;  /* |true|  */ 
+
+   set_debug_level(DEBUG, 0, 0);
+
+   int status = 0;
+
+   int ret_val = 0;
+
+   MYSQL_RES *result = 0;
+   MYSQL_ROW curr_row;
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+   long int affected_rows;
+
+   Handle_Value_Type curr_handle_value;
+
+   unsigned long curr_handle_value_id;
+
+   stringstream sql_strm;
+
+   map<int, string> curr_idx_type_map;
+
+   map<int, string>::iterator map_iter;
+   map<int, string>::iterator prev_map_iter;
+
+   long int curr_idx;
+
+   string handle_database = (standalone_handle) ? "handlesystem_standalone" : "handlesystem";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `Handle_Type::add_values'."
+            << endl
+            << "`hvt_vector.size()' == " << hvt_vector.size() << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.01.30.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Type::add_values| definition@>=
+
+   status = mysql_select_db(mysql_ptr, handle_database.c_str());
+
+   if (status == 0)
+   {  
+
+#if DEBUG_COMPILE
+        
+        if (DEBUG)
+        {
+           lock_cerr_mutex(); 
+           cerr << "In `Handle_Type::add_values':  `mysql_select_db succeeded'."
+                << endl 
+                << "Selected database `" << handle_database << "' successfully."
+                << endl;
+           unlock_cerr_mutex();
+
+        }  /* |if (DEBUG)|  */ 
+
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   }  /* |if (status == 0)| */
+
+   else /* |status != 0| */
+   {
+      lock_cerr_mutex(); 
+      cerr << "In `Handle_Type::add_values':  `mysql_select_db' failed, returning " 
+           << status << ":"
+           << endl
+           << mysql_error(mysql_ptr)
+           << endl
+           << "Failed to select database `" << handle_database << "'."
+           << endl 
+           << "Exiting function unsuccessfully with return value 1."
+           << endl;
+      unlock_cerr_mutex();
+
+      return 1;
+
+   }   /* |else| (|status != 0|) */
+
+@q ***** (5) @>
+@
+@<|Handle_Type::add_values| definition@>=
+
+   if (lock_tables == true) 
+   {
+@q ****** (6) @>
+
+       pthread_mutex_lock(&sql_lock_tables_mutex);
+
+       status = submit_mysql_query("lock tables handles write", result, mysql_ptr, 0, 0, 0);
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `Handle_Type::add_values':"
+                << endl
+                << "`submit_mysql_query' failed, returning " << status << "."
+                << endl
+                << "Failed to lock `handles' table."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           if (result)
+              mysql_free_result(result);
+
+           pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+           return 1;
+
+       }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `Handle_Type::add_values':"
+                << endl
+                << "`submit_mysql_query' succeeded, returning 0."
+                << endl
+                << "Locked `handles' table successfully."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+       mysql_free_result(result);
+       result = 0;
+
+@q ****** (6) @>
+
+   }  /* |if (lock_tables == true) |  */
+
+@q ***** (5) @>
+@
+@<|Handle_Type::add_values| definition@>=
+
+   if (hvt_vector.size() == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "WARNING!  In `Handle_Type::add_values':  `hvt_vector.size()' == 0." 
+            << endl
+            << "No values to add.  Will try to unlock `" << handle_database << ".handles' "
+            << "database table (if `lock_tables' == `true') "
+            << "and exit function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ret_val = 1;
+
+       goto ADD_VALUES_UNLOCK_TABLES;
+
+   }  /* |if (hvt_vector.size() == 0)|  */
+
+
+@q ***** (5) Check whether handle exists.  @>
+@ Check whether handle exists.  
+\initials{LDF 2013.01.31.}
+
+\LOG
+\initials{LDF 2013.01.31.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Type::add_values| definition@>=
+
+@q ****** (6) @>
+
+    sql_strm.str("");
+
+    sql_strm << "select handle_id from handles where handle_id = " << handle_id << " limit 1";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex();
+       cerr << "In `add_values':  `sql_strm.str()' == " <<  sql_strm.str() 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   status = submit_mysql_query(sql_strm.str().c_str(), result, mysql_ptr, &row_ctr, &field_ctr);
+
+@q ****** (6) @>
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `Handle_Type::add_values':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Failed to retrieve `handle_id' from `handles' database table."
+            << endl
+            << "Will try to unlock tables (if `lock_tables' == `true') "
+            << "and exit function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+       {
+           mysql_free_result(result);
+           result = 0;
+       }
+
+       ret_val = 1;
+
+       goto ADD_VALUES_UNLOCK_TABLES;
+
+   }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Handle_Type::add_values':"
+            << endl
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q ****** (6) @>
+@
+@<|Handle_Type::add_values| definition@>=
+
+   if (row_ctr == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `Handle_Type::add_values':"
+            << endl
+            << "`submit_mysql_query' returned 0 rows."
+            << endl
+            << "Failed to retrieve `handle_id' from `handles' database table."
+            << endl
+            << "Will try to unlock tables (if `lock_tables' == `true') "
+            << "and exit function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+       {
+           mysql_free_result(result);
+           result = 0;
+       }
+
+       ret_val = 1;
+
+       goto ADD_VALUES_UNLOCK_TABLES;
+
+   }  /* |if (row_ctr == 0)|  */
+
+@q ****** (6) @>
+
+@ We don't need to fetch the value, since we already know what it is;  we just
+need to know that the handle really exists.
+\initials{LDF 2013.01.31.}
+ 
+@<|Handle_Type::add_values| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Handle_Type::add_values':"
+            << endl
+            << "`submit_mysql_query' returned " << row_ctr << " rows."
+            << endl
+            << "Retrieved `handle_id' from `handles' database table successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   mysql_free_result(result);
+   result = 0;
+
+@q ****** (6) @>
+
+@q ***** (5) Get value for |handle_value_id|.  @>
+
+@ Get value for |handle_value_id|.  
+\initials{LDF 2013.01.31.}
+
+@<|Handle_Type::add_values| definition@>=
+
+   sql_strm.str("");
+
+   sql_strm << "select handle_value_id from handles order by handle_value_id desc limit 1";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex();
+       cerr << "In `add_values':  `sql_strm.str()' == " <<  sql_strm.str() 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   status = submit_mysql_query(sql_strm.str().c_str(), result, mysql_ptr, &row_ctr, &field_ctr);
+
+@q ****** (6) @>
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `Handle_Type::add_values':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Failed to retrieve highest value of `handle_value_id' from "
+            << "`handles' database table."
+            << endl
+            << "Will try to unlock tables (if `lock_tables' == `true') "
+            << "and exit function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+       {
+           mysql_free_result(result);
+           result = 0;
+       }
+
+       ret_val = 1;
+
+       goto ADD_VALUES_UNLOCK_TABLES;
+
+   }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Handle_Type::add_values':"
+            << endl
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q ****** (6) @>
+@
+@<|Handle_Type::add_values| definition@>=
+
+   if (row_ctr == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `Handle_Type::add_values':"
+            << endl
+            << "`submit_mysql_query' returned 0 rows."
+            << endl
+            << "Failed to retrieve highest value of `handle_value_id' from `handles' "
+            << "database table."
+            << endl
+            << "Will try to unlock tables (if `lock_tables' == `true') "
+            << "and exit function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+       {
+           mysql_free_result(result);
+           result = 0;
+       }
+
+       ret_val = 1;
+
+       goto ADD_VALUES_UNLOCK_TABLES;
+
+   }  /* |if (row_ctr == 0)|  */
+
+@q ****** (6) @>
+@ 
+@<|Handle_Type::add_values| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Handle_Type::add_values':"
+            << endl
+            << "`submit_mysql_query' returned " << row_ctr << " rows."
+            << endl
+            << "Retrieved highest value of `handle_value_id' from `handles' "
+            << "database table successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Handle_Type::add_values| definition@>=
+
+   if ((curr_row = mysql_fetch_row(result)) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `Handle_Type::add_values:"
+            << endl 
+            << "`mysql_fetch_row' failed:"
+            << endl
+            << mysql_error(mysql_ptr)
+            << endl
+            << "Will try to unlock tables (if `lock_tables' == `true') "
+            << "and exit function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result);
+       result = 0;
+ 
+       ret_val = 1;
+
+       goto ADD_VALUES_UNLOCK_TABLES;
+
+   }  /* |if (curr_row = mysql_fetch_row(result) == 0)|  */
+
+@q ****** (6) @>
+
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Handle_Type::add_values: `mysql_fetch_row' succeeded."
+            << endl
+            << "`curr_row[0]' == " << curr_row[0]
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */ 
+
+   errno = 0;
+   curr_handle_value_id = strtoul(curr_row[0], 0, 10);
+
+   if (curr_handle_value_id == ULONG_MAX)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `Handle_Type::add_values:"
+            << endl 
+            << "`strtoul' failed, returning `ULONG_MAX':"
+            << endl 
+            << strerror(errno)
+            << endl
+            << "Failed to set `curr_handle_value_id'."
+            << endl
+            << "Will try to unlock tables (if `lock_tables' == `true') "
+            << "and exit function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result);
+       result = 0;
+ 
+       ret_val = 1;
+
+       goto ADD_VALUES_UNLOCK_TABLES;
+
+   }  /* |if (curr_handle_value_id == ULONG_MAX)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Handle_Type::add_values:"
+            << endl 
+            << "`strtoul' succeeded:  `curr_handle_value_id' == " << curr_handle_value_id << "."
+            << endl
+            << "Will increment."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   ++curr_handle_value_id;
+
+   mysql_free_result(result);
+   result = 0;
+   sql_strm.str("");
+
+@q ***** (5) Fill |curr_idx_type_map|.  @>
+
+@ Fill |curr_idx_type_map|.  
+\initials{LDF 2013.02.05.}
+
+\LOG
+\initials{LDF 2013.02.05.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Type::add_values| definition@>=
+
+@q ****** (6) @>
+
+   sql_strm << "select idx, type from handles where handle_id = " << handle_id;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+   
+   status = submit_mysql_query(sql_strm.str().c_str(), result, mysql_ptr, &row_ctr, &field_ctr);
+
+@q ****** (6) @>
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `Handle_Type::add_values':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Failed to retrieve `idx' and `type' values from "
+            << "`handles' database table for `handle_id' == " << handle_id << "."
+            << endl
+            << "Will try to unlock tables (if `lock_tables' == `true') "
+            << "and exit function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+       {
+           mysql_free_result(result);
+           result = 0;
+       }
+
+       ret_val = 1;
+
+       goto ADD_VALUES_UNLOCK_TABLES;
+
+   }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Handle_Type::add_values':"
+            << endl
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q ****** (6) @>
+
+@ There should always be at least one handle value, i.e., one with \.{type} $=$ \.{HS\_ADMIN}.
+\initials{LDF 2013.02.05.}
+
+@<|Handle_Type::add_values| definition@>=
+
+   if (row_ctr == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "ERROR!  In `Handle_Type::add_values':"
+            << endl
+            << "`submit_mysql_query' returned 0 rows."
+            << endl
+            << "Failed to retrieve `idx' and `type' values from "
+            << "`handles' database table for `handle_id' == " << handle_id << "."
+            << endl
+            << "Will try to unlock tables (if `lock_tables' == `true') "
+            << "and exit function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+       {
+           mysql_free_result(result);
+           result = 0;
+       }
+
+       ret_val = 1;
+
+       goto ADD_VALUES_UNLOCK_TABLES;
+
+   }  /* |if (row_ctr == 0)|  */
+
+@q ****** (6) @>
+@ 
+@<|Handle_Type::add_values| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Handle_Type::add_values':"
+            << endl
+            << "`submit_mysql_query' returned " << row_ctr << " rows."
+            << endl
+            << "Retrieved `idx' and `type' values from `handles' "
+            << "database table for `handle_id' == " << handle_id << " successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Handle_Type::add_values| definition@>=
+
+   for (int i = 0; i < row_ctr; ++i)
+   {
+@q ******* (7) @>
+       if ((curr_row = mysql_fetch_row(result)) == 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `Handle_Type::add_values:"
+                << endl 
+                << "`mysql_fetch_row' failed:"
+                << endl
+                << mysql_error(mysql_ptr)
+                << endl
+                << "Will try to unlock tables (if `lock_tables' == `true') "
+                << "and exit function unsuccessfully "
+                << "with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result);
+           result = 0;
+ 
+           ret_val = 1;
+
+           goto ADD_VALUES_UNLOCK_TABLES;
+
+       }  /* |if (curr_row = mysql_fetch_row(result) == 0)|  */
+
+@q ******* (7) @>
+
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `Handle_Type::add_values: `mysql_fetch_row' succeeded."
+                << endl
+                << "`curr_row[0]' == " << curr_row[0]
+                << endl 
+                << "`curr_row[1]' == " << curr_row[1]
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */ 
+
+
+@q ******* (7) @>
+
+       errno = 0;
+
+       curr_idx = strtol(curr_row[0], 0, 10);
+
+       if (curr_idx == LONG_MAX || curr_idx == LONG_MIN)
+       {
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `Handle_Type::add_values:"
+                << endl 
+                << "`strtol' failed, returning " << curr_idx << " ";
+
+           if (curr_idx == LONG_MAX)
+               cerr << "(LONG_MAX)." << endl;
+           else 
+               cerr << "(LONG_MIN)." << endl;
+
+           cerr << strerror(errno)
+                << endl
+                << "Will try to unlock tables (if `lock_tables' == `true') "
+                << "and exit function unsuccessfully "
+                << "with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result);
+           result = 0;
+ 
+           ret_val = 1;
+
+           goto ADD_VALUES_UNLOCK_TABLES;
+
+
+       }  /* |if|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "`strtol' succeeded, returning " << curr_idx << " (`curr_idx')."
+            << endl; 
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+   curr_idx_type_map[curr_idx] = curr_row[1];
+
+@q ******* (7) @>
+
+   }  /* |for|  */
+
+@q ****** (6) @>
+
+   mysql_free_result(result);
+   result = 0;
+   sql_strm.str("");
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+
+       cerr << "`curr_idx_type_map':" << endl;
+
+       for (map<int, string>::const_iterator iter = curr_idx_type_map.begin();
+            iter != curr_idx_type_map.end();
+            ++iter)
+
+       {
+            cerr << iter->first << ", " << iter->second << endl;
+           
+       }  /* |for|  */
+
+       cerr << endl;
+
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */
+
+@q ****** (6) @>
+
+@q ***** (5) @>
+@
+@<|Handle_Type::add_values| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+
+       cerr << "Showing `hvt_vector':" << endl;
+
+       for (vector<Handle_Value_Triple>::const_iterator iter = hvt_vector.begin();
+            iter != hvt_vector.end();
+            ++iter)
+       {
+           cerr << "`iter->idx'      == " << iter->idx
+                << endl 
+                << "`iter->type'     == " << iter->type
+                << endl 
+                << "`iter->data_str' == " << iter->data_str
+                << endl;
+
+       }  /* |for|  */
+
+       cerr << endl;
+
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.01.30.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Type::add_values| definition@>=
+
+   for (vector<Handle_Value_Triple>::iterator iter = hvt_vector.begin();
+        iter != hvt_vector.end();
+        ++iter)
+   {
+@q ****** (6) @>
+
+         sql_strm.str("");
+
+@q ****** (6) Check whether the index value has already been used.  @>
+
+@ Check whether the index value has already been used.  If it hasn't, we just use it.
+If it has, we check what range it belongs to, assuming that |iter->idx| and 
+|iter->type| have been chosen to correspond with the pairs of values in 
+|Handle_Value_Type::idx_type_map|.
+If a value within the range hasn't already been used, we use it (and push a pair onto 
+|curr_idx_type_map|).  Otherwise, we find the next unused value 
+|>= Handle_Value_Type::OTHER_HANDLE_VALUE_TYPE|.  
+\initials{LDF 2013.02.05.}
+
+\LOG
+\initials{LDF 2013.03.07.}
+Added code for finding an unused value for |iter->idx|, as described above.
+\ENDLOG 
+
+@<|Handle_Type::add_values| definition@>=
+
+         map_iter = curr_idx_type_map.find(iter->idx);
+
+         if (map_iter != curr_idx_type_map.end())  /* index value already used.  */
+         {
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "`map_iter' != `curr_idx_type_map.end()'.  "
+                      << "Index `iter->idx' == " << iter->idx << " has already "
+                      << "been used."
+                      << endl
+                      << "Will search for range for another value to use." 
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ******* (7) @>
+
+          map<int, string>::iterator range_iter_0;
+          map<int, string>::iterator range_iter_1;
+ 
+          bool found = false;
+
+@q ******* (7) @>
+
+          for (range_iter_0 = Handle_Value_Type::idx_type_map.begin();
+               range_iter_0 != Handle_Value_Type::idx_type_map.end();
+               ++range_iter_0)
+          {
+@q ******** (8) @>
+          
+
+              range_iter_1 = range_iter_0;
+              ++range_iter_1;
+
+#if DEBUG_COMPILE
+              if (DEBUG) 
+              {
+                  lock_cerr_mutex(); 
+                  cerr << "range_iter_0->first == " << range_iter_0->first
+                       << endl
+                       << "range_iter_0->second == " << range_iter_0->second
+                       << endl;
+                  unlock_cerr_mutex(); 
+
+              }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ******** (8) @>
+
+              if (range_iter_1 == Handle_Value_Type::idx_type_map.end())
+              {
+@q ********* (9) @>
+
+#if DEBUG_COMPILE
+                   if (DEBUG) 
+                   {
+                       lock_cerr_mutex(); 
+                       cerr << "Reached end of `Handle_Value_Type::idx_type_map'."
+                            << endl
+                            << "Breaking."
+                            << endl;
+                       unlock_cerr_mutex(); 
+                   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+                   break;
+
+@q ********* (9) @>
+
+              }  /* |if|  */
+
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+              else if (DEBUG) 
+              {
+                   lock_cerr_mutex(); 
+                   cerr << "range_iter_1->first == " << range_iter_1->first
+                        << endl
+                        << "range_iter_1->second == " << range_iter_1->second
+                        << endl;
+                    unlock_cerr_mutex(); 
+
+              }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******** (8) @>
+
+              if (iter->idx >= range_iter_0->first 
+                  && iter->idx < range_iter_1->first)
+              {
+@q ********* (9) @>
+
+#if DEBUG_COMPILE
+                   if (DEBUG)
+                   {
+                       lock_cerr_mutex(); 
+                       cerr << "Found range:  " << range_iter_0->first << " <= " 
+                            << iter->idx << " < " << range_iter_1->first
+                            << endl;
+                       unlock_cerr_mutex(); 
+
+                   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ********* (9) @>
+
+                   ++iter->idx;
+
+                   for (; iter->idx < range_iter_1->first; ++iter->idx)
+                   {
+@q ********** (10) @>
+                        map_iter = curr_idx_type_map.find(iter->idx);
+
+                        if (map_iter == curr_idx_type_map.end())
+                        {
+@q *********** (11) @>
+
+#if DEBUG_COMPILE
+                                if (DEBUG)            
+                                {
+                                    lock_cerr_mutex(); 
+                                    cerr << "Found unused value within range:  " << iter->idx
+                                         << endl
+                                         << "Breaking."
+                                         << endl;
+                                    unlock_cerr_mutex(); 
+
+                                }  /* |if (DEBUG)|  */    
+#endif  /* |DEBUG_COMPILE|  */ 
+
+                             found = true;
+                             break;
+
+@q *********** (11) @>
+
+                        }  /* |if|  */
+                    
+@q ********** (10) @>
+     
+                   }  /* |for|  */
+
+@q ********* (9) @>
+
+                   break;
+
+@q ********* (9) @>
+
+              }  /* |if|  */
+
+@q ******** (8) @>
+
+          }  /* |for|  */
+
+@q ******* (7) @>
+
+          if (!found)
+          {
+
+#if DEBUG_COMPILE
+               if (DEBUG)
+               {
+                   lock_cerr_mutex(); 
+                   cerr << "Index value not found.  Will use value >= "
+                        << Handle_Value_Type::idx_type_map[
+                              Handle_Value_Type::OTHER_HANDLE_VALUE_TYPE_INDEX]
+                        << " == " << Handle_Value_Type::OTHER_HANDLE_VALUE_TYPE_INDEX
+                        << endl;
+                       unlock_cerr_mutex(); 
+
+               }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+               iter->idx = curr_idx_type_map.rbegin()->first;
+               ++iter->idx;
+
+               if (iter->idx < Handle_Value_Type::OTHER_HANDLE_VALUE_TYPE_INDEX)
+                   iter->idx = Handle_Value_Type::OTHER_HANDLE_VALUE_TYPE_INDEX;
+
+          }  /* |if (!found)|  */
+
+@q ******* (7) @>
+@
+@<|Handle_Type::add_values| definition@>=
+
+#if DEBUG_COMPILE
+          if (DEBUG)
+          {
+              lock_cerr_mutex(); 
+              cerr << "iter->idx == " << iter->idx << endl;
+              unlock_cerr_mutex(); 
+
+          }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+         }  /* |if (map_iter != curr_idx_type_map.end())|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+         else if (DEBUG)  /* index value not already used   */
+         {
+             lock_cerr_mutex(); 
+             cerr << "`map_iter' == `curr_idx_type_map.end()'.  "
+                  << "Index `iter->idx' == " << iter->idx << " hasn't already "
+                  << "been used."
+                  << endl
+                  << "No need to search for range for another value to use." 
+                  << endl;
+             unlock_cerr_mutex(); 
+
+         }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@ If |return_hvt_vector| is non-null, put |iter->idx| and |iter->type| onto |*return_hvt_vector|.
+\initials{LDF 2013.07.03.}
+
+\LOG
+\initials{LDF 2013.07.03.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Type::add_values| definition@>=
+
+@q ******* (7) @>
+
+   if (return_hvt_vector != 0)
+   {
+#if DEBUG_COMPILE
+         if (DEBUG)  
+         {
+             lock_cerr_mutex(); 
+             cerr << "In Handle_Type::add_values:"
+                  << endl 
+                  << "`return_hvt_vector' is non-null.  Pushing `Handle_Value_Triple' "
+                  << "onto the vector to which it points."
+                  << endl
+                  << "`iter->idx' == " << iter->idx
+                  << endl 
+                  << "`iter->type' == " << iter->type
+                  << endl;
+             unlock_cerr_mutex(); 
+
+         }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+      
+         return_hvt_vector->push_back(Handle_Value_Triple(iter->idx, iter->type, iter->data_str));
+
+
+#if DEBUG_COMPILE
+         if (DEBUG)  
+         {
+             lock_cerr_mutex(); 
+             return_hvt_vector->back().show("*return_hvt_vector->back():");
+             unlock_cerr_mutex(); 
+
+         }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   }  /* |if (return_hvt_vector != 0)|  */
+
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In Handle_Type::add_values:"
+            << endl 
+            << "`return_hvt_vector' is null.  Not pushing a `Handle_Value_Triple' "
+            << "onto a vector."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ******* (7) @>
+
+
+@q ****** (6) @>
+@
+@<|Handle_Type::add_values| definition@>=
+
+         sql_strm << "insert into handles (handle, idx, type, "
+                  << "data, ttl_type, ttl, timestamp, refs, admin_read, admin_write, "
+                  << "pub_read, pub_write, handle_id, handle_value_id, created, "
+                  << "created_by_user_id) "
+                  << "values "
+                  << "('" << handle << "', " << iter->idx << ", '" << iter->type << "', "
+                  << "'" << iter->data_str << "', "
+                  << "0, 86400, " << time(0) << ", '', 1, 1, 1, 0, " << handle_id 
+                  << ", " << curr_handle_value_id << ", now()," << user_id << ")";
+
+#if DEBUG_COMPILE
+         if (DEBUG)
+         {
+             lock_cerr_mutex(); 
+             cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+             unlock_cerr_mutex(); 
+
+         }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+         status = submit_mysql_query(sql_strm.str().c_str(), result, 
+                                     mysql_ptr, 0, 0, &affected_rows); 
+       
+@q ****** (6) @>
+
+         if (status != 0)
+         {
+
+              lock_cerr_mutex(); 
+              cerr << "ERROR!  In `Handle_Type::add_values':"
+                   << endl
+                   << "`submit_mysql_query' failed, returning " << status << "."
+                   << endl 
+                   << "Failed to insert row into `" << handle_database << ".handles' "
+                   << "database table."
+                   << endl 
+                   << "Will try to unlock `" << handle_database << ".handles' "
+                   << "database table (if `lock_tables' == `true') "
+                   << "and exit function unsuccessfully with return value 1."
+                   << endl;
+              unlock_cerr_mutex(); 
+
+              ret_val = 1;
+
+              if (result)
+              {
+                  mysql_free_result(result);
+                  result = 0;
+              }    
+
+              goto ADD_VALUES_UNLOCK_TABLES;
+
+         }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `Handle_Type::add_values':"
+                << endl
+                << "`submit_mysql_query' succeeded, returning 0." 
+                << endl 
+                << "`affected_rows' == " << affected_rows << "."
+                << endl;
+          unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+     
+          mysql_free_result(result);
+          result = 0;
+
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2013.02.08.}
+Added this section.
+
+\initials{LDF 2013.08.01.}
+@:BUG FIX@> BUG FIX:  Now incrementing |curr_handle_value_id|.
+\ENDLOG
+
+@<|Handle_Type::add_values| definition@>=
+
+      curr_handle_value.clear();
+
+      curr_handle_value.set(handle, iter->idx, iter->type, 
+                            const_cast<char*>(iter->data_str.c_str()), 
+                            iter->data_str.size(), 0, 86400, time(0), 0, 0, 
+                            true, true, true, false, 
+                            user_id, handle_id,
+                            curr_handle_value_id, false, time(0), 0);
+
+
+      if (iter->type == "IRODS_OBJECT")
+         curr_handle_value.filename = iter->data_str;
+
+      handle_value_map[iter->idx] = curr_handle_value;
+
+      ++curr_handle_value_id;
+
+@q ****** (6) @>
+
+   }  /* |for|  */
+
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.01.30.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Type::add_values| definition@>=
+
+ADD_VALUES_UNLOCK_TABLES:
+
+   if (result)
+   {
+       mysql_free_result(result);
+       result = 0;
+   }
+
+   if (lock_tables == true) 
+   {
+
+       status = submit_mysql_query("unlock tables", result, mysql_ptr, 0, 0, 0);
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `Handle_Type::add_values':"
+                << endl
+                << "`submit_mysql_query' failed, returning " << status << "."
+                << endl
+                << "Failed to unlock `handles' table."
+                << endl
+                << "Will exit function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           if (result)
+           {
+               mysql_free_result(result);
+               result = 0;
+           }
+
+           ret_val = 1;
+
+       }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `Handle_Type::add_values':"
+                << endl
+                << "`submit_mysql_query' succeeded, returning 0."
+                << endl
+                << "Unlocked `handles' table successfully."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+       pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+       mysql_free_result(result);
+       result = 0;
+
+   }  /* |if (lock_tables == true) |  */
+
+@q ***** (5) @>
+@
+@<|Handle_Type::add_values| definition@>=
+
+   if (ret_val != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `Handle_Type::add_values' unsuccessfully with return value "
+            << ret_val << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return ret_val;
+
+   }  /* |if (ret_val != 0)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `Handle_Type::add_values' successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    return 0;
+
+}  /* End of |Handle_Type::add_values| definition  */
+
+@q **** (4) Delete from database (|delete_from_database|).  @>
+@ Delete from database (|delete_from_database|).
+\initials{LDF 2013.07.04.}
+
+\LOG
+\initials{LDF 2013.07.04.}
+Added this function.
+
+\initials{LDF 2013.07.25.}
+Added |int user_id| argument.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|class Handle_Type| function declarations@>=
+
+int
+delete_from_database(MYSQL *mysql_ptr, 
+                     int user_id,
+                     unsigned int options, 
+                     unsigned long int delay_value = 0UL,
+                     int *handle_rows = 0, 
+                     int thread_ctr = 0);
+
+@q ***** (5) Definition  @>
+@
+@<|Handle_Type::delete_from_database| definition@>=
+
+int
+Handle_Type::delete_from_database(MYSQL *mysql_ptr, 
+                                  int user_id,
+                                  unsigned int options,
+                                  unsigned long int delay_value,
+                                  int *handle_rows, 
+                                  int thread_ctr)
+{
+@q ****** (6) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   string thread_str;
+
+   stringstream temp_strm;
+
+   MYSQL_RES *result = 0;
+   long int affected_rows;
+
+   stringstream sql_strm;
+
+   int status;
+
+   int ret_val = 0;
+
+   if (thread_ctr > 0)
+   {
+       temp_strm << "[Thread " << thread_ctr << "] ";
+       thread_str = temp_strm.str();
+
+       temp_strm.str("");
+   }
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Handle_Type::delete_from_database'."
+            << endl
+            << "`handle' == " << handle
+            << endl
+            << "`options' == " << hex << options << " (hex)" << dec
+            << endl;
+
+        if (options & 1U)
+        {
+            cerr << "`IMMEDIATE' (0x1) == `true'."
+                 << endl;
+        }
+        else
+        {
+            cerr << "`IMMEDIATE' (0x1) == `false'."
+                 << endl;
+        }
+        
+        cerr << "delay_value == " << delay_value << endl;
+
+        unlock_cerr_mutex(); 
+        
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) Error handling:  "immediate" option set and |delay_value > 0|.  @>
+
+@ Error handling:  "immediate" option set and |delay_value > 0|.  
+\initials{LDF 2013.08.26.}
+
+\LOG
+\initials{LDF 2013.08.26.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Type::delete_from_database| definition@>=
+
+   if (options & 1U && delay_value > 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "WARNING! In `Handle_Type::delete_from_database':"
+            << endl
+            << "\"immediate\" option set and `delay_value' == " << delay_value << " (> 0)"
+            << endl
+            << "This shouldn't be possible."
+            << endl
+            << "Unsetting \"immediate\" option and using default delay value."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       options &= ~1UL;
+
+       delay_value = 1;
+    
+   }  /* |if (options & 1U && delay_value > 0)|  */
+
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2013.08.26.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Type::delete_from_database| definition@>=
+
+   errno = 0;
+   time_t delay_time = time(0);
+
+   if (delay_time == static_cast<time_t>(-1))
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR! In `Handle_Type::delete_from_database':"
+            << endl
+            << "`time' failed, returning `(time_t) -1':"
+            << endl
+            << strerror(errno)
+            << endl
+            << "Failed to set current time."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (delay_time == static_cast<time_t>(-1))|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::delete_from_database':"
+            << endl
+            << "`time' succeeded.  `delay_time' == " << delay_time << " " 
+            << convert_seconds(delay_time, true, false)
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ****** (6) Error handling:  |delay_value| too large.  @>
+
+@ Error handling:  |delay_value| too large.  
+\initials{LDF 2013.08.26.}
+
+\LOG
+\initials{LDF 2013.08.26.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Type::delete_from_database| definition@>=
+
+   if (delay_value > 0)
+   {
+@q ******* (7) @>
+
+       if (delay_value == ULONG_MAX || ULONG_MAX - delay_time <= delay_value)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "WARNING! In `Handle_Type::delete_from_database':"
+                << endl
+                << "`delay_value' == " << delay_value << " exceeds maximum value."
+                << endl
+                << "Will use default delay value."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           delay_value = 1;
+
+       }  /* |if (delay_value == ULONG_MAX || ULONG_MAX - delay_time <= delay_value)|  */
+
+@q ******* (7) @>
+
+       else 
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+              lock_cerr_mutex(); 
+              cerr << thread_str << "In `Handle_Type::delete_from_database':"
+                   << endl
+                   << "`delay_value' == " << delay_value << " doesn't exceed maximum value."
+                   << endl
+                   << "Will set deletion time to " 
+                   << convert_seconds(delay_value + delay_time, true)
+                   << endl;
+              unlock_cerr_mutex(); 
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           delay_time += delay_value;
+
+       }  /* |else|  */
+
+@q ******* (7) @>    
+
+   }  /* |if (delay_value > 0)|  */
+
+@q ****** (6) If not marking for immediate deletion:                  @>
+@q ****** (6) Add handle value of type "HANDLE_MARKED_FOR_DELETION".  @>
+
+@ If not marking for immediate deletion:
+Add handle value of |type| |"HANDLE_MARKED_FOR_DELETION"|.
+\initials{LDF 2013.07.25.}
+
+\LOG
+\initials{LDF 2013.07.25.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Type::delete_from_database| definition@>=
+
+   if (!(options & 1U))  /* Not immediate.  */
+   {
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `Handle_Type::delete_from_database':"
+                 << endl
+                 << "`!(options & 1U):  Not marking `Handle_Type' object for "
+                 << "immediate deletion."
+                 << endl
+                 << "Will call `Handle_Type::add_value' to add "
+                 << "handle value of type `HANDLE_MARKED_FOR_DELETION'."
+                 << endl;
+             unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */   
+
+@q ******* (7) @>
+@
+@<|Handle_Type::delete_from_database| definition@>=
+
+        Handle_Value_Triple hvt;
+
+        status = add_value(mysql_ptr, 
+                           Handle_Value_Type::HANDLE_MARKED_FOR_DELETION_INDEX,
+                           "HANDLE_MARKED_FOR_DELETION",
+                           convert_seconds(0, true, true),
+                           user_id,
+                           &hvt);
+
+        if (status != 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  In `Handle_Type::delete_from_database':"
+                 << endl
+                 << "`Handle_Type::add_value' failed, returning " << status << ":"
+                 << endl
+                 << "Failed to add handle value of type \"HANDLE_MARKED_FOR_DELETION\"."
+                 << endl
+                 << "Exiting function unsuccessfully with return value 1."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            return 1;
+
+        }  /* |if (status != 0)|  */
+                           
+@q ******* (7) @>
+@
+@<|Handle_Type::delete_from_database| definition@>=
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `Handle_Type::delete_from_database':"
+                 << endl
+                 << "`Handle_Type::add_value' succeeded, returning 0."
+                 << endl
+                 << "Added handle value of type \"HANDLE_MARKED_FOR_DELETION\" successfully:"
+                 << endl;
+
+            hvt.show("hvt:");
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+   }    /* |if (!(options & 1U))| Not immediate.*/
+
+@q ****** (6) @>
+@
+@<|Handle_Type::delete_from_database| definition@>=
+
+   string handle_database = (standalone_handle) ? "handlesystem_standalone" : "handlesystem";
+
+   pthread_mutex_lock(&sql_lock_tables_mutex);
+
+   sql_strm << "lock tables " << handle_database << ".handles write, "
+            << "gwirdsif.Irods_Objects_Handles write";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::delete_from_database':"
+            << endl
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Type::delete_from_database':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Failed to lock tables."
+            << endl
+            << "Exiting function unsuccessfully with return value 1." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+          mysql_free_result(result);
+
+       pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+       return 1;
+     
+   }
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::delete_from_database':"
+            << endl
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "Locked tables successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   mysql_free_result(result);
+   result = 0;
+
+@q ****** (6) @>
+
+@ The value used below 31622400 $=$ Number of seconds in a year $+$ 1 day (366 days).
+This way, |Handle_Type| objects marked for immediate deletion can easily be identified
+because their |delete_from_database_timestamp| values will be more than a year 
+older than the current date/time.
+\initials{LDF 2013.07.21.}  */
+
+\LOG
+\initials{LDF 2013.07.25.}
+@:BUG FIX@> BUG FIX:  Now using |purge_database_limit| instead of 
+|purge_database_interval| to set the \.{last\_modified} field.
+\par
+Added code to ensure that the value used to set the \.{last\_modified} field
+is reasonable.
+\ENDLOG 
+
+@<|Handle_Type::delete_from_database| definition@>=
+
+   sql_strm.str("");
+
+   sql_strm << "update " << handle_database << ".handles set marked_for_deletion = 1, ";
+
+   if (options & 1U)  /* IMMEDIATE  */
+   {
+        time_t temp_time   = time(0);
+        time_t temp_time_1 = purge_database_limit + 31622400;
+
+        if (temp_time_1 >= temp_time)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "WARNING!  In `Handle_Type::delete_from_database':"
+                 << endl
+                 << "`temp_time_1' >= `temp_time':"
+                 << endl
+                 << "`temp_time' == `time(0)' == " << temp_time
+                 << endl 
+                 << "`temp_time_1' == `purge_database_limit' + 31622400 == " 
+                 << temp_time_1
+                 << endl
+                 << "`purge_database_limit' == " << purge_database_limit
+                 << endl 
+                 << "31622400 == number of seconds per 366 days (1 year + 1 day)"
+                 << endl
+                 << "Can't subtract `temp_time_1' from `temp_time'."
+                 << endl
+                 << "Setting `delete_from_database_timestamp' to `purge_database_limit' - 1 == "
+                 << (purge_database_limit - 1)
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            temp_time -= purge_database_limit + 1;
+
+        }  /* |if (temp_time_1 >= temp_time)|  */
+    
+        else
+            temp_time -= temp_time_1;
+
+        sql_strm << "delete_from_database_timestamp = '" << convert_seconds(temp_time) << "', ";
+
+   }  /* |if (options & 1U)|  IMMEDIATE  */
+
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2013.08.26.}
+Added this section.
+\ENDLOG
+
+@<|Handle_Type::delete_from_database| definition@>=
+
+   else if (delay_value > 1)  /* Non-default delay  */
+   {
+      sql_strm << "delete_from_database_timestamp = '" << convert_seconds(delay_time) << "', ";
+   }
+
+@q ****** (6) @>
+@
+@<|Handle_Type::delete_from_database| definition@>=
+
+   else /* Not immediate, default delay  */
+   {
+       sql_strm << "delete_from_database_timestamp = '" << convert_seconds() << "', ";
+
+   }
+
+   sql_strm << "last_modified = now() "
+            << "where handle_id = " << handle_id << " and marked_for_deletion = 0";
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::delete_from_database':"
+            << endl
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, &affected_rows);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Type::delete_from_database':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Failed to mark entries in `" << handle_database << ".handles' table "
+            << "for deletion."
+            << endl
+            << "Exiting function unsuccessfully with return value 1." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+          mysql_free_result(result);
+
+       result = 0;
+
+       ret_val = 1;
+
+       goto UNLOCK_TABLES;
+     
+   }
+
+@q ****** (6) @>
+@
+@<|Handle_Type::delete_from_database| definition@>=
+
+   else if (affected_rows == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "WARNING!  In `Handle_Type::delete_from_database':"
+            << endl
+            << "`affected_rows' == 0"
+            << endl
+            << "No rows in `" << handle_database << ".handles' table "
+            << "marked for deletion."
+            << endl
+            << "Exiting function unsuccessfully with return value 2." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result);
+       result = 0;
+
+       ret_val = 2;
+
+       goto UNLOCK_TABLES;
+     
+   }
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::delete_from_database':"
+            << endl
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "`affected_rows' == " << affected_rows
+            << endl
+            << "Marked entries for deletion from `" << handle_database << ".handles' table "
+            << "successfully."
+            << endl
+            << "`affected_rows' == " << affected_rows 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   if (handle_rows)
+      *handle_rows = affected_rows;
+
+   mysql_free_result(result);
+   result = 0;
+
+
+@q ****** (6) @>
+@
+@<|Handle_Type::delete_from_database| definition@>=
+
+UNLOCK_TABLES:
+
+   if (result)
+   {
+      mysql_free_result(result);
+      result = 0;
+   }
+
+   sql_strm.str("");
+
+   sql_strm << "unlock tables";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::delete_from_database':"
+            << endl
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Type::delete_from_database':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Failed to unlock tables."
+            << endl
+            << "Exiting function unsuccessfully with return value 1." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+          mysql_free_result(result);
+
+       pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+       return 1;
+     
+   }
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::delete_from_database':"
+            << endl
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "Unlocked tables successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+   pthread_mutex_unlock(&sql_lock_tables_mutex);
+   mysql_free_result(result);
+   result = 0;
+
+@q ****** (6) @>
+@
+
+\LOG
+\initials{LDF 2013.07.18.}
+Added this section.
+
+\initials{LDF 2013.08.19.}
+Added code for checking whether the ``purge database'' thread is running.
+\ENDLOG
+
+@<|Handle_Type::delete_from_database| definition@>=
+
+   if (options & 1U)  /* IMMEDIATE  */
+   {
+@q ******* (7) @>
+
+        if (purge_database_thread_id == static_cast<pthread_t>(0))
+        {
+             lock_cerr_mutex(); 
+             cerr << thread_str << "NOTICE!  In `Handle_Type::delete_from_database':"
+                  << endl
+                  << "`purge_database_thread_id' == 0."
+                  << endl
+                  << "\"Purge database\" thread not running.  Not calling `pthread_cond_signal' "
+                  << "to wake it up."
+                  << endl
+                  << "Continuing."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+        }  /* |if (purge_database_thread_id == 0)|  */
+
+@q ******* (7) @>
+
+        else
+        {
+            pthread_mutex_lock(&purge_server_database_mutex);
+
+            status = pthread_cond_signal(&purge_server_database_cond);
+
+            if (status != 0)
+            {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "ERROR!  In `Handle_Type::delete_from_database':"
+                    << endl
+                    << "`pthread_cond_signal' failed, returning " << status << ":"
+                    << endl
+                    << "Error:  " << strerror(status)
+                    << endl
+                    << "Exiting function unsuccessfully with return value 1." 
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               ret_val = 1;
+
+            }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `Handle_Type::delete_from_database':"
+                     << endl
+                     << "`pthread_cond_signal' succeeded, returning 0."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            pthread_mutex_unlock(&purge_server_database_mutex);
+
+        }  /* |else|  */
+
+@q ******* (7) @>
+
+   } /* |if (options & 1U)| (IMMEDIATE)  */
+
+@q ****** (6) Exit function with return value |ret_val|.  @>
+
+@ Exit function with return value |ret_val|.  
+\initials{LDF 2013.07.25.}
+
+This may be a successful exit or not.
+\initials{LDF 2013.07.25.}
+
+@<|Handle_Type::delete_from_database| definition@>=
+
+   if (ret_val != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::delete_from_database':"
+            << endl
+            << "`ret_val' == " << ret_val << " (!= 0)"
+            << endl
+            << "Exiting function with return value " << ret_val << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return ret_val;
+
+   }  /* |if (ret_val != 0)|  */
+
+@q ****** (6) Exit function successfully with return value 0.  @>
+
+@ Exit function successfully with return value 0.
+\initials{LDF 2013.07.25.}
+
+@<|Handle_Type::delete_from_database| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Handle_Type::delete_from_database' successfully "
+            << "with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |Handle_Type::delete_from_database| definition  */
+
+
+@q *** (3) Find (|find|).  @>
+@ Find (|find|).
+\initials{LDF 2013.07.04.}
+
+\LOG
+\initials{LDF 2013.07.04.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|class Handle_Type| function declarations@>=
+const map<unsigned long int, Handle_Value_Type>::iterator
+find(string type);
+
+
+@q **** (4) Definition  @>
+@
+@<|Handle_Type::find| definition@>=
+const map<unsigned long int, Handle_Value_Type>::iterator
+Handle_Type::find(string type)
+{
+
+@q ***** (5) @>
+    
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status = 0;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `Handle_Type::find'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Handle_Type::find| definition@>=
+
+   for (map<unsigned long int, Handle_Value_Type>::iterator iter = handle_value_map.begin();
+        iter != handle_value_map.end();
+        ++iter)
+   {
+        if (iter->second.type == type)
+            return iter;
+   }
+
+@q ***** (5) @>
+@
+@<|Handle_Type::find| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `Handle_Type::find':  Handle value with `type' == `" << type << "' not found."
+            << endl 
+            << "Exiting function successfully with return value `handle_value_map.end()'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    return handle_value_map.end();
+
+}  /* End of |Handle_Type::find| definition  */
+
+
+@q *** (3) Functions for retrieving values from fields.  @>
+@ Functions for retrieving values from fields.
+\initials{LDF 2013.07.17.}
+
+The fields are actually data members of |Handle_Value_Type|.
+\initials{LDF 2013.07.17.}
+
+@q **** (4) |created_by_user_id|.  @>
+@ |created_by_user_id|. 
+\initials{LDF 2013.07.17.}
+
+\LOG
+\initials{LDF 2013.07.17.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration @>
+
+@<|class Handle_Type| function declarations@>=
+
+int 
+created_by_user_id(void);
+
+@q ***** (5) Definition  @>
+@
+@<|Handle_Type::created_by_user_id| definition@>=
+
+int 
+Handle_Type::created_by_user_id(void)
+{
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   if (handle_value_map.size() == 0)
+      return 0;
+   else
+   {
+
+#if DEBUG_COMPILE
+      if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "handle_value_map.begin()->second.created_by_user_id == " 
+                << handle_value_map.begin()->second.created_by_user_id
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+      return handle_value_map.begin()->second.created_by_user_id;
+
+   }  /* |else|  */
+   
+}  /* End of |Handle_Type::created_by_user_id| definition  */
+
+
+@q *** (3) Fetch handles from database (version with vector arguments).  @>
+@ Fetch handles from database (version with vector arguments).
+\initials{LDF 2013.08.12.}
+
+The argument |vector<unsigned long int> &handle_id_vector| contains the IDs 
+for the handles to be fetched.  The latter are stored in the 
+|vector<Handle_Type> &handle_vector| argument.
+\initials{LDF 2013.11.28.}
+
+\LOG
+\initials{LDF 2013.08.12.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration (version with vector arguments)  @>
+@
+@<|class Handle_Type| function declarations@>=
+static
+int
+fetch_handles_from_database(MYSQL *&mysql_ptr,
+                            vector<unsigned long int> &handle_id_vector,
+                            vector<Handle_Type> &handle_vector,
+                            string type = "",
+                            string thread_str = "");
+
+
+
+@q **** (4) Definition (version with vector arguments)  @>
+@
+@<|Handle_Type::fetch_handles_from_database| definition@>=
+int
+Handle_Type::fetch_handles_from_database(
+                               MYSQL *&mysql_ptr,
+                               vector<unsigned long int> &handle_id_vector,
+                               vector<Handle_Type> &handle_vector,
+                               string type,
+                               string thread_str)
+
+{
+@q ***** (5) @>
+
+     int status;
+
+     bool DEBUG = false;  /* |true|  */
+     set_debug_level(DEBUG, 0, 0); 
+
+     MYSQL_RES *result = 0;
+     unsigned int row_ctr;
+     unsigned int field_ctr;
+     stringstream sql_strm;
+     MYSQL_ROW curr_row;
+
+     Handle_Type curr_handle;
+     Handle_Value_Type curr_handle_value;
+
+     unsigned long int prev_handle_id = 0;
+
+     char temp_str[256];
+     memset(temp_str, 0, 256);
+
+     string handle_database = (standalone_handle) ? "handlesystem_standalone" : "handlesystem"; 
+
+
+#if DEBUG_COMPILE
+     if (DEBUG)
+     {
+         lock_cerr_mutex(); 
+         cerr << thread_str 
+              << "Entering `Handle_Type::fetch_handles_from_database' "
+              << "(with vector arguments)."
+              << endl;
+         unlock_cerr_mutex(); 
+
+     }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Handle_Type::fetch_handles_from_database| definition@>=
+
+     sql_strm << "select handle_id, handle_value_id, idx, type, length(data), data, ttl_type, "
+              << "ttl, timestamp, length(refs), refs, admin_read, admin_write, pub_read, "
+              << "pub_write, marked_for_deletion, created, last_modified, handle, "
+              << "created_by_user_id, "
+              << "irods_object_id, delete_from_database_timestamp "
+              << "from " << handle_database << ".handles where "
+              << "handle_id in(";
+
+     string comma_str = "";
+
+     for (vector<unsigned long int>::const_iterator iter = handle_id_vector.begin();
+          iter != handle_id_vector.end();
+          ++iter)
+     {
+           sql_strm << comma_str << *iter;
+     
+           comma_str = ", ";
+
+     }  /* |for|  */
+
+     sql_strm << ") ";
+
+     if (!type.empty())
+     {
+         sql_strm << " and type = '" << type << "' ";        
+
+     }  /* |if (!type.empty())|  */
+
+     sql_strm << "order by handle, idx";
+
+#if DEBUG_COMPILE
+     if (DEBUG)
+     {
+         lock_cerr_mutex(); 
+         cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+         unlock_cerr_mutex(); 
+
+     }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+     status = submit_mysql_query(sql_strm.str().c_str(), result, mysql_ptr, &row_ctr, &field_ctr);
+
+     if (status != 0)
+     {
+         lock_cerr_mutex(); 
+         cerr << thread_str
+              << "ERROR!  In `Handle_Type::fetch_handles_from_database':"
+              << endl 
+              << "`Scan_Parse_Parameter_Type::submit_mysql_query' failed, returning " 
+              << status << "."
+              << endl
+              << mysql_error(mysql_ptr)
+              << endl 
+              << "Failed to fetch handles from database."
+              << endl 
+              << "Exiting function unsuccessfully with return value 1."
+              << endl;
+         unlock_cerr_mutex(); 
+
+         if (result)
+         {
+             mysql_free_result(result);
+         }
+
+         return 1;
+
+     }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE 
+     else if (DEBUG)
+     {
+         lock_cerr_mutex(); 
+         cerr << thread_str
+              << "In `Handle_Type::fetch_handles_from_database':"
+              << endl 
+              << "`Scan_Parse_Parameter_Type::submit_mysql_query' succeeded."
+              << endl
+              << "`row_ctr' == " << row_ctr
+              << endl
+              << "`field_ctr' == " << field_ctr
+              << endl;
+         unlock_cerr_mutex(); 
+
+     }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Handle_Type::fetch_handles_from_database| definition@>=
+
+     if (row_ctr == 0)
+     {
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str
+                 << "In `Handle_Type::fetch_handles_from_database':"
+                 << endl 
+                 << "`Scan_Parse_Parameter_Type::submit_mysql_query' returned 0 rows."
+                 << endl
+                 << "No handles fetched."
+                 << endl 
+                 << "Exiting function successfully with return value 2."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+    
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        mysql_free_result(result);
+
+        return 2;
+
+     }  /* |if (row_ctr == 0)|  */
+
+@q ****** (6) @>
+@
+@<|Handle_Type::fetch_handles_from_database| definition@>=
+
+#if DEBUG_COMPILE
+     else if (DEBUG)
+     {
+         lock_cerr_mutex();
+         cerr << thread_str
+              << "In `Handle_Type::fetch_handles_from_database':"
+              << endl 
+              << "`Scan_Parse_Parameter_Type::submit_mysql_query' returned " 
+              << row_ctr << " rows."
+              << endl;
+         unlock_cerr_mutex(); 
+
+     }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Handle_Type::fetch_handles_from_database| definition@>=
+
+     for (int i = 0; i < row_ctr; ++i)
+     {
+@q ******* (7) @>
+
+         if ((curr_row = mysql_fetch_row(result)) == 0)
+         {
+             lock_cerr_mutex(); 
+             cerr << thread_str
+                  << "ERROR!  In `Handle_Type::fetch_handles_from_database':"
+                  << endl 
+                  << "`mysql_fetch_row' failed:"
+                  << endl
+                  << mysql_error(mysql_ptr)
+                  << endl 
+                  << "Exiting function unsuccessfully with return value 1."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+             mysql_free_result(result);
+
+             return 1;
+
+         }  /* |if (curr_row = mysql_fetch_row(result) == 0)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE 
+         else if (DEBUG)
+         {
+             lock_cerr_mutex(); 
+             cerr << thread_str
+                  << "In `Handle_Type::fetch_handles_from_database':"
+                  << endl 
+                  << "`mysql_fetch_row' succeeded."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+         }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+         curr_handle_value.clear();
+
+         status = curr_handle_value.set(curr_row, field_ctr);
+
+         if (status == 2)
+         {
+             lock_cerr_mutex(); 
+             cerr << thread_str
+                  << "ERROR!  In `Handle_Type::fetch_handles_from_database':"
+                  << endl 
+                  << "`Handle_Value_Type::set' returned 2:  No entry found in the `handles' " 
+                  << "database."
+                  << endl
+                  << "Exiting function unsuccessfully with return value 1."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+             mysql_free_result(result);
+
+             return 1;
+
+         }  /* |if (status == 2)|  */
+
+@q ******* (7) @>
+
+         else if (status != 0)
+         {
+             lock_cerr_mutex(); 
+             cerr << thread_str
+                  << "ERROR!  In `Handle_Type::fetch_handles_from_database':"
+                  << endl 
+                  << "`Handle_Value_Type::set' failed, returning " << status << "."
+                  << endl
+                  << "Exiting function unsuccessfully with return value 1."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+             mysql_free_result(result);
+
+             return 1;
+
+         }  /* |if (status != 0)|  */
+ 
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+         else if (DEBUG)
+         {
+             lock_cerr_mutex(); 
+             cerr << thread_str
+                  << "In `Handle_Type::fetch_handles_from_database':"
+                  << endl 
+                  << "`Handle_Value_Type::set' succeeded, returning 0." 
+                  << endl;
+
+             curr_handle_value.show("curr_handle_value:");
+
+             unlock_cerr_mutex(); 
+
+         }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+         if (type == "IRODS_OBJECT" || type == "DC_METADATA_IRODS_OBJECT")
+         {  
+              memset(temp_str, 0, 256);
+              strncpy(temp_str, curr_handle_value.data, curr_handle_value.data_length);
+              curr_handle_value.filename = temp_str;
+         }
+
+
+         if (prev_handle_id == 0)
+         {
+             curr_handle.handle = curr_handle_value.handle;
+             curr_handle.handle_id = curr_handle_value.handle_id;
+             curr_handle.handle_value_map[curr_handle_value.idx] = curr_handle_value;
+         }  
+         else if (prev_handle_id == curr_handle_value.handle_id)
+         {
+            curr_handle.handle_value_map[curr_handle_value.idx] = curr_handle_value;  
+         }
+         else  /* Create new |Handle_Type| object  */
+         {
+              handle_vector.push_back(curr_handle);
+              curr_handle.clear();
+              curr_handle.handle = curr_handle_value.handle;
+              curr_handle.handle_id = curr_handle_value.handle_id;
+              curr_handle.handle_value_map[curr_handle_value.idx] = curr_handle_value;
+         }
+
+         prev_handle_id = curr_handle_value.handle_id;
+
+         curr_handle_value.clear();
+
+@q ******* (7) @>
+
+   }  /* |for|  */
+
+   if (curr_handle.handle_value_map.size() > 0)
+   {
+       handle_vector.push_back(curr_handle);
+   }
+
+   mysql_free_result(result);
+   result = 0;
+
+@q ***** (5) @>
+@
+@<|Handle_Type::fetch_handles_from_database| definition@>=
+
+#if DEBUG_COMPILE
+     if (DEBUG)
+     {
+         lock_cerr_mutex(); 
+         cerr << "Exiting `Handle_Type::fetch_handles_from_database' "
+              << "(with vector arguments) successfully with return value 0."
+              << endl
+              << "handle_vector.size() == " << handle_vector.size() 
+              << endl;
+         unlock_cerr_mutex(); 
+
+     }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+     return 0;
+
+@q ***** (5) @>
+
+}  /* End of |Handle_Type::fetch_handles_from_database| (with vector arguments)
+      definition  */
+
+@q *** (3) Fetch single handle from database (|fetch_handle_from_database|).  @>
+@ Fetch single handle from database (|fetch_handle_from_database|).
+\initials{LDF 2013.08.14.}
+
+\LOG
+\initials{LDF 2013.08.14.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration (version with vector arguments)  @>
+@
+@<|class Handle_Type| function declarations@>=
+static
+int
+fetch_handle_from_database(MYSQL *&mysql_ptr,
+                           unsigned long int handle_id,
+                           Handle_Type &handle,
+                           string type = "",
+                           string thread_str = "");
+
+
+
+@q **** (4) Definition (version with vector arguments)  @>
+@
+@<|Handle_Type::fetch_handle_from_database| definition@>=
+int
+Handle_Type::fetch_handle_from_database(
+                               MYSQL *&mysql_ptr,
+                               unsigned long int handle_id,
+                               Handle_Type &handle,
+                               string type,
+                               string thread_str)
+
+{
+@q ***** (5) @>
+
+     int status;
+
+     bool DEBUG = false;  /* |true|  */
+     set_debug_level(DEBUG, 0, 0); 
+
+#if DEBUG_COMPILE
+     if (DEBUG)
+     {
+         lock_cerr_mutex(); 
+         cerr << thread_str 
+              << "Entering `Handle_Type::fetch_handle_from_database'."
+              << endl;
+         unlock_cerr_mutex(); 
+
+     }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Handle_Type::fetch_handle_from_database| definition@>=
+
+     string handle_database = (standalone_handle) ? "handlesystem_standalone" : "handlesystem";
+
+     vector<unsigned long int> handle_id_vector;
+     vector<Handle_Type> handle_vector;
+
+     handle_id_vector.push_back(handle_id);
+
+     status = fetch_handles_from_database(mysql_ptr, 
+                                          handle_id_vector,
+                                          handle_vector,
+                                          type,
+                                          thread_str);
+
+     if (status == 2)
+     {
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str
+                 << "In `Handle_Type::fetch_handle_from_database':"
+                 << endl 
+                 << "`Handle_Type::fetch_handles_from_database' (with vector arguments) "
+                 << "returned 2.  No handles fetched."
+                 << endl 
+                 << "Exiting function successfully with return value 2."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+    
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        return 2;
+
+     }  /* |if (status == 2)|  */
+
+@q ***** (5) @>
+
+     else if (status != 0)
+     {
+         lock_cerr_mutex(); 
+         cerr << thread_str 
+              << "ERROR!  In `Handle_Type::fetch_handle_from_database':"
+              << endl 
+              << "`Handle_Type::fetch_handles_from_database' (with vector arguments) "
+              << "failed, returning " << status << "."
+              << endl
+              << "Exiting function unsuccessfully with return value " << status << "."
+              << endl;
+         unlock_cerr_mutex(); 
+
+         return status;
+
+     }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|Handle_Type::fetch_handle_from_database| definition@>=
+
+#if DEBUG_COMPILE
+     else if (DEBUG)
+     {
+         lock_cerr_mutex(); 
+         cerr << thread_str 
+              << "In `Handle_Type::fetch_handle_from_database':"
+              << endl 
+              << "`Handle_Type::fetch_handles_from_database' (with vector arguments) "
+              << "succeeded, returning 0."
+              << endl;
+         unlock_cerr_mutex(); 
+
+     }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+   
+@q ***** (5) @>
+@
+@<|Handle_Type::fetch_handle_from_database| definition@>=
+
+    if (handle_vector.size() == 0)
+    {
+         lock_cerr_mutex(); 
+         cerr << thread_str 
+              << "ERROR!  In `Handle_Type::fetch_handle_from_database':"
+              << endl 
+              << "`handle_vector' is empty.  Failed to fetch handle from "
+              << "`" << handle_database << ".handles' database table."
+              << endl
+              << "Exiting function unsuccessfully with return value 1."
+              << endl;
+         unlock_cerr_mutex(); 
+
+         return 1;
+
+
+    }   /* |if (handle_vector.size() == 0)|  */
+
+@q ***** (5) @>
+
+    handle = handle_vector.front();
+
+#if DEBUG_COMPILE
+    if (DEBUG)
+    {
+        lock_cerr_mutex(); 
+        cerr << thread_str 
+             << "In `Handle_Type::fetch_handle_from_database':"
+             << endl;
+
+        handle.show("handle:");
+
+        unlock_cerr_mutex(); 
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Handle_Type::fetch_handle_from_database| definition@>=
+
+#if DEBUG_COMPILE
+     if (DEBUG)
+     {
+         lock_cerr_mutex(); 
+         cerr << thread_str 
+              << "Exiting `Handle_Type::fetch_handle_from_database' successfully "
+              << "with return value 0."
+              << endl;
+         unlock_cerr_mutex(); 
+
+     }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+     return 0;
+
+}  /* End of |Handle_Type::fetch_handle_from_database| definition  */
+
+
+@q *** (3) Delete handle values (|delete_handle_values|---|static| version). @>
+
+@ Delete handle values (|delete_handle_values|---|static| version).
+\initials{LDF 2013.08.19.}
+
+@q **** (4) Declaration  @>
+
+@<|class Handle_Type| function declarations@>=
+static
+int
+delete_handle_values(std::set<unsigned long int> &handle_id_set, 
+                     vector<string> &handle_value_type_vector,
+                     MYSQL *&mysql_ptr,
+                     string thread_str = "",
+                     bool lock_table = true);
+
+@q **** (4) Definition  @>
+@
+@<|Handle_Type::delete_handle_values| definitions@>=
+int
+Handle_Type::delete_handle_values(std::set<unsigned long int> &handle_id_set, 
+                                  vector<string> &handle_value_type_vector,
+                                  MYSQL *&mysql_ptr,
+                                  string thread_str,
+                                  bool lock_table)
+{
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status = 0;
+
+   stringstream sql_strm;
+
+   MYSQL_RES *result = 0;
+   MYSQL_ROW curr_row;
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+   long int affected_rows;
+
+   string handles_database = (standalone_handle) ? "handlesystem_standalone" : "handlesystem";
+
+   int ret_val = 0;
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Handle_Type::delete_handle_values' (static version)."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Handle_Type::delete_handle_values| definitions@>=
+
+   if (handle_id_set.size() == 0 || handle_value_type_vector.size() == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Type::delete_handle_values':"
+            << endl 
+            << "`handle_id_set' and/or `handle_value_type_vector' is empty."
+            << endl
+            << "Not deleting handle values."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if|  */
+   
+@q ***** (5) @>
+@
+@<|Handle_Type::delete_handle_values| definitions@>=
+
+   if (lock_table)
+   {
+@q ****** (6) @>
+
+      pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+      sql_strm << "lock tables " << handles_database << ".handles write";
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::delete_handle_values':"
+            << endl 
+            << "`lock_table' == `true'.  Will try to lock `" << handles_database << ".handles' "
+            << "database table."
+            << endl
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Type::delete_handle_values':"
+            << endl 
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+          mysql_free_result(result);   
+
+
+       pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::delete_handle_values':"
+            << endl 
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "Locked `" << handles_database << ".handles' "
+            << "database table successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   mysql_free_result(result);   
+   result = 0;
+
+@q ****** (6) @>
+
+   }  /* |if (lock_table)|  */
+
+@q ***** (5) @>
+@
+@<|Handle_Type::delete_handle_values| definitions@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::delete_handle_values':"
+            << endl 
+            << "`lock_table' == `false'.  Not locking `" << handles_database << ".handles' "
+            << "database table."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Handle_Type::delete_handle_values| definitions@>=
+
+   sql_strm.str("");
+
+   string comma_str = "";
+
+
+   sql_strm << "delete from " << handles_database << ".handles where handle_id in (";
+
+   for (set<unsigned long int>::iterator iter = handle_id_set.begin();
+        iter != handle_id_set.end();
+        ++iter)
+   {
+          sql_strm << comma_str << *iter;
+
+          comma_str = ", ";
+   }
+
+   sql_strm << ") and type in (";
+
+   comma_str = "";
+
+   for (vector<string>::iterator iter = handle_value_type_vector.begin();
+        iter != handle_value_type_vector.end();
+        ++iter)
+   {
+          sql_strm << comma_str << "'" << *iter << "'";
+
+          comma_str = ", ";
+   }
+
+   sql_strm << ")";
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::delete_handle_values':"
+            << endl
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Handle_Type::delete_handle_values| definitions@>=
+
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, &affected_rows); 
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Type::delete_handle_values':"
+            << endl 
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Will try to unlock `" << handles_database << ".handles' database table "
+            << "before exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+          mysql_free_result(result);   
+
+       ret_val = 1;
+
+       goto UNLOCK_TABLES;
+
+   }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|Handle_Type::delete_handle_values| definitions@>=
+   
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::delete_handle_values':"
+            << endl 
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "Deleted row(s) from `" << handles_database << ".handles' database table "
+            << "successfully."
+            << endl 
+            << "`affected_rows' == " << affected_rows
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   mysql_free_result(result);   
+   result = 0;
+
+@q ***** (5) @>
+@
+@<|Handle_Type::delete_handle_values| definitions@>=
+
+UNLOCK_TABLES:
+
+   if (result)
+   {
+       mysql_free_result(result);   
+       result = 0;
+   }
+
+@q ***** (5) @>
+
+   if (lock_table)
+   {
+@q ****** (6) @>
+
+      sql_strm.str("");
+
+      sql_strm << "unlock tables";
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::delete_handle_values':"
+            << endl 
+            << "`lock_table' == `true'.  Will try to unlock `" << handles_database << ".handles' "
+            << "database table."
+            << endl
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Type::delete_handle_values':"
+            << endl 
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+          mysql_free_result(result);   
+
+       pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::delete_handle_values':"
+            << endl 
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "Unlocked `" << handles_database << ".handles' "
+            << "database table successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   pthread_mutex_unlock(&sql_lock_tables_mutex);
+   mysql_free_result(result);   
+   result = 0;
+
+@q ****** (6) @>
+
+   }  /* |if (lock_table)|  */
+
+@q ***** (5) @>
+@
+@<|Handle_Type::delete_handle_values| definitions@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::delete_handle_values':"
+            << endl 
+            << "`lock_table' == `false'.  Not unlocking `" << handles_database << ".handles' "
+            << "database table."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Handle_Type::delete_handle_values| definitions@>=
+
+   if (ret_val != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::delete_handle_values':"
+            << endl 
+            << "`ret_val' == " << ret_val << " (!= 0)"
+            << endl 
+            << "Exiting function unsuccessfully with return value `ret_val' == " 
+            << ret_val << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return ret_val;
+
+   }  /* |if (ret_val != 0)|  */
+
+@q ***** (5) @>
+@
+@<|Handle_Type::delete_handle_values| definitions@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Handle_Type::delete_handle_values' (static version) "
+            << "successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+   return 0;
+
+@q ***** (5) @>
+
+}  /* End of |Handle_Type::delete_handle_values| (|static| version) definition  */
+
+
+@q *** (3) Delete handle values (|delete_handle_values|---member version). @>
+
+@ Delete handle values (|delete_handle_values|---member version).
+\initials{LDF 2013.08.19.}
+
+@q **** (4) Declaration  @>
+
+@<|class Handle_Type| function declarations@>=
+int
+delete_handle_values(vector<string> &handle_value_type_vector,
+                     MYSQL *&mysql_ptr,
+                     string thread_str = "",
+                     bool lock_table = true);
+
+@q **** (4) Definition  @>
+@
+@<|Handle_Type::delete_handle_values| definitions@>=
+int
+Handle_Type::delete_handle_values(vector<string> &handle_value_type_vector,
+                                  MYSQL *&mysql_ptr,
+                                  string thread_str,
+                                  bool lock_table)
+{
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status = 0;
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Handle_Type::delete_handle_values' (member version)."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   std::set<unsigned long int> handle_id_set;
+
+   handle_id_set.insert(handle_id);
+
+   status = delete_handle_values(handle_id_set, 
+                                 handle_value_type_vector,
+                                 mysql_ptr,
+                                 thread_str,
+                                 lock_table);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR! In `Handle_Type::delete_handle_values' (member version):"
+            << endl
+            << "`Handle_Type::delete_handle_values' (static version) failed, returning "
+            << status << "."
+            << endl 
+            << "Exiting function unsuccessfully with return value `status' == " << status << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return status;
+
+   }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|Handle_Type::delete_handle_values| definitions@>=   
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::delete_handle_values' (member version):"
+            << endl
+            << "`Handle_Type::delete_handle_values' (static version) succeeded, returning 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Handle_Type::delete_handle_values| definitions@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Handle_Type::delete_handle_values' (member version) "
+            << "successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+   return 0;
+
+@q ***** (5) @>
+
+}  /* End of |Handle_Type::delete_handle_values| (member version) definition  */
+
+@q *** (3) Unmark for deletion (|unmark_handle_for_deletion|).  @>
+@ Unmark for deletion (|unmark_handle_for_deletion|).
+\initials{LDF 2013.08.22.}
+
+\LOG
+\initials{LDF 2013.08.22.}
+Added this function.
+
+\initials{LDF 2013.09.11.}
+Renamed this function from |unmark_for_deletion| to |unmark_handle_for_deletion|.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|class Handle_Type| function declarations@>=
+int
+unmark_handle_for_deletion(MYSQL *&mysql_ptr, string thread_str = "");
+
+@q **** (4) Definition  @>
+@
+@<|Handle_Type::unmark_handle_for_deletion| definition@>=
+int
+Handle_Type::unmark_handle_for_deletion(MYSQL *&mysql_ptr, string thread_str)
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status = 0;
+
+   MYSQL_RES *result = 0;
+   MYSQL_ROW curr_row;
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+   long int affected_rows;
+
+   stringstream sql_strm;
+
+   map<unsigned long int, Handle_Value_Type>::iterator hv_iter;
+
+   int ret_val = 0;
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Handle_Type::unmark_handle_for_deletion'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Handle_Type::unmark_handle_for_deletion| definition@>=
+
+   if (handle_value_map.size() == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Type::unmark_handle_for_deletion':"
+            << endl
+            << "`handle_value_map.size()' == 0.  No handle values."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (handle_value_map.size() == 0)|  */
+
+@q ***** (5) @>
+@
+@<|Handle_Type::unmark_handle_for_deletion| definition@>=
+
+   hv_iter = find("HANDLE_MARKED_FOR_DELETION");
+
+   if (hv_iter == handle_value_map.end())
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "WARNING!  In `Handle_Type::unmark_handle_for_deletion':"
+            << endl 
+            << "Handle `" << handle << "' isn't marked for deletion."
+            << endl 
+            << "Can't unmark handle for deletion."
+            << endl
+            << "Exiting function unsuccessfully with return value "
+            << "`GW_HANDLE_NOT_MARKED_FOR_DELETION'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return GW_HANDLE_NOT_MARKED_FOR_DELETION;
+
+   }  /* |if (hv_iter == handle_value_map.end())|  */
+
+@q ***** (5) @>
+@
+@<|Handle_Type::unmark_handle_for_deletion| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "In `Handle_Type::unmark_handle_for_deletion':"
+            << endl 
+            << "Handle `" << handle << "' is marked for deletion."
+            << endl 
+            << "Will unmark."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Handle_Type::unmark_handle_for_deletion| definition@>=
+
+   string handles_database = (standalone_handle) ? "handlesystem_standalone" 
+                               : "handlesystem";
+
+   pthread_mutex_lock(&sql_lock_tables_mutex);
+
+   sql_strm << "lock tables " << handles_database << ".handles write";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "In `Handle_Type::unmark_handle_for_deletion':"
+            << endl 
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+    
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Type::unmark_handle_for_deletion':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Failed to lock `" << handles_database << ".handles' database table."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+           mysql_free_result(result);
+
+       pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::unmark_handle_for_deletion':"
+            << endl
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "Locked `" << handles_database << ".handles' database table successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   mysql_free_result(result);
+   result = 0;
+   sql_strm.str("");
+
+@q ***** (5) @>
+@
+@<|Handle_Type::unmark_handle_for_deletion| definition@>=
+
+   sql_strm << "delete from " << handles_database << ".handles "
+            << "where handle_value_id = " << hv_iter->second.handle_value_id;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "In `Handle_Type::unmark_handle_for_deletion':"
+            << endl 
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+    
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, &affected_rows);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Type::unmark_handle_for_deletion':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Failed to delete row from `" << handles_database << ".handles' database table."
+            << endl 
+            << "Will try to unlock tables and exit function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+       {
+           mysql_free_result(result);
+           result = 0;
+       }
+
+       ret_val = 1;
+
+       goto UNLOCK_TABLES;
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::unmark_handle_for_deletion':"
+            << endl
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "`affected_rows' == " << affected_rows
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   mysql_free_result(result);
+   result = 0;
+   sql_strm.str("");
+
+@q ***** (5) @>
+@
+@<|Handle_Type::unmark_handle_for_deletion| definition@>=
+
+   sql_strm << "update " << handles_database << ".handles "
+            << "set marked_for_deletion = 0, delete_from_database_timestamp = 0, "
+            << "last_modified = now() "
+            << "where handle_id = " << handle_id;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "In `Handle_Type::unmark_handle_for_deletion':"
+            << endl 
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+    
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, &affected_rows);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Type::unmark_handle_for_deletion':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Failed to update rows in `" << handles_database << ".handles' database table."
+            << endl 
+            << "Will try to unlock tables and exit function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+       {
+           mysql_free_result(result);
+           result = 0;
+       }
+
+       ret_val = 1;
+
+       goto UNLOCK_TABLES;
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::unmark_handle_for_deletion':"
+            << endl
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "`affected_rows' == " << affected_rows
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   mysql_free_result(result);
+   result = 0;
+   sql_strm.str("");
+
+@q ***** (5) @>
+@
+@<|Handle_Type::unmark_handle_for_deletion| definition@>=
+
+
+UNLOCK_TABLES:
+
+   if (result)
+   {
+       mysql_free_result(result);
+       result = 0;
+   }
+
+   sql_strm.str("");
+
+   sql_strm << "unlock tables";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "In `Handle_Type::unmark_handle_for_deletion':"
+            << endl 
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+    
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Handle_Type::unmark_handle_for_deletion':"
+            << endl
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Failed to unlock database tables."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+           mysql_free_result(result);
+
+       pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+       return 1;
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::unmark_handle_for_deletion':"
+            << endl
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "Unlocked database tables successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   pthread_mutex_unlock(&sql_lock_tables_mutex);
+   mysql_free_result(result);
+   result = 0;
+
+@q ***** (5) @>
+@
+@<|Handle_Type::unmark_handle_for_deletion| definition@>=
+
+   if (ret_val != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Handle_Type::unmark_handle_for_deletion':"
+            << endl
+            << "Exiting function with return value " << ret_val << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return ret_val;
+
+
+   }  /* |if (ret_val != 0)|  */
+
+@q ***** (5) @>
+@
+@<|Handle_Type::unmark_handle_for_deletion| definition@>=
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Handle_Type::unmark_handle_for_deletion' successfully "
+            << "with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |Handle_Type::unmark_handle_for_deletion| definition  */
+
+@q *** (3) @>
+
+
+@q ** (2) Putting Handle_Type together.@>
+
+@ Putting \.{Handle\_Type} together.
+\initials{LDF 2012.10.12.}
+
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+class Irods_Object_Type;
+typedef void* yyscan_t;
+class Scan_Parse_Parameter_Type;
+#if 0
+class Handle_Type;
+class Handle_Value_Type;
+#endif 
+@<Declare |class Handle_Type|@>@;@/
+@<|Handle_Type| constructor definitions@>@;@/
+@<|Handle_Type::operator=| definition@>@;@/
+@<|Handle_Type::show| definition@>@;@/
+@<|Handle_Type::clear| definition@>@;@/
+@<|Handle_Type::add_value| definition@>@;@/
+@<|Handle_Type::add_values| definition@>@;@/
+@<|Handle_Type::delete_from_database| definition@>@;@/
+@<|Handle_Type::find| definition@>@;@/
+@<|Handle_Type::created_by_user_id| definition@>@;@/
+@<|Handle_Type::fetch_handles_from_database| definition@>@;@/
+@<|Handle_Type::fetch_handle_from_database| definition@>@;@/
+@<|Handle_Type::delete_handle_values| definitions@>@;@/
+@<|Handle_Type::unmark_handle_for_deletion| definition@>@;@/
+
+@q *** (3) This is what's written to the header file `hndltype.h'.  @>
+
+@ This is what's written to the header file \filename{hndltype.h}.  
+\initials{LDF 2008.12.05.}
+
+@(hndltype.h@>=
+#ifndef HNDLTYPE_H
+#define HNDLTYPE_H 1
+class Irods_Object_Type;
+class Scan_Parse_Parameter_Type;
+typedef void* yyscan_t;
+#if 0 
+class Handle_Type;
+class Handle_Value_Type;
+#endif 
+@<Declare |class Handle_Type|@>@;@/
+#endif 
+
+
+@q (progn (cweb-mode) (outline-minor-mode))                           @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

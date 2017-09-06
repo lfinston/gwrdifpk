@@ -1,0 +1,1991 @@
+@q pullpttp.web  @>
+
+@q Created by Laurence D. Finston (LDF) Tue Feb 11 14:03:43 CET 2014  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+@q * (0) |class Pull_Path_Type| (pullrqtp.web).  @>
+
+@*  {\bf class Pull\_Path\_Type} (pullrqtp\PERIOD web).
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <errno.h>
+#include <math.h>
+#include <time.h>
+#include <limits.h>
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
+
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <fstream>
+#include <sstream>   
+#include <string>
+#include <vector>
+#include <deque>
+#include <stack>
+#include <set>
+
+#include <pthread.h>
+#include <expat.h>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#include <mysql.h>
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif 
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "helper.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "gntlsfnc.h++"
+#include "ex_rfc2818.h++"
+
+@q ** (2) |class Pull_Path_Type| declaration.  @>
+
+@ {\bf class Pull\_Path\_Type} declaration.
+\initials{LDF 2014.02.10.}
+
+\LOG
+\initials{LDF 2014.02.10.}
+Added this |class| declaration.
+
+\initials{LDF 2014.02.11.}
+Added |string distinguished_name|.
+
+\initials{LDF 2014.02.12.}
+Added |new_checksum_sha224|.  It does {\it not\/} correspond to a field in the
+\.{gwirdcli.Pull\_Paths} database table.  It's used in |pull_response| for storing the
+new SHA224 checksum if it (and therefore the file) has changed.
+
+\initials{LDF 2014.02.19.}
+Added |friend| declaration for |class Scan_Parse_Parameter_Type|.
+\ENDLOG 
+
+@<|class Pull_Path_Type| declaration@>=
+
+class Pull_Path_Type
+{
+
+   friend class Pull_Response_Type;
+   friend class Scan_Parse_Parameter_Type;
+
+   friend void* pull_response(void *v);
+
+   int pull_path_id;
+   int pull_response_id;
+   int owner_id;
+   string owner_username;
+   string owner_distinguished_name;
+   string local_path;
+   string remote_path;
+   string checksum_sha224;
+
+   time_t created;
+   time_t last_modified;
+
+   string new_checksum_sha224;
+   bool force_flag;
+
+   public:
+
+   @<|Pull_Path_Type| function declarations@>@;@/ 
+
+};
+
+@q *** (3) Constructors.  @>
+
+@ Constructors.
+\initials{LDF 2014.02.11.}
+
+\LOG
+\initials{LDF 2014.02.11.}
+Added this section.
+\ENDLOG
+
+@q **** (4) Default constructor.  @>
+@ Default constructor.
+\initials{LDF 2014.02.11.}
+
+\LOG
+\initials{LDF 2014.02.11.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|Pull_Path_Type| function declarations@>=
+
+Pull_Path_Type(void);
+
+@q ***** (5) Definition  @>
+@
+@<|Pull_Path_Type| constructor definitions@>=
+
+Pull_Path_Type::Pull_Path_Type(void)
+{
+
+    pull_path_id = pull_response_id = owner_id = 0;
+
+    created = last_modified = static_cast<time_t>(0);
+
+    force_flag = false;
+
+    return;
+
+}  /* End of |Pull_Path_Type| default constructor definition  */
+
+
+@q **** (4) Copy constructor.  @>
+@ Copy constructor.
+\initials{LDF 2014.02.11.}
+
+\LOG
+\initials{LDF 2014.02.11.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|Pull_Path_Type| function declarations@>=
+
+Pull_Path_Type(const Pull_Path_Type &p);
+
+@q ***** (5) Definition  @>
+@
+@<|Pull_Path_Type| constructor definitions@>=
+
+Pull_Path_Type::Pull_Path_Type(const Pull_Path_Type &p)
+{
+
+    operator=(p);
+
+    return;
+
+}  /* End of |Pull_Path_Type| copy constructor definition  */
+
+@q *** (3) Assignment operator.  @>
+@ Assignment operator.
+\initials{LDF 2014.02.11.}
+
+\LOG
+\initials{LDF 2014.02.11.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Pull_Path_Type| function declarations@>=
+const Pull_Path_Type&
+operator=(const Pull_Path_Type &p);
+
+@q **** (4) Definition  @>
+@
+@<|Pull_Path_Type::operator=| definition@>=
+const Pull_Path_Type&
+Pull_Path_Type::operator=(const Pull_Path_Type &p)
+{
+
+   pull_path_id             = p.pull_path_id;
+   pull_response_id         = p.pull_response_id;
+   owner_id                 = p.owner_id;
+   owner_username           = p.owner_username;
+   owner_distinguished_name = p.owner_distinguished_name;
+   local_path               = p.local_path;
+   remote_path              = p.remote_path;
+   checksum_sha224          = p.checksum_sha224;
+   new_checksum_sha224      = p.new_checksum_sha224;
+   created                  = p.created;
+   last_modified            = p.last_modified;
+   force_flag               = p.force_flag;
+
+   return p;
+
+}  /* End of |Pull_Path_Type::operator=| definition  */
+
+@q *** (3) Equality operator.  @>
+@ Equality operator.
+\initials{LDF 2014.02.20.}
+
+\LOG
+\initials{LDF 2014.02.20.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Pull_Path_Type| function declarations@>=
+bool
+operator==(const Pull_Path_Type &p) const;
+
+@q **** (4) Definition  @>
+@
+@<|Pull_Path_Type::operator==| definition@>=
+bool
+Pull_Path_Type::operator==(const Pull_Path_Type &p) const
+{
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `Pull_Path_Type::operator==':"
+            << endl;
+
+       show("*this:");
+  
+       cerr << endl;
+
+       p.show("p:");
+
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   bool b = (   pull_response_id         == p.pull_response_id
+             && owner_id                 == p.owner_id
+             && local_path               == p.local_path
+             && remote_path              == p.remote_path
+             && (   (owner_username.empty() || p.owner_username.empty())
+                 || owner_username == p.owner_username)
+             && (   (owner_distinguished_name.empty() || p.owner_distinguished_name.empty())
+                 || owner_distinguished_name == p.owner_distinguished_name));
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `Pull_Path_Type::operator==' with return value " << b << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+   return b;
+
+}  /* End of |Pull_Path_Type::operator==| definition  */
+
+@q *** (3) Inequality operator.  @>
+@ Inequality operator.
+\initials{LDF 2014.02.20.}
+
+\LOG
+\initials{LDF 2014.02.20.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Pull_Path_Type| function declarations@>=
+bool
+operator!=(const Pull_Path_Type &p) const;
+
+@q **** (4) Definition  @>
+@
+@<|Pull_Path_Type::operator!=| definition@>=
+bool
+Pull_Path_Type::operator!=(const Pull_Path_Type &p) const
+{
+
+   return !operator==(p);
+
+}  /* End of |Pull_Path_Type::operator!=| definition  */
+
+
+
+
+@q *** (3) Set.  @>
+@ Set.
+\initials{LDF 2014.02.11.}
+
+\LOG
+\initials{LDF 2014.02.11.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Pull_Path_Type| function declarations@>=
+int
+set(MYSQL_ROW &curr_row, string thread_str = "");
+
+@q **** (4) Definition  @>
+@
+@<|Pull_Path_Type::set| definition@>=
+int
+Pull_Path_Type::set(MYSQL_ROW &curr_row, string thread_str)
+{
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   unsigned long int temp_val = 0UL;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Pull_Path_Type::set'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+@q ***** (5) @>
+@
+@<|Pull_Path_Type::set| definition@>=
+
+   int field_ctr = 0;
+
+@q ***** (5) |pull_path_id|  @>
+@ |pull_path_id|.
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Path_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Path_Type::set':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Can't set `pull_path_id'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;        
+   }
+   else
+   {
+@q ****** (6) @>
+
+       errno = 0;
+       temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Path_Type::set':"
+                << "`strtoul' failed, returning `ULONG_MAX'."
+                << endl
+                << "Failed to set `pull_path_id'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;        
+
+       }
+
+@q ****** (6) @>
+
+       else if (temp_val > UINT_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Path_Type::set':"
+                << "`temp_val' == " << temp_val << " (> `UINT_MAX')."
+                << endl
+                << "Invalid value.  Failed to set `pull_path_id'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;        
+
+       }
+
+@q ****** (6) @>
+
+       pull_path_id = temp_val;
+
+       temp_val = 0UL;
+   
+@q ****** (6) @>
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+@q ***** (5) |pull_response_id|  @>
+@ |pull_response_id|.
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Path_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Path_Type::set':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Can't set `pull_response_id'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;        
+   }
+   else
+   {
+@q ****** (6) @>
+
+       errno = 0;
+       temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Path_Type::set':"
+                << "`strtoul' failed, returning `ULONG_MAX'."
+                << endl
+                << "Failed to set `pull_response_id'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;        
+
+       }
+
+@q ****** (6) @>
+
+       else if (temp_val > UINT_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Path_Type::set':"
+                << "`temp_val' == " << temp_val << " (> `UINT_MAX')."
+                << endl
+                << "Invalid value.  Failed to set `pull_response_id'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;        
+
+       }
+
+@q ****** (6) @>
+
+       pull_response_id = temp_val;
+
+       temp_val = 0UL;
+   
+@q ****** (6) @>
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+@q ***** (5) |owner_id|  @>
+@ |owner_id|.
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Path_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Path_Type::set':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Can't set `owner_id'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;        
+   }
+   else
+   {
+@q ****** (6) @>
+
+       errno = 0;
+       temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Path_Type::set':"
+                << "`strtoul' failed, returning `ULONG_MAX'."
+                << endl
+                << "Failed to set `owner_id'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;        
+
+       }
+
+@q ****** (6) @>
+
+       else if (temp_val > UINT_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Path_Type::set':"
+                << "`temp_val' == " << temp_val << " (> `UINT_MAX')."
+                << endl
+                << "Invalid value.  Failed to set `owner_id'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;        
+
+       }
+
+@q ****** (6) @>
+
+       owner_id = temp_val;
+
+       temp_val = 0UL;
+   
+@q ****** (6) @>
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+
+@q ***** (5) |owner_username|  @>
+@ |owner_username|.
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Path_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Path_Type::set':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Can't set `owner_username'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;        
+   }
+   else
+   {
+
+       owner_username = curr_row[field_ctr];
+
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+
+
+@q ***** (5) |owner_distinguished_name|  @>
+@ |owner_distinguished_name|.
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Path_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Path_Type::set':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Can't set `owner_distinguished_name'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;        
+   }
+   else
+   {
+
+       owner_distinguished_name = curr_row[field_ctr];
+
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+@q ***** (5) |local_path|  @>
+@ |local_path|.
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Path_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Path_Type::set':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Can't set `local_path'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;        
+   }
+   else
+   {
+
+       local_path = curr_row[field_ctr];
+
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+@q ***** (5) |remote_path|  @>
+@ |remote_path|.
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Path_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Path_Type::set':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Can't set `remote_path'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;        
+   }
+   else
+   {
+
+       remote_path = curr_row[field_ctr];
+
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+@q ***** (5) |checksum_sha224|  @>
+@ |checksum_sha224|.
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Path_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "WARNING!  In `Pull_Path_Type::set':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Setting `checksum_sha224' to the empty string."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       checksum_sha224 = "";
+   }
+   else
+   {
+
+       checksum_sha224 = curr_row[field_ctr];
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+@q ***** (5) |created|  @>
+@ |created|.
+\initials{LDF 2014.02.13.}
+
+@<|Pull_Path_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "WARNING!  `Pull_Path_Type::set':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Setting `created' to `(time_t) 0'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       created = static_cast<time_t>(0);
+
+   }
+   else
+   {
+@q ****** (6) @>
+
+       errno = 0;
+       temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Path_Type::set':"
+                << "`strtoul' failed, returning `ULONG_MAX'."
+                << endl
+                << "Failed to set `created'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;        
+
+       }
+
+@q ****** (6) @>
+
+       created = temp_val;
+
+       temp_val = 0UL;
+   
+@q ****** (6) @>
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+@q ***** (5) |last_modified|  @>
+@ |last_modified|.
+\initials{LDF 2014.02.13.}
+
+@<|Pull_Path_Type::set| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "WARNING!  `Pull_Path_Type::set':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Setting `last_modified' to `(time_t) 0'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       last_modified = static_cast<time_t>(0);
+
+   }
+   else
+   {
+@q ****** (6) @>
+
+       errno = 0;
+       temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Path_Type::set':"
+                << "`strtoul' failed, returning `ULONG_MAX'."
+                << endl
+                << "Failed to set `last_modified'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;        
+
+       }
+
+@q ****** (6) @>
+
+       last_modified = temp_val;
+
+       temp_val = 0UL;
+   
+@q ****** (6) @>
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+@q ***** (5) @>
+@
+@<|Pull_Path_Type::set| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Pull_Path_Type::set' successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+   return 0;
+
+}  /* End of |Pull_Path_Type::set| definition  */
+
+
+@q *** (3) Clear.  @>
+@ Clear.
+\initials{LDF 2014.02.11.}
+
+\LOG
+\initials{LDF 2014.02.11.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|Pull_Path_Type| function declarations@>=
+void
+clear(void);
+
+@q ***** (5) Definition  @>
+@
+@<|Pull_Path_Type::clear| definition@>=
+void
+Pull_Path_Type::clear(void)
+{
+
+    pull_path_id = pull_response_id = owner_id = 0;
+
+    local_path = remote_path = owner_username = owner_distinguished_name 
+       = checksum_sha224 = new_checksum_sha224 = "";
+          
+    created = last_modified = static_cast<time_t>(0); 
+
+    force_flag = false;
+
+    return;
+
+}  /* End of |Pull_Path_Type::clear| definition  */
+
+@q *** (3) Show.  @>
+@ Show.
+\initials{LDF 2014.02.11.}
+
+\LOG
+\initials{LDF 2014.02.11.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|Pull_Path_Type| function declarations@>=
+void
+show(string s = "") const;
+
+@q ***** (5) Definition  @>
+@
+@<|Pull_Path_Type::show| definition@>=
+void
+Pull_Path_Type::show(string s) const
+{
+
+    if (s.empty())
+       s = "Pull_Path_Type:";
+
+    cerr << s 
+         << endl
+         << "pull_path_id:              " << pull_path_id
+         << endl 
+         << "pull_response_id:          " << pull_response_id
+         << endl 
+         << "owner_id:                  " << owner_id
+         << endl 
+         << "owner_username:            " << owner_username
+         << endl 
+         << "owner_distinguished_name:  " << owner_distinguished_name
+         << endl 
+         << "local_path:                " << local_path
+         << endl 
+         << "remote_path:               " << remote_path
+         << endl
+         << "checksum_sha224:           " << checksum_sha224
+         << endl
+         << "new_checksum_sha224:       " << new_checksum_sha224
+         << endl
+         << "force_flag:                " << force_flag
+         << endl
+         << "created:                   " << created;
+
+    if (created > 0)
+        cerr << "   " << convert_seconds(created);
+
+    cerr << endl;
+
+    cerr << "last_modified:             " << last_modified;
+
+    if (last_modified > 0)
+       cerr << "   " << convert_seconds(last_modified);
+
+    cerr << endl;
+          
+    return;
+
+}  /* End of |Pull_Path_Type::show| definition  */
+
+@q *** (3) Write pull path to database (|write_pull_path_to_database|). @>
+@ Write pull path to database (|write_pull_path_to_database|).
+\initials{LDF 2014.02.19.}
+
+@q **** (4) Declaration  @>
+
+@<|Pull_Path_Type| function declarations@>=
+int
+write_pull_path_to_database(MYSQL *mysql_ptr, bool lock = true, string thread_str = "");
+
+@q **** (4) Definition  @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+int
+Pull_Path_Type::write_pull_path_to_database(MYSQL *mysql_ptr, bool lock, string thread_str)
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status = 0;
+
+   stringstream sql_strm;
+
+   MYSQL_RES *result = 0;
+   MYSQL_ROW curr_row;
+
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+   long int affected_rows;
+ 
+   unsigned long int temp_val = 0UL;
+ 
+   stringstream temp_strm;
+
+   FILE *fp = 0;
+
+   int ret_val = 0;
+
+   char buffer[256];
+
+   memset(buffer, 0, 256);
+
+   string temp_str;
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Pull_Path_Type::write_pull_path_to_database'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+@q ***** (5) @>
+@ 
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+   if (pull_path_id > 0 && force_flag == false)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `Pull_Path_Type::write_pull_path_to_database':"
+            << endl
+            << "`pull_path_id' == " << pull_path_id << " (> 0) and `force_flag' == `false'."
+            << endl
+            << "Not overwriting existing entry in the `gwirdcli.Pull_Paths' database table."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1;
+
+   }  /* |if (pull_path_id > 0 && force_flag == false)|  */
+
+@q ***** (5) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+   if (lock == true)
+   {
+@q ****** (6) @>
+
+       pthread_mutex_lock(&sql_lock_tables_mutex);
+
+       sql_strm << "lock tables gwirdcli.Pull_Paths write";
+
+       status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, 0);
+
+       if (status != 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Path_Type::write_pull_path_to_database':"
+               << endl 
+               << "`submit_mysql_query' failed, returning " << status << "."
+               << endl
+               << "Failed to lock `gwirdcli.Pull_Paths' database table."
+               << endl
+               << "Exiting function unsuccessfully with return value 1."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          if (result)
+             mysql_free_result(result); 
+
+          pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+          return 1;
+
+       }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Pull_Path_Type::write_pull_path_to_database':"
+                << endl 
+                << "`submit_mysql_query' succeeded, returning 0:"
+                << endl
+                << "Locked `gwirdcli.Pull_Paths' database table successfully."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        mysql_free_result(result); 
+        result = 0;
+        sql_strm.str("");
+
+
+   }  /* |if (lock == true)|  */
+
+@q ***** (5) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `Pull_Path_Type::write_pull_path_to_database':"
+            << endl
+            << "`lock' == `false'.  Not locking database tables."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ***** (5) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+   if (pull_path_id == 0)
+   {
+@q ****** (6) @>
+
+       sql_strm << "select pull_path_id from gwirdcli.Pull_Paths "
+                << "order by pull_path_id desc limit 1";
+
+       status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, &row_ctr, &field_ctr);
+
+       if (status != 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Path_Type::write_pull_path_to_database':"
+               << endl 
+               << "`submit_mysql_query' failed, returning " << status << "."
+               << endl
+               << "Failed to query `gwirdcli' database."
+               << endl
+               << "Will try to unlock tables."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          if (result)
+          {
+             mysql_free_result(result); 
+             result = 0;
+          }
+
+          ret_val = 1;
+
+          goto UNLOCK_TABLES;
+
+       }  /* |if (status != 0)|  */
+
+
+@q ****** (6) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+               << "In `Pull_Path_Type::write_pull_path_to_database':"
+               << endl 
+               << "`submit_mysql_query' succeeded, returning 0."
+               << endl
+               << "`row_ctr'   == " << row_ctr
+               << endl
+               << "`field_ctr' == " << field_ctr
+               << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+       if (row_ctr == 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Path_Type::write_pull_path_to_database':"
+               << endl 
+               << "`row_ctr' == 0."
+               << endl
+               << "Failed to retrieve `pull_path_id' from `gwirdcli.Pull_Paths' "
+               << "database table."
+               << endl
+               << "Will try to unlock tables."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          if (result)
+          {
+             mysql_free_result(result); 
+             result = 0;
+          }
+
+          ret_val = 1;
+
+          goto UNLOCK_TABLES;
+
+       }  /* |if (row_ctr == 0)|  */
+
+
+@q ****** (6) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+       curr_row = mysql_fetch_row(result);
+
+       if (curr_row == 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Path_Type::write_pull_path_to_database':"
+               << endl 
+               << "`mysql_fetch_row' failed, returning NULL."
+               << endl
+               << "Will try to unlock tables."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          mysql_free_result(result); 
+          result = 0;
+
+          ret_val = 1;
+
+          goto UNLOCK_TABLES;
+
+       }  /* |if (curr_row == 0)|  */
+
+       
+@q ****** (6) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+ 
+       if (curr_row[0] == 0 || strlen(curr_row[0]) == 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Path_Type::write_pull_path_to_database':"
+               << endl 
+               << "`curr_row[0]' is NULL or empty."
+               << endl
+               << "Will try to unlock tables."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          mysql_free_result(result); 
+          result = 0;
+
+          ret_val = 1;
+
+          goto UNLOCK_TABLES;
+
+       }  /* |if|  */
+
+@q ****** (6) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+       errno = 0;
+       temp_val = strtoul(curr_row[0], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Path_Type::write_pull_path_to_database':"
+               << endl 
+               << "`strtoul' failed, returning `ULONG_MAX':"
+               << endl 
+               << strerror(errno)
+               << endl
+               << "Will try to unlock tables."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          mysql_free_result(result); 
+          result = 0;
+
+          ret_val = 1;
+
+          goto UNLOCK_TABLES;
+
+
+       }
+
+@q ****** (6) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+       else if (temp_val > INT_MAX - 1)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Path_Type::write_pull_path_to_database':"
+               << endl 
+               << "`strtoul' returned `temp_val' == " << temp_val << " (> `INT_MAX' - 1)"
+               << endl
+               << "Value out of range."
+               << endl 
+               << "Will try to unlock tables."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          mysql_free_result(result); 
+          result = 0;
+
+          ret_val = 1;
+
+          goto UNLOCK_TABLES;
+
+       }
+
+@q ****** (6) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+       else
+       {
+           pull_path_id = temp_val + 1;
+           temp_val = 0UL;           
+       }
+
+       mysql_free_result(result); 
+       result = 0;
+       sql_strm.str("");
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Pull_Path_Type::write_pull_path_to_database':"
+                << endl
+                << "`pull_path_id' == " << pull_path_id
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   }  /* |if (pull_path_id == 0)|  */
+
+@q ***** (5) @>
+@
+@:TODO@> !! TODO:  Look into using a C or \CPLUSPLUS/ API for generating the checksum.
+I've taken a cursory look at GPGME and libgcrypt and it doesn't seem like it would be 
+straightforward to use either of these libraries.
+\initials{LDF 2014.02.20.}
+
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+   if (checksum_sha224.empty() || force_flag == true)
+   {
+@q ****** (6) @>
+
+       temp_strm.str("");
+
+       temp_strm << "a=`sha224sum " << local_path << "`; echo $?; echo $a";
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "temp_strm.str() == " << temp_strm.str() << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+       errno = 0;
+       fp = popen(temp_strm.str().c_str(), "r");
+
+@q ****** (6) @>
+
+       if (fp == 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Path_Type::write_pull_path_to_database':"
+               << endl 
+               << "`popen' failed, returning 0:"
+               << endl
+               << strerror(errno)
+               << endl 
+               << "Will try to unlock tables."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          ret_val = 1;
+
+          goto UNLOCK_TABLES;
+
+       }  /* |if (fp == 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Pull_Path_Type::write_pull_path_to_database':"
+                << endl 
+                << "`popen' succeeded."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+       memset(buffer, 0, 256);
+ 
+       status = fread(buffer, 1, 255, fp);
+
+       if (status == 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Path_Type::write_pull_path_to_database':"
+               << endl 
+               << "`fread' failed, returning 0:"
+               << endl 
+               << "Will try to unlock tables."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          ret_val = 1;
+
+          pclose(fp);
+          fp = 0;
+
+          goto UNLOCK_TABLES;
+
+       }  /* |if (status == 0)|  */
+
+@q ****** (6) @>
+
+       else if (status == 255)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Path_Type::write_pull_path_to_database':"
+               << endl 
+               << "`fread' returned 255:  Output of `sha224sum' command, executed via "
+               << "`popen', exceeds maximum amount (254 characters)."
+               << endl 
+               << "`buffer' =="
+               << endl
+               << buffer
+               << endl 
+               << "Will try to unlock tables."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          ret_val = 1;
+
+          pclose(fp);
+          fp = 0;
+
+          goto UNLOCK_TABLES;
+
+       }  /* |else if (status == 255)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "In `Pull_Path_Type::write_pull_path_to_database':"
+               << endl 
+               << "`fread' succeeded, returning " << status << "."
+               << endl 
+               << "`buffer' =="
+               << endl
+               << buffer
+               << endl;
+          unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+       temp_strm.str("");
+
+       temp_str = "";
+
+       temp_strm << buffer;
+
+       temp_strm.clear();
+
+       temp_strm >> status >> temp_str;
+
+       temp_strm.clear();
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "status == " << status << endl
+                << "temp_str == " << temp_str << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q ****** (6) @>
+
+       if (status != 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Path_Type::write_pull_path_to_database':"
+               << endl 
+               << "`sha224sum' command, executed via `popen', failed, returning " << status << "."
+               << endl 
+               << "`buffer' =="
+               << endl
+               << buffer
+               << endl 
+               << "Will try to unlock tables."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          ret_val = 1;
+
+          pclose(fp);
+          fp = 0;
+
+          goto UNLOCK_TABLES;
+
+       }  /* |else if (status == 255)|  */
+
+@q ****** (6) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Pull_Path_Type::write_pull_path_to_database':"
+                << endl 
+                << "`sha224sum' command, executed via `popen', succeeded, returning 0."
+                << endl 
+                << "`temp_str' == " << temp_str
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+       checksum_sha224 = temp_str;
+
+       temp_str = "";
+
+       pclose(fp);
+       fp = 0;
+
+   }  /* |if (checksum_sha224.empty() || force_flag == true)|  */
+
+
+@q ***** (5) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       show("*this:");
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ***** (5) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+   if (force_flag == true)
+      sql_strm << "replace ";
+   else 
+   
+      sql_strm << "insert ";
+
+/* !! START HERE:  LDF 2014.02.20.  */
+
+   sql_strm << "into gwirdcli.Pull_Paths (pull_path_id, pull_response_id, "
+            << "owner_id, local_path, remote_path, checksum_sha224, "
+            << "created, last_modified) "
+            << "values "
+            << "(" << pull_path_id << ", " << pull_response_id << ", "
+            << owner_id << ", '" << local_path << "', '" << remote_path << "', " 
+            << "'" << checksum_sha224 << "', ";
+
+   if (force_flag)
+      sql_strm << "from_unixtime(" << created << "), now()";
+   else 
+      sql_strm << "now(), 0";
+
+   sql_strm << ")";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+   status = submit_mysql_query(sql_strm.str(), 
+                               result, 
+                               mysql_ptr, 
+                               0, 
+                               0, 
+                               &affected_rows, 
+                               thread_str);
+
+   if (status != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Path_Type::write_pull_path_to_database':"
+            << endl 
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl 
+            << "Failed to insert (or replace) row into the `gwirdcli.Pull_Paths' database table."
+            << endl
+            << "Will try to unlock tables."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ret_val = 1;
+
+       if (result) 
+       {
+          mysql_free_result(result); 
+          result = 0;
+       }
+
+       goto UNLOCK_TABLES;
+
+   }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+
+   else if (   (force_flag == false && affected_rows != 1)
+            || (force_flag == true  && affected_rows != 2))
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Path_Type::write_pull_path_to_database':"
+            << endl 
+            << "`affected_rows' == " << affected_rows << " ";
+
+      
+       if (force_flag == true)
+          cerr << "(!= 2)";
+       else 
+          cerr << "(!= 1)";
+
+       cerr << endl;
+
+       if (affected_rows == 0)
+          cerr << "Failed to insert (or replace) row into the `gwirdcli.Pull_Paths' "
+               << "database table.";
+       else
+          cerr << "This is not permitted.";
+
+       cerr << endl
+            << "Will try to unlock tables."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ret_val = 1;
+
+       mysql_free_result(result); 
+       result = 0;
+
+       goto UNLOCK_TABLES;
+
+   }  /* |else if (affected_rows != 1)|  */
+
+@q ***** (5) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `Pull_Path_Type::write_pull_path_to_database':"
+            << endl 
+            << "`submit_mysql_query' succeeded, returning 0."
+            << endl
+            << "Inserted (or replaced) row into the `gwirdcli.Pull_Paths' database table "
+            << "successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   if (force_flag)
+   {
+
+       lock_cerr_mutex(); 
+       lock_cout_mutex();
+       cout << thread_str 
+            << "In `Pull_Path_Type::write_pull_path_to_database':"
+            << endl 
+            << "Overwrote entry in `gwirdcli.Pull_Paths' database table."
+            << endl;
+       unlock_cout_mutex();
+       unlock_cerr_mutex(); 
+
+   }
+
+   mysql_free_result(result); 
+   result = 0;
+
+@q ***** (5) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+
+UNLOCK_TABLES:
+
+   if (result)
+   {
+      mysql_free_result(result); 
+      result = 0;
+   }
+
+   if (lock == true)
+   {
+
+@q ****** (6) @>
+
+       sql_strm.str("");
+
+       sql_strm << "unlock tables";
+
+       status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, 0);
+
+       if (status != 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Path_Type::write_pull_path_to_database':"
+               << endl 
+               << "`submit_mysql_query' failed, returning " << status << "."
+               << endl
+               << "Failed to unlock `gwirdcli.Pull_Paths' database table."
+               << endl 
+               << "Exiting function unsuccessfully with return value 1."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          if (result)
+             mysql_free_result(result); 
+        
+          pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+          return 1;
+
+       }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Pull_Path_Type::write_pull_path_to_database':"
+                << endl 
+                << "`submit_mysql_query' succeeded, returning 0:"
+                << endl
+                << "Unlocked `gwirdcli.Pull_Paths' database table successfully."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+       mysql_free_result(result); 
+       result = 0;
+
+   }  /* |if (lock == true)|  */
+
+@q ***** (5) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `Pull_Path_Type::write_pull_path_to_database':"
+            << endl
+            << "`lock' == `false'.  Not unlocking database tables."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+   if (ret_val != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Pull_Path_Type::write_pull_path_to_database' "
+            << "with return value " << ret_val << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return ret_val;
+
+   }  /* |if (ret_val != 0)|  */
+
+@q ***** (5) @>
+@
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Pull_Path_Type::write_pull_path_to_database' "
+            << "successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+   return 0;
+
+}  /* End of |Pull_Path_Type::write_pull_path_to_database| definition   */
+
+
+@q *** (3) @>
+
+@q ** (2) Putting |class Pull_Path_Type| together.@>
+
+@ Putting |class Pull_Path_Type| together.
+\initials{LDF 2014.02.10.}
+
+@q *** (3) This is what's compiled.  @>
+
+This is what's compiled.  
+\initials{LDF 2014.02.20.}
+
+@c
+using namespace std;
+@<Include files@>@;@/
+using namespace gwrdifpk;
+@<|class Pull_Path_Type| declaration@>@;@/ 
+@<|Pull_Path_Type| constructor definitions@>@;@/ 
+@<|Pull_Path_Type::operator=| definition@>@;@/
+@<|Pull_Path_Type::operator==| definition@>@;@/
+@<|Pull_Path_Type::operator!=| definition@>@;@/
+@<|Pull_Path_Type::set| definition@>@;@/
+@<|Pull_Path_Type::clear| definition@>@;@/
+@<|Pull_Path_Type::show| definition@>@;@/
+@<|Pull_Path_Type::write_pull_path_to_database| definition@>@;@/
+
+@q *** (3) This is what's written to the header file `pullpttp.h++'.  @>
+
+@ This is what's written to the header file \filename{pullpttp.h++}.  
+\initials{LDF 2014.02.01.}
+
+@(pullpttp.h@>=
+#ifndef PULLPTTP_H
+#define PULLPTTP_H 1
+using namespace std;
+@<|class Pull_Path_Type| declaration@>@;@/ 
+#endif 
+
+@q (progn (cweb-mode) (outline-minor-mode))                              @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

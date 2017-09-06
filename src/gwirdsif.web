@@ -1,0 +1,3602 @@
+@q gwirdsif.web  @>
+@q [...]/Finston/gwrdifpk/src/gwirdsif.web  @>
+
+@q Created by Laurence D. Finston (LDF) Mon Jun 25 14:41:04 CEST 2012  @>
+
+@q * (1) Top  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+@* Server program gwirdsif.
+\initials{LDF 2012.11.21.}
+
+@q * (1) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#include <stdlib.h>
+#include <stdio.h>
+
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif 
+
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <grp.h>
+#include <math.h>
+#include <pwd.h>
+#include <signal.h>
+#include <string.h>
+
+#include <sys/mman.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/un.h>
+#include <sys/wait.h>
+#include <time.h>
+#include <unistd.h>
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+#include <string>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <stdarg.h>
+#include <limits.h>
+#include <algorithm>
+#include <fstream>
+#include <iterator>
+
+#include <sstream>   
+
+#include <map>
+#include <vector>
+#include <deque>
+#include <stack>
+#include <set>
+
+#include <pthread.h>
+
+#include <expat.h>
+
+#if HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#include <mysql.h>
+
+#undef NAME_LEN
+#undef LOCAL_HOST
+
+#include "rspercds.h++"
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "sgnlhndl.h++"
+#include "purgfncs.h++"
+#include "purgdtbs.h++"
+#include "purgarch.h++"
+#include "purgdcmd.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "cmdlnopt.h++"
+#include "parser.h++"  
+#include "scanner.h++"
+#include "rspnstp.h++" 
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "pullrqtp.h++"
+#include "pullpttp.h++"
+#include "pullrstp.h++"
+#include "scprpmtp.h++"
+#include "usrinftp.h++"
+#include "connect.h++"
+#include "listnlcl.h++"
+#include "lstnrmta.h++"
+#include "lstnrmtx.h++"
+#include "pullrqst.h++"
+
+@q * (1) Finish gwirdsif (exit handler).  @>
+@ Finish gwirdsif (exit handler).
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this function.
+
+\initials{LDF 2013.04.25.}
+Changed name of this function from |finish| to |finish_gwirdsif| in order to prevent 
+confusion with the exit handler for the client program \.{gwirdcli}.
+\ENDLOG
+
+@q ** (2) Definition  @>
+
+@<|finish_gwirdsif| definition@>=
+void
+finish_gwirdsif(void)
+{
+
+    bool DEBUG = false;  /* |true|  */
+    set_debug_level(DEBUG, 0, 0);
+
+    int status;
+
+#if DEBUG_COMPILE
+    if (DEBUG) 
+    {
+        lock_cerr_mutex(); 
+        cerr << "[gwirdsif] Entering `finish_gwirdsif'." << endl;
+        unlock_cerr_mutex(); 
+    }
+#endif  /* |DEBUG_COMPILE|  */  
+
+     pthread_attr_destroy(&attr);  
+
+@q ** (2) @>
+@
+\LOG
+\initials{LDF 2013.04.19.}
+Added this section.
+\ENDLOG
+
+@<|finish_gwirdsif| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "thread_ctr_id_map.size() == " << thread_ctr_id_map.size() << endl;
+
+       if (thread_ctr_id_map.size() > 0)
+          cerr << "Will cancel threads with IDs on `thread_ctr_id_map'." << endl;
+       else
+          cerr << "`thread_ctr_id_map' is empty.  No threads with IDs on "
+               << "`thread_ctr_id_map' to cancel." 
+               << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+@q ** (2) @>
+    
+  pthread_mutex_lock(&thread_ctr_id_map_mutex);
+
+  for (map<unsigned int, pthread_t>::iterator iter = thread_ctr_id_map.begin();
+       iter != thread_ctr_id_map.end();
+       ++iter)
+   {   
+@q *** (3) @>
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "iter->first == " << iter->first << endl
+                 << "iter->second == " << iter->second << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        if (pthread_equal(pthread_self(), iter->second))
+        {
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "`pthread_self()' == `iter->second' == " << iter->second
+                     << endl
+                     << "Not calling `pthread_cancel' on the current thread."
+                     << endl
+                     << "Continuing."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            continue;
+
+        }  /* |if (pthread_equal(pthread_self(), iter->second))|  */
+
+
+@q *** (3) @>
+
+        status = pthread_cancel(iter->second);
+
+        if (status != 0)
+        {
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `finish_gwirdsif':  `pthread_cancel' failed, returning "
+                << status << ":" 
+                << endl
+                << strerror(status)
+                << endl
+                << "Failed to cancel thread number " << iter->first << " "
+                << "with ID " << iter->second << ".  Continuing."
+                << endl;
+           unlock_cerr_mutex(); 
+       }
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `finish_gwirdsif':  `pthread_cancel' succeeded, returning 0."
+                << endl
+                << "Canceled thread number " << iter->first << " "
+                << "with ID " << iter->second << " successfully."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q *** (3) @>
+
+   }  /* |for|  */
+
+   pthread_mutex_unlock(&thread_ctr_id_map_mutex);
+
+   thread_ctr_id_map.clear();
+   thread_id_ctr_map.clear();
+
+@q ** (2) @>
+@
+\LOG
+\initials{LDF 2013.09.19.}
+Added code for unlocking the memory for |gpg_key_id| and |gpg_passphrase| 
+and deleting them.
+\ENDLOG
+
+@<|finish_gwirdsif| definition@>=
+
+
+   if (!save_temp_files)
+   {
+       for (map<int, User_Info_Type>::iterator iter = global_user_info_map.begin();
+            iter != global_user_info_map.end();
+            ++iter)
+       {
+            unlink(iter->second.get_irods_env_filename().c_str());
+            unlink(iter->second.get_irods_auth_filename().c_str());
+
+       }  /* |for|  */
+
+   }  /* |if (!save_temp_files)|  */
+
+   global_user_info_map.clear();
+
+   if (gpg_key_id != 0)
+   {
+       memset(gpg_key_id, 0, 10);
+       munlock(gpg_key_id, 10);
+       delete[] gpg_key_id;
+       gpg_key_id = 0;
+        
+   }
+
+   if (gpg_passphrase != 0)
+   {
+       memset(gpg_passphrase, 0, gpg_passphrase_length);
+       munlock(gpg_passphrase, gpg_passphrase_length);
+       delete[] gpg_passphrase;
+       gpg_passphrase = 0;
+        
+   }
+
+   if (mysql_password != 0)
+   {
+       memset(mysql_password, 0, MYSQL_PASSWORD_LENGTH);
+       munlock(mysql_password, MYSQL_PASSWORD_LENGTH);
+       delete[] mysql_password;
+       mysql_password = 0;
+       
+   }
+  
+
+
+@q ** (2) @>
+@
+\LOG
+\initials{LDF 2013.07.25.}
+@:BUG FIX@> BUG FIX: Now calling |pthread_cond_destroy| on |purge_server_database_cond|.
+\ENDLOG 
+
+@<|finish_gwirdsif| definition@>=
+
+   pthread_mutex_destroy(&cerr_mutex);
+   pthread_mutex_destroy(&cout_mutex);
+   pthread_mutex_destroy(&thread_ctr_mutex);
+   pthread_mutex_destroy(&session_data_mutex);
+   pthread_mutex_destroy(&gpg_passphrase_fifo_mutex);
+   pthread_mutex_destroy(&sql_mutex);
+   pthread_mutex_destroy(&sql_lock_tables_mutex);
+   pthread_mutex_destroy(&log_strm_mutex);
+   pthread_mutex_destroy(&err_log_strm_mutex);
+   pthread_mutex_destroy(&thread_ctr_id_map_mutex);
+   pthread_mutex_destroy(&global_user_info_map_mutex);
+   pthread_mutex_destroy(&purge_server_database_mutex);
+   pthread_cond_destroy(&purge_server_database_cond);
+
+   pthread_mutex_destroy(&purge_irods_archive_mutex);
+   pthread_cond_destroy(&purge_irods_archive_cond);
+
+   pthread_mutex_destroy(&purge_dc_metadata_mutex);
+   pthread_cond_destroy(&purge_dc_metadata_cond);
+
+   if (gpg_passphrase_fifo_fd > 0)
+   {
+      close(gpg_passphrase_fifo_fd);
+      unlink(gpg_passphrase_fifo_name.c_str());
+   }
+
+   log_strm.close();
+   err_log_strm.close();
+
+#if DEBUG_COMPILE
+   if (DEBUG) 
+   {
+       cerr << "[gwirdsif] Exiting `finish_gwirdsif'." << endl;
+   }
+#endif  /* |DEBUG_COMPILE|  */  
+
+   return;
+
+}   /* End of |finish_gwirdsif| definition  */
+
+
+
+@q * (1) Main  @>
+
+@ Main.
+\initials{LDF 2012.06.25.}
+
+@<Main@>=
+int
+main(int argc, char *argv[])
+{
+@q ** (2) @>
+
+    bool DEBUG = false;  /* |true|  */
+    set_debug_level(DEBUG, 0, 0);
+
+    is_gwirdsif = true;
+
+    string current_dir;
+
+    stringstream temp_strm;
+
+    cerr << "# " << get_datestamp(0, 0, 0, 2, "'") << endl
+         << "Started run" << endl; 
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       cerr << "[gwirdsif] [Thread 0] In `main':  Entering `gwirdsif'." << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    pthread_mutex_init(&cerr_mutex, 0);
+    pthread_mutex_init(&cout_mutex, 0);
+    pthread_mutex_init(&thread_ctr_mutex, 0);
+    pthread_mutex_init(&session_data_mutex, 0);
+    pthread_mutex_init(&gpg_passphrase_fifo_mutex, 0);
+    pthread_mutex_init(&sql_mutex, 0);
+    pthread_mutex_init(&sql_lock_tables_mutex, 0);
+    pthread_mutex_init(&log_strm_mutex, 0);
+    pthread_mutex_init(&err_log_strm_mutex, 0);
+    pthread_mutex_init(&global_user_info_map_mutex, 0);
+    pthread_mutex_init(&purge_server_database_mutex, 0);
+    pthread_mutex_init(&purge_irods_archive_mutex, 0);
+    pthread_mutex_init(&purge_dc_metadata_mutex, 0);
+
+    pthread_cond_init(&purge_server_database_cond, 0);
+    pthread_cond_init(&purge_irods_archive_cond, 0);
+    pthread_cond_init(&purge_dc_metadata_cond, 0);
+
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+
+    int status = 0;
+
+    status = atexit(finish_gwirdsif);
+
+    if (status != 0) 
+    {
+        cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  Cannot set exit function.  "
+             << "Exiting program `gwirdsif' with exit status 1." 
+             << endl;
+        exit(1);
+    }
+
+@q ** (2) Put thread ID for |main| onto |thread_ctr_id_map|.  @>
+
+@ Put thread ID for |main| onto |thread_ctr_id_map|.  
+
+\LOG
+\initials{LDF 2013.04.23.}
+Added this section.
+\ENDLOG
+
+@<Main@>=
+   
+    thread_ctr_id_map[0] = pthread_self();
+    thread_id_ctr_map[pthread_self()] = 0;
+
+@q ** (2) Install signal handlers.  @>
+
+@ Install signal handlers.
+\initials{LDF 2013.04.19.}
+
+\LOG
+\initials{LDF 2013.04.19.}
+Added this section.
+\ENDLOG
+
+@<Main@>=
+
+    struct sigaction signal_action;
+ 
+    signal_action.sa_flags = 0;
+    signal_action.sa_handler = signal_handler;  /* Currently only using one signal handler.
+                                                   \initials{LDF 2013.04.19.}  */
+    sigemptyset(&signal_action.sa_mask);
+
+@q *** (3) SIGINT == 2.  Interrupt.    @>
+@ |SIGINT == 2|.  Interrupt.    @>
+
+@<Main@>=
+
+    sigaddset(&signal_action.sa_mask, SIGINT);
+   
+    errno = 0;
+    status = sigaction(SIGINT, &signal_action, &default_sigint_action);
+
+    if (status == -1)
+    {
+        cerr << "ERROR!  In `main':  `sigaction' failed, returning -1:"
+             << endl
+             << strerror(errno)
+             << endl
+             << "Failed to install signal handler for SIGINT."
+             << endl 
+             << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+             << endl;
+
+        exit(1);
+
+    }
+#if DEBUG_COMPILE 
+    else if (DEBUG)
+    {
+        cerr << "In `main':  `sigaction' succeeded, returning 0."
+             << endl 
+             << "Installed signal handler for SIGINT successfully."
+             << endl;
+    }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q *** (3) SIGTERM  @>
+@ \.{SIGTERM}.a
+
+@<Main@>=
+
+    sigdelset(&signal_action.sa_mask, SIGINT);
+    sigaddset(&signal_action.sa_mask, SIGTERM);
+   
+    errno = 0;
+    status = sigaction(SIGTERM, &signal_action, &default_sigterm_action);
+
+    if (status == -1)
+    {
+        cerr << "ERROR!  In `main':  `sigaction' failed, returning -1:"
+             << endl
+             << strerror(errno)
+             << endl
+             << "Failed to install signal handler for SIGTERM."
+             << endl 
+             << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+             << endl;
+
+        exit(1);
+
+    }
+#if DEBUG_COMPILE 
+    else if (DEBUG)
+    {
+        cerr << "In `main':  `sigaction' succeeded, returning 0."
+             << endl 
+             << "Installed signal handler for SIGTERM successfully."
+             << endl;
+    }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ** (2) Get username and home directory.  @>
+
+@ Get username and home directory.  
+\initials{LDF 2013.04.11.}
+
+\LOG
+\initials{LDF 2013.04.11.}
+Moved this section.  Previously, it appeared after the call to 
+|process_command_line_options|.
+
+\initials{LDF 2013.04.11.}
+Added error-handling code for the case that the current user is \.{root}, 
+has a real or effective group id $= 0$ 0 (\.{root} group), 
+or is a member of group 0.  In all of these cases, \.{gwirdsif} exits 
+unsuccessfully with exit status 1.  There's no need to run \.{gwirdsif}
+with root privileges and exiting in these cases avoids an unnecessary risk.
+@:NOTE@> !! PLEASE NOTE:  There may be a way of evading these checks and 
+running \.{gwirdsif} with root privileges.  For example, it might be possible to 
+use \.{sudo} for this purpose.
+\ENDLOG 
+
+@<Main@>=
+
+@q *** (3) @>
+    
+    struct passwd pwbuf;
+    char buf[sysconf(_SC_GETPW_R_SIZE_MAX)]; 
+    struct passwd *pwbufp;
+
+    status = getpwuid_r(getuid(), &pwbuf,
+                        buf, sysconf(_SC_GETPW_R_SIZE_MAX), &pwbufp);
+
+
+#if DEBUG_COMPILE
+    if (DEBUG)
+    {
+         cerr << "[gwirdsif] [Thread 0] In `main':  `getpwuid_r' returned `" << status << "'" 
+              << endl;
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */             
+
+    if (status != 0)
+    {
+       cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  `getpwuid_r' failed, returning " 
+            << status << "." << endl
+            << endl 
+            << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+            << endl;
+
+       exit(1);
+
+    }  /* |if (status != 0)|  */
+
+    if (pwbuf.pw_gid == 0 && strcmp(pwbuf.pw_name, "root") == 0)
+    {
+       cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':"
+            << endl 
+            << "`pwbuf.pw_gid' ==  " << pwbuf.pw_gid
+            << endl 
+            << "`pwbuf.pw_name' == " << pwbuf.pw_name
+            << endl 
+            << "`pwbuf.pw_gid' == 0 and/or `pwbuf.pw_name' == `root'."
+            << endl 
+            << "It's not a good idea to run `gwirdsif' as `root' "
+            << "or a user with root privileges, so this isn't permitted."
+            << endl 
+            << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+            << endl;
+
+       exit(1);
+
+    }  /* |if (strcmp(pwbuf.pw_name, "root") == 0)|  */
+    
+
+    if (strlen(pwbuf.pw_dir) == 0)
+    {
+       cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  `pwbuf.pw_dir' is empty.  "
+            << "This isn't permitted."
+            << endl 
+            << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+            << endl;
+
+       exit(1);
+
+    }  /* |if (strlen(pw_dir) == 0)|  */
+
+@q *** (3) @>
+@
+@<Main@>=
+
+    homedir = pwbuf.pw_dir;
+
+#if DEBUG_COMPILE
+    if (DEBUG)
+    {
+        cerr << "[gwirdsif] [Thread 0] In `main':"
+             << endl 
+             << "`pwbuf.pw_name' == " << pwbuf.pw_name << ""
+             << endl 
+             << "homedir ==         " << homedir << "" 
+             << endl 
+             << "pwbuf.pw_gid ==    " << pwbuf.pw_gid << "" 
+             << endl;
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ** (2) Check groups.  @>
+
+@ Check groups.  If the real or effective group ID $= 0$ (\.{root}), or if 
+the current user belongs to the \.{root} group, exit unsuccessfully with 
+exit status 1.  This is meant to ensure that the effective group ID of 
+the process running \.{gwirdsif} is not changed to 0.
+\initials{LDF 2013.04.11.}
+
+@<Main@>=
+
+@q *** (3) @>
+
+    gid_t gid  = getgid();
+    gid_t egid = getegid();
+
+#if DEBUG_COMPILE
+    if (DEBUG)
+    {
+        cerr << "gid == " << gid << endl
+             << "egid == " << egid << endl;
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    if (gid == 0 || egid == 0)
+    {
+        cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':"
+             << endl 
+             << "Real group ID `gid'  == " << gid
+             << endl  
+             << "Effective group ID `egid' == " << egid
+             << endl 
+             << "`gid' == 0 and/or `egid' == 0"
+             << endl 
+             << "It's not a good idea to run `gwirdsif' as `root' "
+             << "or a user with root privileges, so this isn't permitted."
+             << endl 
+             << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+             << endl;
+
+        exit(1);
+
+    }  /* |if (gid == 0 || egid == 0)|  */
+
+@q *** (3) @>
+@ First, we allocate space for a single |gid_t| on |gid_t *list|.
+Then, we call |getgroups| once with its |size| argument $= 0$ to find 
+the size of the list of group IDs.  
+If it returns a value $> 1$, we call |realloc| to allocate more space for it,
+using |gid_t *list_1| to refer to the new block of memory.  If, however, it
+returns 1, we just set |list_1 = list|.  Then we call |getgroups| again to get the list.
+\initials{LDF 2013.04.11.}
+
+@<Main@>=
+
+    errno = 0;
+    gid_t *list = static_cast<gid_t*>(malloc(sizeof(gid_t))); 
+
+    if (list == 0)
+    {
+        cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':"
+             << endl 
+             << "`malloc' failed, returning NULL:"
+             << endl  
+             << strerror(errno)
+             << endl 
+             << "Can't determine supplementary groups for current user."
+             << endl 
+             << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+             << endl;
+
+        exit(1);
+
+    }  /* |if (list == 0)|  */
+
+@q *** (3) @>
+@ 
+@<Main@>=
+ 
+    status = getgroups(0, list);
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       cerr << "`getgroups' returned " << status << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q *** (3) @>
+
+    if (status == -1)
+    {
+        cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':"
+             << endl 
+             << "`getgroups' failed, returning -1:"
+             << endl  
+             << strerror(errno)
+             << endl 
+             << "Can't determine supplementary groups for current user."
+             << endl 
+             << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+             << endl;
+
+        free(list);
+        list = 0;
+
+        exit(1);
+
+    }  /* |if (status == -1)|  */
+
+@q *** (3) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       cerr << "[gwirdsif] [Thread 0] In `main':"
+            << endl 
+            << "`getgroups' succeeded, returning " << status << "."
+            << endl;
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q *** (3) @>
+@
+@<Main@>=
+
+   int group_ctr = status;
+
+   if (group_ctr == 0)
+   {
+
+   }
+   else /* |group_ctr > 0|  */
+   {
+@q **** (4) @>
+
+        errno = 0;
+
+        gid_t *list_1 = 0;
+
+        if (group_ctr > 1)
+        {
+           list_1 = static_cast<gid_t*>(realloc(list, group_ctr)); 
+
+           if (list_1 == 0)
+           {
+                cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':"
+                     << endl 
+                     << "`realloc' failed, returning NULL:"
+                     << endl  
+                     << strerror(errno)
+                     << endl 
+                     << "Can't determine supplementary groups for current user."
+                     << endl 
+                     << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+                     << endl;
+
+                free(list);
+                list = 0;
+
+                exit(1);
+
+           }  /* |if (list_1 == 0)|  */
+#if DEBUG_COMPILE
+           else if (DEBUG)
+           {
+               cerr << "[gwirdsif] [Thread 0] In `main':"
+                    << endl 
+                    << "`realloc' succeeded."
+                    << endl;
+
+           }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        }  /* |if (group_ctr > 1)|  */
+
+        else 
+        {
+           list_1 = list;
+           list = 0;
+        }
+
+        errno = 0;
+        status = getgroups(group_ctr, list_1);
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            cerr << "`getgroups' returned " << status << endl;
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        if (status == -1)
+        {
+            cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':"
+                 << endl 
+                 << "`getgroups' failed, returning -1:"
+                 << endl  
+                 << strerror(errno)
+                 << endl 
+                 << "Can't determine supplementary groups for current user."
+                 << endl 
+                 << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+                 << endl;
+
+            free(list_1);
+            list_1 = 0;
+
+            exit(1);
+
+        }  /* |if (status == -1)|  */
+
+        else if (status != group_ctr)
+        {
+            cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':"
+                 << endl 
+                 << "`getgroups' returned " << status << " != " << group_ctr << " "
+                 << "(return value of previous call to `getgroups')"
+                 << endl 
+                 << "This shouldn't be possible."
+                 << endl 
+                 << "Can't determine supplementary groups for current user."
+                 << endl 
+                 << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+                 << endl;
+
+            free(list_1);
+            list_1 = 0;
+
+            exit(1);
+
+        }  /* |if (status == -1)|  */
+
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            cerr << "[gwirdsif] [Thread 0] In `main':"
+                 << endl 
+                 << "`getgroups' succeeded, returning " << status << "."
+                 << endl;
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+   
+        for (int i = 0; i < group_ctr; ++i)
+        {
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                cerr << "list_1[" << i << "] == " << list_1[i] << endl;
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+
+            if (list_1[i] == 0)
+            {
+                 cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':"
+                      << endl 
+                      << "`list_1[" << i << "] == 0 (root)"
+                      << endl 
+                      << "User could set the effective group ID of this process to 0 (root)."
+                      << endl 
+                      << "This is potentially risky and therefore not permitted."
+                      << endl 
+                      << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+                      << endl;
+                 
+                 free(list_1);
+                 list_1 = 0;
+
+                 exit(1);
+
+            }  /* |if (list_1[i] == 0)|  */
+
+        }  /* |for|  */
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            cerr << "[gwirdsif] [Thread 0] In `main':  "
+                 << "Current user is not a a member of the `root' group (gid 0)."
+                 << endl;
+            
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        free(list_1);
+        list_1 = 0;
+
+@q **** (4) @>
+
+   }  /* |else| (|group_ctr > 0|)  */
+
+@q *** (3) @>
+
+@q ** (2) Get hostname.  @>
+@ Get hostname.  
+\initials{LDF 2012.09.19.}
+
+\LOG
+\initials{LDF 2012.09.19.}
+Added this section.  |getdomainname| doesn't return the domain name when I call it
+as \.{lfinsto} on \.{pcfinston.gwdg.de}, so I use a pipe to call \.{hostname --long}
+instead.  I would expect this to work on most Linux systems.
+
+\initials{LDF 2014.02.14.}
+Added code for setting |string gwirdsif_ip_address|.
+\ENDLOG
+
+@<Main@>=
+
+@q *** (3) @>
+
+    char buffer[128];
+    memset(buffer, 0, 128);
+
+    FILE* fp = popen("hostname --long && hostname --ip-address", "r");
+
+    if (fp == 0)
+    {
+         cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  `popen' failed, "
+              << "returning 0."
+              << endl
+              << "Calls to `hostname' failed.  Can't set `gwirdsif_hostname' "
+              << "and `gwirdsif_ip_address'."
+              << endl 
+              << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+              << endl;
+
+         exit(1);
+           
+    }   
+
+@q *** (3) @>
+
+#if DEBUG_COMPILE
+    if (DEBUG)
+    {
+         cerr << "[gwirdsif] [Thread 0] In `main':  `popen' succeeded."
+              << endl;
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q *** (3) @>
+
+    status = fread(buffer, 1, 128, fp);
+
+    if (status == 0)
+    {
+         cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  `fread' failed, returning 0."
+              << endl 
+              << "Calls to `hostname' failed."
+              << endl 
+              << "Can't set `gwirdsif_hostname' or `gwirdsif_ip_address'."
+              << endl 
+              << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+              << endl;
+
+         pclose(fp);
+
+         exit(1);
+
+    }
+
+@q *** (3) @>
+
+    else if (status == 128)
+    {
+         cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  `fread' returned 128:  "
+              << "Output of `hostname --long' exceeds maximum length."
+              << endl 
+              << "Can't set `gwirdsif_hostname' and `gwirdsif_ip_address'."
+              << endl 
+              << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+              << endl;
+
+         pclose(fp);
+
+         exit(1);
+
+    }    
+
+
+@q *** (3) @>
+
+#if DEBUG_COMPILE
+    else if (DEBUG)
+    {
+         cerr << "[gwirdsif] [Thread 0] In `main':  `fread' succeeded, returning "
+              << status << "."
+              << endl 
+              << "`buffer' == " << buffer
+              << endl;
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q *** (3) @>
+
+    pclose(fp);
+    fp = 0;
+
+    temp_strm.str("");
+
+    temp_strm << buffer;
+
+    temp_strm.clear();
+
+    temp_strm >> gwirdsif_hostname >> gwirdsif_ip_address;
+
+@q *** (3) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "gwirdsif_hostname   == " << gwirdsif_hostname << endl
+            << "gwirdsif_ip_address == " << gwirdsif_ip_address << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+    
+   temp_strm.str("");
+   temp_strm.clear();
+
+@q ** (2) Initialize the MySQL library.  @>
+
+@ Initialize the MySQL library.  
+\initials{LDF 2012.07.10.}
+
+\LOG
+\initials{LDF 2012.07.10.}
+Added this section.
+\ENDLOG
+
+@<Main@>=
+
+    if (mysql_library_init(0, NULL, NULL)) 
+    {
+        cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  Failed to initialize the MySQL library."
+             << endl
+             << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+             << endl;
+
+        exit(1);
+
+    }
+
+#if DEBUG_COMPILE
+    else if (DEBUG)
+    {
+      cerr << "[gwirdsif] [Thread 0] In `main':  mysql_library_init succeeded." << endl;
+    }  
+#endif  /* |DEBUG_COMPILE|  */  
+
+
+
+@q ** (2) Process command-line options.  @>
+@ Process command-line options.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this section.
+\ENDLOG
+
+@<Main@>=
+
+
+    port_num_anon = DEFAULT_PORT_NUM_ANON;
+    port_str_anon = DEFAULT_PORT_STR_ANON;
+
+    port_num_x_509 = DEFAULT_PORT_NUM_X_509;
+    port_str_x_509 = DEFAULT_PORT_STR_X_509;
+
+    status = process_command_line_options(argc, argv);
+
+    if (status != 0)
+    {
+         cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  "
+              << "`process_command_line_options' failed, returning " << status
+              << endl
+              << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+              << endl;
+
+          mysql_library_end();
+          exit(1);
+
+    }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+    else if (DEBUG)
+    {
+         cerr << "[gwirdsif] [Thread 0] In `main':  "
+              << "`process_command_line_options' succeeded, returning 0."
+              << endl;
+
+    }  /* |else if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q ** (2) @>
+@
+\LOG
+\initials{LDF 2013.09.24.}
+Added this section.
+\ENDLOG
+
+@<Main@>=
+
+    if (mysql_username.empty())
+        mysql_username = "root";
+
+@q ** (2) Check |config_dir| and set, if necessary.  @>
+
+@ Check |config_dir| and set, if necessary. 
+\initials{LDF 2013.07.04.}
+
+\LOG
+\initials{LDF 2013.07.04.}
+Added this section.
+\ENDLOG
+
+@<Main@>=
+
+    char *temp_ptr = getenv("PWD");
+
+    if (temp_ptr != 0)
+        current_dir = temp_ptr;
+
+    if (config_dir.empty())
+    {
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "`config_dir' is empty.  "
+                 << "Will try to set to value of environment variable `PWD'."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+
+        if (!current_dir.empty())
+            config_dir = current_dir;
+
+    }
+
+    if (config_dir.empty())
+    {
+         cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  `config_dir' not set."
+              << endl
+              << "This isn't permitted."
+              << endl
+              << "Use `--config-directory' option or ensure "
+              << "that the environment variable `PWD' is set."
+              << endl 
+              << "Exiting program `gwirdsif' with exit status 1." 
+              << endl;
+
+         mysql_library_end();
+
+         exit(1);
+    }
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdsif] [Thread 0] In `main':  `config_dir' == " 
+            << config_dir 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ** (2) Set |gpg_passphrase_fifo_name|, create FIFO |gpg_passphrase_fifo_id| @>
+@q ** (2) and open the latter for writing in non-blocking mode.                @>
+
+@ Set |gpg_passphrase_fifo_name|, create FIFO |gpg_passphrase_fifo_id|
+and open the latter for writing in non-blocking mode.               
+\initials{LDF 2013.09.27.}
+
+\LOG
+\initials{LDF 2013.09.27.}
+Added this section.
+\ENDLOG
+
+@<Main@>=
+
+@q *** (3) @>
+   
+
+   pthread_mutex_lock(&gpg_passphrase_fifo_mutex);
+
+   gpg_passphrase_fifo_name = "/tmp/gwirdsif.decrypt.fifo";
+
+   errno = 0;
+   status = unlink(gpg_passphrase_fifo_name.c_str());
+
+   if (status == -1 && errno == ENOENT)
+   {
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+          lock_cerr_mutex(); 
+          cerr << "[gwirdsif] [Thread 0] In `main':"
+               << "In `main':  FIFO `" << gpg_passphrase_fifo_name << "' doesn't exist."
+               << endl 
+               << "Will create."
+               << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   }  
+
+@q *** (3) @>
+
+   else if (status == -1)
+   {
+      lock_cerr_mutex(); 
+      cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':"
+           << endl 
+           << "`unlink' failed, returning -1:"
+           << endl 
+           << strerror(errno)
+           << endl
+           << "Failed to unlink old FIFO `" << gpg_passphrase_fifo_name << "'."
+           << endl 
+           << "Exiting program `gwirdsif' with exit status 1." 
+           << endl;
+      unlock_cerr_mutex(); 
+
+      pthread_mutex_unlock(&gpg_passphrase_fifo_mutex);
+
+      mysql_library_end();
+
+      exit(1);
+
+   }  /* |if (status == -1)|  */
+
+@q *** (3) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "[gwirdsif] [Thread 0] In `main':"
+           << "In `main':  `unlink' succeeded, returning 0."
+           << endl 
+           << "Removed old FIFO `" << gpg_passphrase_fifo_name << "' successfully."
+           << endl
+           << "Will recreate."
+           << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q *** (3) @>
+@
+@<Main@>=
+
+   errno = 0;
+   status = mkfifo(gpg_passphrase_fifo_name.c_str(),  S_IRUSR | S_IWUSR);
+
+   if (status == -1)
+   {
+      lock_cerr_mutex(); 
+      cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':"
+           << endl 
+           << "`mkfifo' failed, returning -1:"
+           << endl 
+           << strerror(errno)
+           << endl
+           << "Failed to created FIFO `" << gpg_passphrase_fifo_name << "'."
+           << endl 
+           << "Exiting program `gwirdsif' with exit status 1." 
+           << endl;
+      unlock_cerr_mutex(); 
+
+      pthread_mutex_unlock(&gpg_passphrase_fifo_mutex);
+
+      mysql_library_end();
+
+      exit(1);
+
+   }  /* |if (status == -1)|  */
+
+@q *** (3) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << "[gwirdsif] [Thread 0] In `main':"
+           << "`mkfifo' succeeded, returning 0."
+           << endl 
+           << "Created FIFO `" << gpg_passphrase_fifo_name << "' successfully."
+           << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<Main@>=
+
+   errno = 0;
+
+   gpg_passphrase_fifo_fd = open(gpg_passphrase_fifo_name.c_str(), O_RDWR | O_NONBLOCK);
+
+   if (gpg_passphrase_fifo_fd == -1)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  `open' failed, returning -1:"
+            << endl        
+            << strerror(errno)
+            << endl
+            << "Failed to open FIFO `" << gpg_passphrase_fifo_name << "' for reading or writing "
+            << "in non-blocking mode."
+            << endl 
+            << "Exiting program `gwirdsif' with exit status 1." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+       pthread_mutex_unlock(&gpg_passphrase_fifo_mutex);
+
+       mysql_library_end();
+
+       exit(1);
+
+   }  /* |if|  */
+
+@q *** (3) @>
+
+@ @:NOTE@> !! PLEASE NOTE:  |gpg_passphrase_fifo_mutex| must be unlocked before |set_password| 
+is called, because the latter locks it.
+\initials{LDF 2013.10.02.}
+
+@<Main@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdsif] [Thread 0] In `main': `open' succeeded."
+            << endl
+            << "Opened FIFO `" << gpg_passphrase_fifo_name << "' "
+            << "for reading and writing, in non-blocking mode, successfully."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   pthread_mutex_unlock(&gpg_passphrase_fifo_mutex);
+
+@q ** (2) Set |admin_data| and |admin_data_length|.  @>
+
+@ Set |admin_data| and |admin_data_length|.  
+\initials{LDF 2013.01.11.}
+
+\LOG
+\initials{LDF 2013.01.11.}
+Added this section.
+\ENDLOG
+
+@<Main@>=
+
+    string admin_data_file = config_dir;
+   
+    admin_data_file += "/admin_data.bin";
+
+    fp = fopen(admin_data_file.c_str(), "r");
+
+    if (fp == 0)
+    {
+        cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  `fopen' failed, returning 0."
+             << endl
+             << "Failed to open `" << admin_data_file << "'."
+             << endl 
+             << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+             << endl;
+
+         mysql_library_end();
+         exit(1);
+            
+    }  /* |if (fp == 0)|  */
+
+#if DEBUG_COMPILE
+    else if (DEBUG)
+    {
+        cerr << "[gwirdsif] [Thread 0] In `main':  `fopen' succeeded."
+             << endl
+             << "Opened `" << admin_data_file << "' successfully."
+             << endl;
+
+    }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    status = fread(admin_data, 1, 64, fp);
+
+    if (status == 0)
+    {
+        cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  `fread' failed, returning 0."
+             << endl
+             << "Failed to read data from `admin_data.bin'."
+             << endl 
+             << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+             << endl;
+
+         mysql_library_end();
+         exit(1);
+
+    }
+
+    admin_data_length = status;
+
+#if DEBUG_COMPILE
+    if (DEBUG)
+    {
+        cerr << "[gwirdsif] [Thread 0] In `main':  `fread' succeeded."
+             << endl
+             << "Read `" << admin_data_file << "' successfully."
+             << endl
+             << "Read " << admin_data_length  << " bytes:"
+             << endl;
+
+         fwrite(admin_data, 1, admin_data_length, stderr);
+
+         cerr << endl;
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    fclose(fp);
+    fp = 0;
+
+@q ** (2) @>
+@
+\LOG
+\initials{LDF 2013.06.07.}
+Added this section.
+\ENDLOG
+
+@<Main@>=
+
+    if (irods_server_dir.empty())
+    {
+         char *temp_ptr = getenv("IRODS_SERVER_DIR");
+
+         if (temp_ptr != 0)
+            irods_server_dir = temp_ptr;
+
+    }
+
+   if (irods_server_dir.empty())
+   {
+        cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  `irods_server_dir' not set."
+             << endl
+             << "This isn't permitted."
+             << endl
+             << "Use `--irods-server-directory' option "
+             << "or set environment variable `IRODS_SERVER_DIR'."
+             << endl 
+             << "Exiting program `gwirdsif' with exit status 1." 
+             << endl;
+
+        mysql_library_end();
+
+        exit(1);
+   }
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdsif] [Thread 0] In `main':  `irods_server_dir' == " 
+            << irods_server_dir
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ** (2) Check iRODS server, restart if necessary.  @>
+
+@ Check iRODS server, restart if necessary.  
+\initials{LDF 2013.06.07.}
+
+This doesn't seem to be completely fool-proof.  See the |check_irods_server| definition in 
+\filename{utilfncs.web} for more information.
+\initials{LDF 2013.06.07.}
+
+\LOG
+\initials{LDF 2013.06.07.}
+Added this section.
+\ENDLOG
+
+@<Main@>=
+
+   status = check_irods_server(irods_server_pid, 0);
+
+   if (status != 0)
+   {
+        cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  "
+             << "`check_irods_server' failed, returning " 
+             << status << "."
+             << endl 
+             << "iRODS server not running.  Failed to restart."
+             << endl 
+             << "Exiting program `gwirdsif' with exit status 1." 
+             << endl;
+
+        mysql_library_end();
+
+        exit(1);
+
+   }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdsif] [Thread 0] In `main':  `check_irods_server' succeeded, "
+            << "returning 0."
+            << endl 
+            << "iRODS server running.  PID == " << irods_server_pid
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */   
+
+   cout << "iRODS server directory:  " << irods_server_dir
+        << endl 
+        << "iRODS server running.  PID:  " << irods_server_pid
+        << endl;
+
+@q ** (2) Set up the directories for the Unix domain socket, logs, the GPG subdirectory, etc.  @>
+
+@ Set up the directories for the Unix domain socket, logs, the GPG subdirectory, etc.
+\initials{LDF 2012.07.19.}
+
+\LOG
+\initials{LDF 2012.07.19.}
+Added this section.
+\ENDLOG
+
+@<Main@>=
+
+@q *** (3) @>
+
+@q *** (3) Set |socket_path|.  @>
+
+@ Set |socket_path|.  |socket_dir| will be empty, unless it's been set 
+by the \.{--socket-directory} option.
+\initials{LDF 2013.04.10.}
+
+@<Main@>=
+
+@q **** (4) @>
+
+    if (!socket_dir.empty())
+    {
+@q ***** (5) @>
+
+
+#if DEBUG_COMPILE
+         if (DEBUG)
+         {
+             
+             cerr << "[gwirdsif] [Thread 0] In `main':  "
+                  << "`socket_dir' == `" << socket_dir << "', i.e., it's non-empty."
+                  << endl;
+             
+
+         }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+         socket_path  = socket_dir;
+         socket_path += "/.gwirdsif/gwirdsif.sock";
+
+@q ***** (5) @>
+
+@ Here, I call the shell version of \.{mkdir} instead of the library function of the same name,
+because the former will create parent directories as needed whereas the latter will not.
+@:NOTE@> !! PLEASE NOTE:  The subdirectory \filename{./gwirdsif} is added below 
+|socket_dir|, so |"/.gwirdsif"| should not be included in the argument to the 
+\.{--socket-directory} option!
+\par
+|socket_dir| and its subdirectory \filename{.gwirdsif} must be readable and executable
+by ``others''.  \.{chmod} is called on |socket_dir| to ensure this:  \.{mkdir} alone 
+with the \.{--mode} option only sets the permissions for the lowest level directory in its
+argument.  That is, it does {\it not \/} set them for any parent directories that might be
+created! 
+@:NOTE@> !! PLEASE NOTE:  Any directory above |socket_dir| must be readable and executable
+by ``others'', too.  Otherwise, they will not be able to access the socket file.
+\initials{LDF 2013.04.10.}
+
+@:NOTE@> !! PLEASE NOTE:  Do {\it NOT\/} run \.{gwirdsif} as a user with root privileges!
+The case that the user is \.{root} is caught above, but there is no guarantee that another
+user may not have root privileges, or that \.{gwirdsif} is called with root privileges.
+The code below tests the value of |socket_dir| and only calls \.{chmod} if it has a 
+reasonable value.  However, 
+\initials{LDF 2013.04.10.}
+
+@<Main@>=
+
+         temp_strm.str("");
+
+         temp_strm << "mkdir --parents --mode=u=rwx,go=rx " << socket_dir << "/.gwirdsif";
+
+         size_t pos = socket_dir.find(homedir);
+
+         if (pos == string::npos)
+         {
+             
+             cerr << "[gwirdsif] [Thread 0] WARNING!  In `main':  `socket_dir' == "
+                  << "`" << socket_dir << "' doesn't contain `homedir' == " 
+                  << "`" << homedir << "'."
+                  << endl 
+                  << "Not calling `chmod', because this could have undesirable effects, "
+                  << "if the current user has root privileges."
+                  << endl;
+             
+
+         }
+         else if (socket_dir == homedir)
+         {
+             
+             cerr << "[gwirdsif] [Thread 0] WARNING!  In `main':  `socket_dir' == "
+                  << "`homedir' == " << homedir
+                  << endl 
+                  << "Not calling `chmod', because this is probably not desirable."
+                  << endl;
+             
+
+         }  /* |else if (socket_dir == homedir)|  */
+
+
+@q ***** (5) @>
+@
+@<Main@>=
+
+         else  /* |pos != string::npos && socket_dir != homedir|  */
+         {
+
+              temp_strm << " && chmod --recursive u=rwx,go=rx " << socket_dir;
+
+#if DEBUG_COMPILE
+              if (DEBUG) 
+              {
+                  cerr << "[gwirdsif] [Thread 0] In `main':  `socket_dir' == "
+                       << "`" << socket_dir << "' contains `homedir' == " 
+                       << "`" << homedir << "'."
+                       << endl 
+                       << "Calling `chmod' on `socket_dir' (" << socket_dir << ")."
+                       << endl;
+
+              }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+         }   /* |else| (|pos != string::npos && socket_dir != homedir|)  */
+
+
+@q ***** (5) @>
+@
+@<Main@>=
+
+#if DEBUG_COMPILE
+         if (DEBUG)
+         {
+             cerr << "temp_strm.str() == " << temp_strm.str() << endl;
+
+         }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<Main@>=
+
+         status = system(temp_strm.str().c_str());
+
+         if (status == -1 || !WIFEXITED(status))
+         {
+             cerr << "[Thread 0] ERROR!  In `main':  "
+                  << "`system' failed, returning " << status << "."
+                  << endl;
+
+             if (WIFEXITED(status))
+                cerr << "WEXITSTATUS(status) == " << WEXITSTATUS(status) 
+                     << endl;
+             else
+                cerr << "Process failed to exit."
+                     << endl;
+ 
+             cerr << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+                  << endl;
+
+             mysql_library_end();
+             exit(1);
+
+         }   /* |(status == -1 || !WIFEXITED(status))|  */
+
+         else if (WEXITSTATUS(status) != 0)
+         {
+                  cerr << "[Thread 0] ERROR!  In `main':  "
+                       << "`mkdir' and/or `chmod' command (called via `system') failed, "
+                       << "returning " << WEXITSTATUS(status) << "."
+                       << endl
+                       << "Failed to created directory `" << socket_dir << "/.gwirdsif' "
+                       << "or (possibly) change the mode of `" << socket_dir << "' recursively."
+                       << endl 
+                       << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+                       << endl;
+
+                  mysql_library_end();
+                  exit(1);
+
+         }       /* |else if (WEXITSTATUS(status) != 0)|  */
+
+#if DEBUG_COMPILE
+         else if (DEBUG)
+         {
+             cerr << "[Thread 0] In `main':  `system' succeeded, returning 0."
+                  << endl
+                  << "Created directory `" << socket_dir << "/.gwirdsif' successfully "
+                  << "and (possibly) changed mode of `" << socket_dir << "' recursively "
+                  << "or they "
+                  << "existed previously."
+                  << endl;
+
+         }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+         temp_strm.str("");
+
+@q ***** (5) @>
+
+    }  /* |if (!socket_dir.empty())|  */
+
+@q **** (4) @>
+
+    else  /* |socket_dir.empty()|  */
+    {
+
+ 
+#if DEBUG_COMPILE
+         if (DEBUG)
+         {
+             cerr << "[gwirdsif] [Thread 0] In `main':  "
+                  << "`socket_dir' was empty.  Set it to `DEFAULT_SOCKET_DIRECTORY' "
+                  << "== `" << DEFAULT_SOCKET_DIRECTORY << "'." 
+                  << endl ;
+
+         }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+         socket_dir   = DEFAULT_SOCKET_DIRECTORY;
+         socket_path  = socket_dir;
+         socket_path += "/gwirdsif.sock";
+
+    }  /* |else| (|socket_dir.empty()|)  */
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       cerr << "[gwirdsif] [Thread 0] In `main':  "
+            << "Set `socket_path' to `" << socket_path << "'."
+            << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   cerr << "Process ID:     " << getpid() 
+        << endl 
+        << "Socket path:    " << socket_path 
+        << endl;
+        
+   
+
+
+@q **** (4) @>
+
+@q *** (3) Set `.gwirdsif' directory for logs, etc.  @>
+
+@ Set \filename{.gwirdsif} directory for logs, etc.  
+\initials{LDF 2013.04.10.}
+
+@:TODO@> !! TODO:  Currently using the \.{--log-directory} option to set |gwirdsif_dir|.
+This is because an option \.{--gwirdsif-directory} might be confusing to a user.  However, 
+the result is that this code may potentially be confusing.  Think about how this could be
+improved.
+\initials{LDF 2013.04.10.}
+
+|log_dir| is set to |gwirdsif_dir| and then \filename{/.gwirdsif} is appended to 
+the former.  |gwirdsif_dir| is used below when searching for the \filename{.gnupg} 
+directory.
+\initials{LDF 2013.04.11.}
+
+\LOG
+\initials{LDF 2013.04.11.}
+Added error-handling code.
+\ENDLOG 
+
+@<Main@>=
+
+@q **** (4) @>
+
+        if (!log_dir.empty())
+        {
+             gwirdsif_dir  = log_dir;
+
+        }  /* |if (!log_dir.empty())|  */
+
+@q **** (4) @>
+
+        else /* |log_dir.empty()|  */
+        {
+
+            char *temp_ptr = getenv("GWIRDSIF_DIR");
+
+            if (temp_ptr == 0)
+            {
+@q ***** (5) @>
+
+                gwirdsif_dir = homedir;
+
+#if DEBUG_COMPILE
+                if (DEBUG)
+                {
+                    cerr << "[gwirdsif] [Thread 0] In `main':  `temp_ptr' == 0.  Environment "
+                         << "variable `GWIRDSIF_DIR' isn't set.  Will try to create `.gwirdsif' "
+                         << "below home directory."
+                         << endl; 
+
+                }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q ***** (5) @>
+   
+            }  /* |if (temp_ptr == 0)|  */
+
+@q **** (4) @>
+
+            else
+                gwirdsif_dir = temp_ptr;
+
+@q **** (4) @>
+
+            temp_ptr = 0;
+
+@q ***** (5) @>
+
+        }  /* |else| (|log_dir.empty()|)  */
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+    if (DEBUG)
+    {
+        cerr << "[gwirdsif] [Thread 0] In `main':  `gwirdsif_dir' == " << gwirdsif_dir 
+             << endl;
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */         
+
+@q **** (4) @>
+
+@ See {\TeX} text above for explanation of the use of the shell versions of 
+\.{mkdir} and \.{chmod}.
+\initials{LDF 2013.04.10.}
+
+@<Main@>=
+
+    temp_strm.str("");
+
+    size_t pos = gwirdsif_dir.find(homedir);
+
+
+    if (pos == string::npos)
+    {
+           cerr << "[gwirdsif] [Thread 0] WARNING!  In `main':  "
+                << "`gwirdsif_dir' == `" << gwirdsif_dir << "' does not contain " 
+                << endl 
+                << "the current user's home directory == `" << homedir << "'."
+                << endl 
+                << "This isn't permitted.  Setting `gwirdsif_dir' to `" << homedir << "'."
+                << endl
+                << "Log files and possibly other files will be stored in "
+                << "`" << homedir << "/.gwirdsif'."
+                << endl;
+
+           gwirdsif_dir = homedir;
+
+    }  /* |if (pos == string::npos)|  */
+
+    temp_strm << "mkdir --parents --mode=u=rwx,go=rx " << gwirdsif_dir << "/.gwirdsif";
+
+    if (gwirdsif_dir == homedir)
+    {
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           cerr << "[gwirdsif] [Thread 0] In `main':  `gwirdsif_dir' == `" << gwirdsif_dir << "'" 
+                << endl 
+                << "`homedir' == " << homedir
+                << endl 
+                << "`gwirdsif_dir' == `homedir' == `" << homedir << "'."
+                << endl
+                << "Not calling `chmod' on `gwirdsif_dir' because this may have undesirable "
+                << "effects."
+                << endl;
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    }
+    else 
+    {
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           cerr << "[gwirdsif] [Thread 0] In `main':  `gwirdsif_dir' == `" << gwirdsif_dir << "'" 
+                << endl 
+                << "`homedir' == " << homedir
+                << endl 
+                << "`gwirdsif_dir' is not equal to `homedir', but contains it."
+                << endl
+                << "Calling `chmod' on `gwirdsif_dir'."
+                << endl;
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        temp_strm << " && chmod --recursive u=rwx,go=rx " << gwirdsif_dir;
+
+    }  /* |else|  */
+
+#if DEBUG_COMPILE
+    if (DEBUG)
+    {
+        cerr << "temp_strm.str() == " << temp_strm.str() << endl;
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+    status = system(temp_strm.str().c_str());
+
+    if (status == -1 || !WIFEXITED(status))
+    {
+        cerr << "[Thread 0] ERROR!  In `main':  "
+             << "`system' failed, returning " << status << "."
+             << endl;
+
+        if (WIFEXITED(status))
+           cerr << "WEXITSTATUS(status) == " << WEXITSTATUS(status) 
+                << endl;
+        else
+           cerr << "Process failed to exit."
+                << endl;
+ 
+        cerr << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+             << endl;
+
+        mysql_library_end();
+        exit(1);
+
+    }   /* |(status == -1 || !WIFEXITED(status))|  */
+
+   else if (WEXITSTATUS(status) != 0)
+   {
+       cerr << "[Thread 0] ERROR!  In `main':  "
+            << "`mkdir' and/or `chmod' command (called via `system') failed, "
+            << "returning " << WEXITSTATUS(status) << "."
+            << endl
+            << "Failed to created directory `" << gwirdsif_dir << "/.gwirdsif' "
+            << "or (possibly) change the mode of `" << gwirdsif_dir << "' recursively."
+            << endl 
+            << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+            << endl;
+
+       mysql_library_end();
+       exit(1);
+
+   }  /* |else if (WEXITSTATUS(status) != 0)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       cerr << "[Thread 0] In `main':  `system' succeeded, returning 0."
+            << endl
+            << "Created directory `" << gwirdsif_dir << "/.gwirdsif' successfully "
+            << "and (possibly) changed mode of `" << gwirdsif_dir << "' recursively, or they "
+            << "existed previously."
+            << endl;
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   log_dir  = gwirdsif_dir;
+   log_dir += "/.gwirdsif"; 
+
+   cerr << "Log directory:  " << log_dir << endl;
+
+
+   temp_strm.str("");
+
+
+@q *** (3) Open |log_strm| and |err_log_strm|.  @>
+
+@ Open |log_strm| and |err_log_strm|.  
+\initials{LDF 2013.04.10.}
+
+\LOG
+\initials{LDF 2013.04.18.}
+Now writing ``\.{\# \<timestamp> "Started run"\<newline>}''
+to standard output and error streams.  This makes it possible for |rotate_log_file| 
+to rotate the files containing this output, if one or both of these streams is redirected 
+to a file.  The files should be named \filename{gwirdsif.stdout} and \filename{gwirdsif.stderr},
+respectively, and be located in the ``log directory''.  The latter is either the
+directory specified with the \.{--log-directory} option, or the default, i.e.,
+the \.{.gwirdsif} subdirectory of the home directory of the user under whose account
+\.{gwirdsif} is running.
+\par
+Other names can be used, but |purge_server_logs| will not rotate them, because there is no 
+way of passing their names to this function.  It would be possible to add command-line 
+options for this purpose, but I don't think there would be any particular advantage to 
+doing this over using the convention explained above.  If a user wants to redirect the 
+output to some other file or files, he or she will be responsible for dealing with them
+or adding a call to |rotate_log_file| for them in |purge_server_logs|.
+\ENDLOG 
+
+@<Main@>=
+
+   log_filename  = log_dir;
+   log_filename += "/gwirdsif.log";
+
+   err_log_filename  = log_dir;
+   err_log_filename += "/gwirdsif.err";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       cerr << "log_filename == " << log_filename << endl
+            << "err_log_filename == " << err_log_filename << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   log_strm.open(log_filename.c_str(), ios_base::app);
+   err_log_strm.open(err_log_filename.c_str(), ios_base::app); 
+
+   if (!(log_strm.is_open() && err_log_strm.is_open()))
+   {
+       cerr << "[Thread 0] ERROR!  In `main':  "
+            << "Failed to open log file `" << log_filename << "' "
+            << "and/or error log file `" << err_log_filename << "'."
+            << endl
+            << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+            << endl;
+
+
+       mysql_library_end();
+       exit(1);
+
+   }  /* |if (!(log_strm.is_open() && err_log_strm.is_open()))|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       cerr << "[Thread 0] In `main':  "
+            << "Opened log file `" << log_filename << "' "
+            << "and error log file `" << err_log_filename << "' successfully."
+            << endl;
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   temp_strm.str("");
+
+   temp_strm << "# " << get_datestamp(0, 0, 0, 2, "'") << endl
+             << "Started run" << endl; 
+
+   /* The string is written to |cerr| at the beginning of |main|,
+      before any other output.
+      \initials{LDF 2013.04.18.}  */
+
+   log_strm << temp_strm.str() << flush;
+
+   err_log_strm << temp_strm.str() << flush;
+
+   cout << temp_strm.str();
+
+   temp_strm.str("");   
+
+@q ** (2) Find the GPG directory to use.  @>
+
+@ Find the GPG directory to use.
+\initials{LDF 2012.07.19.}
+
+\LOG
+\initials{LDF 2012.07.19.}
+Added this section.
+\ENDLOG
+
+Check whether there is a directory named \filename{.gnupg/} below
+|gwirdsif_dir|.  If not, check whether there is one under the 
+home directory of the user under whose account this program is running.
+Otherwise, quit with an error message.
+\par
+It would be possible to check for a directory whose name is stored in an environment
+variable, but I don't want to do this at the moment, because I think one of the two
+possibilities mentioned above should be used.
+\initials{LDF 2012.07.19.}
+
+@<Main@>=
+
+   gpg_homedir = gwirdsif_dir;
+   gpg_homedir += "/.gnupg";
+
+   errno = 0;
+
+   DIR *dir_ptr = 0;
+
+   dir_ptr = opendir(gpg_homedir.c_str());
+
+   if (dir_ptr != 0)
+   {
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          cerr << "[gwirdsif] [Thread 0] In `main':  `dir_ptr' != 0."
+               << endl
+               << "Directory `" << gpg_homedir << "' exists."
+               << endl;
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+      closedir(dir_ptr);
+      dir_ptr = 0;
+
+   }  /* |if (dir_ptr != 0)|  */
+
+@q *** (3) @>
+@
+@<Main@>=
+
+   else
+   {
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+
+           cerr << "[gwirdsif] [Thread 0] In `main':  `opendir' failed, returning 0:" 
+                << endl
+                << strerror(errno)
+                << endl 
+                << "Directory `" << gpg_homedir << "' doesn't exist."
+                << endl
+                << "Will check `" << homedir << "/.gnupg'."
+                << endl;
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+@q **** (4) @>
+
+       gpg_homedir = homedir;
+       gpg_homedir += "/.gnupg";
+
+       errno = 0;
+       dir_ptr = opendir(gpg_homedir.c_str());
+
+       if (dir_ptr != 0)
+       {
+#if DEBUG_COMPILE
+          if (DEBUG)
+          {
+              cerr << "[gwirdsif] [Thread 0] In `main':  `dir_ptr' != 0."
+                   << endl
+                   << "Directory `" << gpg_homedir << "' exists."
+                   << endl;
+
+          }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+          closedir(dir_ptr);
+          dir_ptr = 0;
+
+       }  /* |if (dir_ptr != 0)|  */
+
+@q **** (4) @>
+
+       else 
+       {
+
+           cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  `opendir' failed, returning 0:" 
+                << endl
+                << strerror(errno)
+                << endl 
+                << "Directory `" << gpg_homedir << "' doesn't exist."
+                << endl
+                << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+                << endl;
+
+            mysql_library_end();
+            exit(1);
+
+       }  /* |else|  */
+
+@q **** (4) @>
+
+   }  /* |else|  */
+
+@q ** (2) Check |gpg_key_id|.  @>
+
+@ Check |gpg_key_id|.  
+
+\LOG
+\initials{LDF 2013.09.19.}
+Added this section.
+\ENDLOG
+
+@<Main@>=
+
+    if (gpg_key_id == 0 || strlen(gpg_key_id) == 0)
+    {
+@q *** (3) @>
+
+        bool gpg_path     = false;
+        bool gpg_filename = false;
+
+        char *temp_ptr = getenv("GW_GPG_KEY_ID");
+
+        if (temp_ptr == 0 || strlen(temp_ptr) == 0)
+        {
+            temp_ptr = getenv("GW_GPG_KEY_ID_PATH");
+
+            if (temp_ptr != 0 && strlen(temp_ptr) > 0)
+            {
+               gpg_path = true;
+            }
+            else
+            {
+                temp_ptr = getenv("GW_GPG_KEY_ID_FILENAME");
+
+                if (temp_ptr != 0 && strlen(temp_ptr) > 0)
+                {
+
+                     gpg_filename = true;
+                }       
+            }
+        }
+
+@q *** (3) @>
+@
+@<Main@>=
+
+        if (temp_ptr != 0 && strlen(temp_ptr) > 0)
+        {
+@q **** (4) @>
+
+             if (gpg_key_id == 0)
+             {
+@q ***** (5) @>
+
+                 gpg_key_id = new char[10];
+
+                 status = mlock(gpg_key_id, 10);
+
+                 if (status == -1)
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << "[Thread 0] ERROR!  In `main':"
+                          << endl
+                          << "`mlock' failed, returning -1:"
+                          << endl
+                          << strerror(errno)
+                          << endl
+                          << "Failed to lock memory for `gpg_key_id'."
+                          << endl
+                          << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                     exit(1);
+
+                 }  /* |if (status == -1)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+                 else if (DEBUG)
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << "[Thread 0] In `main':"
+                          << endl
+                          << "`mlock' succeeded, returning 0."
+                          << endl
+                          << "Locked memory for `gpg_key_id' successfully."
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                 }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+                 memset(gpg_key_id, 0, 10);
+
+@q ***** (5) @>
+
+             }  /* |if (gpg_key_id == 0)|  */
+
+@q **** (4) @>
+@
+@<Main@>=
+             if (gpg_path || gpg_filename)
+             {
+@q ***** (5) @>
+
+                 temp_strm.str("");
+
+                 if (gpg_filename)
+                    temp_strm << config_dir << "/";
+
+                 temp_strm << temp_ptr;
+
+#if DEBUG_COMPILE
+                 if (DEBUG)
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << "temp_strm.str() == " << temp_strm.str() << endl;
+                     unlock_cerr_mutex(); 
+
+                 }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */                   
+               
+@q ***** (5) @>
+
+                 errno = 0;
+                 status = access(temp_strm.str().c_str(), F_OK);
+
+                 if (status == -1)
+                 {
+                     lock_cerr_mutex(); 
+                     cerr << "[Thread 0] ERROR!  In `main':"
+                          << endl
+                          << "`access' failed, returning -1:"
+                          << endl
+                          << strerror(errno)
+                          << endl
+                          << "`" << temp_strm.str() << "' does not exist.  "
+                          << "Can't read it to set GPG key ID."
+                          << endl 
+                          << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+                          << endl;
+                     unlock_cerr_mutex(); 
+
+                     exit(1);
+
+                 }  /* |if (status == -1)|  */
+@q ***** (5) @>
+
+                 else 
+                 {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+                     if (DEBUG)        
+                     {
+                         lock_cerr_mutex(); 
+                         cerr << "`" << temp_strm.str() << "' exists."
+                              << endl;
+                         unlock_cerr_mutex(); 
+
+                     }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+                     ifstream in_strm;
+                     in_strm.open(temp_strm.str().c_str());
+
+                     if (!(in_strm && in_strm.is_open()))
+                     {
+@q ******* (7) @>
+
+                         lock_cerr_mutex(); 
+                         cerr << "[Thread 0] ERROR!  In `main':"
+                              << endl
+                              << "`std::ifstream::open' failed.  Failed to open "
+                              << "file `" << temp_strm.str() << "'."
+                              << endl
+                              << "Can't read file to set GPG key ID."
+                              << endl 
+                              << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+                              << endl;
+                         unlock_cerr_mutex(); 
+
+                         in_strm.close();
+
+                         exit(1);
+
+@q ******* (7) @>
+
+                     }  /* |if (!(in_strm && in_strm.open())|  */
+
+@q ****** (6) @>
+                     memset(buffer, 0, 128);
+
+                     in_strm.read(buffer, 127);
+
+                     if (in_strm.gcount() < 8)
+                     {
+
+                         lock_cerr_mutex(); 
+                         cerr << "[Thread 0] ERROR!  In `main':"
+                              << endl
+                              << "Failed to read 8 characters from "
+                              << "file `" << temp_strm.str() << "':"
+                              << endl
+                              << "`in_strm.gcount()' == " << in_strm.gcount()
+                              << endl 
+                              << "Can't set GPG key ID."
+                              << endl 
+                              << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+                              << endl;
+                         unlock_cerr_mutex(); 
+
+                         in_strm.close();
+
+                         exit(1);
+
+                     }
+
+                     in_strm.close();
+
+                     char *buffer_ptr = buffer;
+                     size_t temp_len = 128;
+
+
+                     int i = 0;
+
+                     for (; i < 128; ++i)
+                     {
+                         if (buffer[i] == '#' || isspace(buffer[i]))
+                         {
+                             memset(buffer_ptr, 0, temp_len);
+                             break;
+                         }
+
+                         ++buffer_ptr;
+                         --temp_len;
+                         
+                     }
+
+                     if (strlen(buffer) == 8)
+                        strncpy(gpg_key_id, buffer, 8);
+                     else
+                     {
+                         lock_cerr_mutex(); 
+                         cerr << "[Thread 0] ERROR!  In `main':"
+                              << endl
+                              << "Read invalid GPG key ID from file `" << temp_strm.str() << "':"
+                              << endl
+                              << buffer
+                              << endl 
+                              << "Can't set GPG key ID."
+                              << endl 
+                              << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+                              << endl;
+                         unlock_cerr_mutex(); 
+
+                         exit(1);
+
+                     }
+
+@q ****** (6) @>
+                 }  /* |else|  */        
+    
+@q ***** (5) @>
+
+             }  /* |if (gpg_path || gpg_filename)|  */
+
+@q **** (4) @>
+@
+@<Main@>=
+
+             else if (strlen(temp_ptr) != 8)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << "[Thread 0] ERROR!  In `main':"
+                      << endl
+                      << "Invalid GPG key ID:  " << temp_ptr << " (length) " << strlen(temp_ptr)
+                      << endl
+                      << "GPG key ID must be 8 characters long."
+                      << endl
+                      << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+                 exit(1);
+             }
+             else
+                 strncpy(gpg_key_id, temp_ptr, 8);       
+
+@q **** (4) @>
+
+        }  /* |if (temp_ptr != 0 && strlen(temp_ptr) > 0)|  */
+
+@q *** (3) @>
+@
+@<Main@>=
+
+        else 
+        {
+             lock_cerr_mutex(); 
+             cerr << "[Thread 0] ERROR!  In `main':"
+                  << endl
+                  << "Failed to set GPG key ID."
+                  << endl
+                  << "Use (in order of precedence) the `--gpg-key-id' option "
+                  << "or set one of the environment variables"
+                  << endl 
+                  << "`GW_GPG_KEY_ID' (for a literal key ID) or `GW_GPG_KEY_ID_PATH' "
+                  << "(for the path to a file containing a key ID)"
+                  << endl
+                  << "or `GW_GPG_KEY_ID_PATH' (for the name of a file in `" << config_dir << "'."
+                  << endl
+                  << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+             exit(1);
+
+        }  /* |else|  */
+
+ 
+@q **** (4) @>
+
+
+    }  /* |if (gpg_key_id == 0 || strlen(gpg_key_id) == 0)|  */
+
+@q *** (3) @>
+@
+@<Main@>=
+
+    memset(buffer, 0, 128);
+
+#if DEBUG_COMPILE
+    if (DEBUG)
+    {
+        lock_cerr_mutex(); 
+        lock_cout_mutex(); 
+        cout << "[Thread 0] In `main':  "
+             << "Using GPG key ID " << gpg_key_id << endl;
+        unlock_cout_mutex(); 
+        unlock_cerr_mutex(); 
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "gpg_homedir == " << gpg_homedir << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q *** (3) @>
+
+   temp_strm.str("");
+
+   temp_strm << "a=`gpg --homedir " << gpg_homedir << " --list-key " << gpg_key_id << " 2>&1`; "
+             << "echo $?; echo $a";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "temp_strm.str() == " << temp_strm.str() << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   fp = popen(temp_strm.str().c_str(), "r");
+
+   if (fp == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[Thread 0] ERROR!  In `main':"
+            << endl
+            << "`popen' failed, returning NULL:"
+            << endl 
+            << "Shell command `gpg --list-key' failed, failed to check GPG key ID."
+            << endl
+            << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       exit(1);
+
+
+   }  /* |if (fp == 0)|  */
+
+@q *** (3) @>
+
+   memset(buffer, 0, 128);
+
+   status = fread(buffer, 1, 127, fp);
+
+   if (status == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[Thread 0] ERROR!  In `main':"
+            << endl
+            << "`fread' read 0 characters."
+            << endl 
+            << "Failed to check GPG key ID."
+            << endl
+            << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       pclose(fp);
+
+       exit(1);
+
+   }  /* |if (status == 0)|  */
+
+@q *** (3) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "buffer == " << buffer << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   pclose(fp);
+   fp = 0;
+
+   int temp_val = -1;
+
+   errno = 0;
+   status = sscanf(buffer, "%d", &temp_val);
+
+   if (status == EOF)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[Thread 0] ERROR!  In `main':"
+            << endl
+            << "`sscanf' failed, returning EOF:"
+            << endl 
+            << strerror(errno)
+            << endl 
+            << "Failed to check GPG key ID."
+            << endl
+            << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       exit(1);
+
+   }  /* |if (status == EOF)|  */
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "temp_val == " << temp_val << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   if (temp_val != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[Thread 0] ERROR!  In `main':"
+            << endl
+            << "Shell command `gpg --list-key' failed, returning " << temp_val << ":"
+            << endl 
+            << buffer
+            << endl
+            << "GPG key ID invalid."
+            << endl
+            << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       exit(1);
+
+   }  /* |if (temp_val != 0)|  */
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[Thread 0] In `main':"
+            << endl
+            << "Shell command `gpg --list-key' succeeded, returning 0."
+            << endl
+            << "GPG key ID is valid."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+   
+@q ** (2) Check |mysql_password_filename| and set, if necessary.  @>
+
+@ Check |mysql_password_filename| and set, if necessary. 
+\initials{LDF 2013.09.23.}
+
+\LOG
+\initials{LDF 2013.09.23.}
+Added this section.
+
+\initials{LDF 2013.09.26.}
+Added code for checking whether the file exists.
+
+\initials{LDF 2013.09.26.}
+Removed code from this section to the function |set_password| 
+in \filename{utilfncs.web}.  Added code for testing whether |gpg_passphrase| is NULL
+or empty.
+
+\initials{LDF 2014.01.07.}
+Moved this section to a place after |gpg_homedir| has been set.
+\ENDLOG
+
+@<Main@>=
+
+@q *** (3) @>
+
+   if (mysql_password_filename.empty() && (gpg_passphrase == 0 || strlen(gpg_passphrase) == 0))
+   {
+       cout << "[gwirdsif] [Thread 0] NOTICE!  In `main':"
+            << endl 
+            << "`mysql_password_filename' is empty and `gpg_passphrase' is NULL or empty."
+            << endl
+            << "Not decrypting MySQL password."
+            << endl 
+            << "Please note:  A secret key without a passphrase will be used for decryption "
+            << "of other items, if any."
+            << endl  
+            << "This is not very secure.  Do not do this unless you know the risks "
+            << "(see documentation)."
+            << endl;
+
+   }  /* |if (gpg_passphrase == 0 || strlen(gpg_passphrase) == 0)|  */
+
+@q *** (3) @>
+
+   else if (!mysql_password_filename.empty())
+   {
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cout << "[gwirdsif] [Thread 0] In `main':  `mysql_password_filename' is not empty:"
+                << endl
+                << "Will decrypt MySQL password."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       if (gpg_passphrase == 0 || strlen(gpg_passphrase) == 0)
+       {
+           cout << "[gwirdsif] [Thread 0] NOTICE!  In `main':  "
+                << "`gpg_passphrase' is NULL or empty."
+                << endl
+                << "Please note:  A secret key without a passphrase will be used for decryption."
+                << endl  
+                << "This is not very secure.  Do not do this unless you know the risks "
+                << "(see documentation)."
+                << endl;
+
+           if (gpg_passphrase == 0)
+              cerr << "gpg_passphrase == 0" << endl;
+           else
+              cerr << "gpg_passphrase != 0" << endl;
+
+       }  /* |if|  */
+
+@q **** (4) @>
+
+       status = set_password(mysql_password_filename, 
+                             mysql_password,
+                             MYSQL_PASSWORD_LENGTH,
+                             DEFAULT_MYSQL_PASSWORD_FILENAME,
+                             gpg_passphrase, 
+                             current_dir, 
+                             string("[Thread 0] "));
+
+       if (status != 0)
+       {
+           cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  `set_password' failed, "
+                << "returning " << status << "."
+                << endl
+                << "Failed to set MySQL password."
+                << endl 
+                << "Exiting program `gwirdsif' with exit status 1." 
+                << endl;
+
+           mysql_library_end();
+
+           exit(1);
+
+       }  /* |if (status != 0)|  */
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "[gwirdsif] [Thread 0] In `main':  `set_password' succeeded, "
+                << "returning 0."
+                << endl 
+                << "`mysql_password' == " << mysql_password
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q *** (3) @>
+
+   }  /* |else|  */
+
+@q ** (2) @>
+
+@q *** (3) @>
+
+@q ** (2) Start purge logs thread.  @>
+
+@ Start purge logs thread.  
+\initials{LDF 2013.04.09.}
+
+@:NOTE@> !! PLEASE NOTE:  Before this point, mutexes don't need to be locked and unlocked, 
+because there's only a single thread.  |pthread_create| is called for the first time in 
+this section. From now on, mutexes should be locked and unlocked.  
+If code from above is inserted below the call to |pthread_create|, 
+it should be checked for places where they should be locked and unlocked.  Furthermore,
+if calls to |pthread_create| are added above, the code below them should be checked in the
+same way.
+\initials{LDF 2013.04.18.}
+
+\LOG
+\initials{LDF 2013.04.09.}
+Added this section.
+
+\initials{LDF 2013.04.17.}
+Added the conditional |if (sleep_value > 0)|.  It is now possible to disable purging by 
+using a 0 argument with the option \.{--purge-interval}.
+\ENDLOG
+
+@<Main@>=
+
+@q *** (3) @>
+
+
+   if (purge_logs_interval > 0UL)
+   {
+@q **** (4) @>
+
+        status = pthread_create(&purge_server_logs_thread_id,
+                                &attr, /* Attribute  */
+                                purge_server_logs,
+                                static_cast<void*>(&purge_logs_interval));
+
+        thread_ctr_id_map[purge_server_logs_thread_ctr] = purge_server_logs_thread_id;
+        thread_id_ctr_map[purge_server_logs_thread_id]  = purge_server_logs_thread_ctr;
+
+        if (status != 0)
+        {
+             lock_cerr_mutex();          
+             cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  "
+                  << "`pthread_create' failed, returning "
+                  << status << ":"
+                  << endl 
+                  << strerror(status)
+                  << endl
+                  << "Failed to create thread calling `purge_server_logs'."
+                  << endl 
+                  << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+                  << endl; 
+             unlock_cerr_mutex(); 
+ 
+             mysql_library_end(); 
+             exit(1);
+
+        }  /* |if (status != 0)|  */
+   
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+         {
+            lock_cerr_mutex(); 
+             cerr << "[gwirdsif] [Thread 0] In `main':  `pthread_create' succeeded, returning 0."
+                  << endl 
+                  << "Created detached thread calling `purge_server_logs' successfully."
+                  << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+
+   }  /* |if (purge_logs_interval > 0UL)|  */
+
+@q *** (3) @>
+@
+@<Main@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdsif] [Thread 0] In `main':  `purge_server_logs_interval' == 0UL."
+            << endl 
+            << "Not starting a thread calling `purge_server_logs'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ** (2) Start purge database thread.  @>
+
+@ Start purge database thread.  
+\initials{LDF 2013.07.14.}
+
+\LOG
+\initials{LDF 2013.07.14.}
+Added this section.
+\ENDLOG
+
+@<Main@>=
+
+@q *** (3) @>
+
+   if (purge_database_interval > 0UL)
+   {
+        status = pthread_create(&purge_database_thread_id,
+                                &attr, /* Attribute  */
+                                purge_server_database,
+                                0);
+
+        thread_ctr_id_map[purge_database_thread_ctr] = purge_database_thread_id;
+        thread_id_ctr_map[purge_database_thread_id]  = purge_database_thread_ctr;
+
+        if (status != 0)
+        {
+             lock_cerr_mutex();          
+             cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  "
+                  << "`pthread_create' failed, returning "
+                  << status << ":"
+                  << endl 
+                  << strerror(status)
+                  << endl
+                  << "Failed to create thread calling `purge_server_database'."
+                  << endl 
+                  << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+                  << endl; 
+             unlock_cerr_mutex(); 
+ 
+             mysql_library_end(); 
+             exit(1);
+
+        }  /* |if (status != 0)|  */
+   
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+         {
+            lock_cerr_mutex(); 
+             cerr << "[gwirdsif] [Thread 0] In `main':  `pthread_create' succeeded, returning 0."
+                  << endl 
+                  << "Created detached thread calling `purge_server_database' successfully."
+                  << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+   }  /* |if (purge_database_interval > 0UL)|  */
+
+@q *** (3) @>
+@
+@<Main@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdsif] [Thread 0] In `main':  `purge_database_interval' == 0UL."
+            << endl 
+            << "Not starting a thread calling `purge_server_database'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   
+@q *** (3) @>
+
+@q ** (2) Start purge iRODS archive thread.  @>
+
+@ Start purge iRODS archive thread.  
+\initials{LDF 2013.08.08.}
+
+\LOG
+\initials{LDF 2013.08.08.}
+Added this section.
+\ENDLOG
+
+@<Main@>=
+
+@q *** (3) @>
+
+   if (purge_irods_archive_interval > 0UL)
+   {
+        status = pthread_create(&purge_irods_archive_thread_id,
+                                &attr, /* Attribute  */
+                                purge_irods_archive,
+                                0);
+
+        thread_ctr_id_map[purge_irods_archive_thread_ctr] = purge_irods_archive_thread_id;
+        thread_id_ctr_map[purge_irods_archive_thread_id]  = purge_irods_archive_thread_ctr;
+
+        if (status != 0)
+        {
+             lock_cerr_mutex();          
+             cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  "
+                  << "`pthread_create' failed, returning "
+                  << status << ":"
+                  << endl 
+                  << strerror(status)
+                  << endl
+                  << "Failed to create thread calling `purge_irods_archive'."
+                  << endl 
+                  << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+                  << endl; 
+             unlock_cerr_mutex(); 
+ 
+             mysql_library_end(); 
+             exit(1);
+
+        }  /* |if (status != 0)|  */
+   
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+         {
+            lock_cerr_mutex(); 
+             cerr << "[gwirdsif] [Thread 0] In `main':  `pthread_create' succeeded, returning 0."
+                  << endl 
+                  << "Created detached thread calling `purge_irods_archive' successfully."
+                  << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+   }  /* |if (purge_irods_archive_interval > 0UL)|  */
+
+@q *** (3) @>
+@
+@<Main@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdsif] [Thread 0] In `main':  `purge_irods_archive_interval' == 0UL."
+            << endl 
+            << "Not starting a thread calling `purge_irods_archive'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ** (2) Start purge Dublin Core metadata thread.  @>
+
+@ Start purge Dublin Core metadata thread.
+\initials{LDF 2013.11.21.}
+
+\LOG
+\initials{LDF 2013.11.21.}
+Added this section.
+\ENDLOG
+
+@<Main@>=
+
+@q *** (3) @>
+
+   if (purge_dc_metadata_interval > 0UL)
+   {
+        status = pthread_create(&purge_dc_metadata_thread_id,
+                                &attr, /* Attribute  */
+                                purge_dc_metadata,
+                                0);
+
+        thread_ctr_id_map[purge_dc_metadata_thread_ctr] = purge_dc_metadata_thread_id;
+        thread_id_ctr_map[purge_dc_metadata_thread_id]  = purge_dc_metadata_thread_ctr;
+
+        if (status != 0)
+        {
+             lock_cerr_mutex();          
+             cerr << "[gwirdsif] [Thread 0] ERROR!  In `main':  "
+                  << "`pthread_create' failed, returning "
+                  << status << ":"
+                  << endl 
+                  << strerror(status)
+                  << endl
+                  << "Failed to create thread calling `purge_dc_metadata'."
+                  << endl 
+                  << "Exiting `gwirdsif' unsuccessfully with exit status 1."
+                  << endl; 
+             unlock_cerr_mutex(); 
+ 
+             mysql_library_end(); 
+             exit(1);
+
+        }  /* |if (status != 0)|  */
+   
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+         {
+            lock_cerr_mutex(); 
+             cerr << "[gwirdsif] [Thread 0] In `main':  `pthread_create' succeeded, returning 0."
+                  << endl 
+                  << "Created detached thread calling `purge_dc_metadata' successfully."
+                  << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+   }  /* |if (purge_dc_metadata_interval > 0UL)|  */
+
+@q *** (3) @>
+@
+@<Main@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdsif] [Thread 0] In `main':  `purge_dc_metadata_interval' == 0UL."
+            << endl 
+            << "Not starting a thread calling `purge_dc_metadata'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q *** (3) @>
+
+@q ** (2) Listen in separate threads.  @>
+
+@ Listen in separate threads.
+\initials{LDF 2012.09.21.}
+
+\LOG
+\initials{LDF 2012.09.21.}
+Added this section.
+\ENDLOG
+
+@<Main@>=
+
+  gcry_control (GCRYCTL_SET_THREAD_CBS, &gcry_threads_pthread);
+
+  char gcrypt_version_str[64];
+
+  strcpy(gcrypt_version_str, gcry_check_version(0));  
+
+#if DEBUG_COMPILE                                                       
+  if (DEBUG) 
+  {
+      lock_cerr_mutex(); 
+      cerr << "Libgcrypt version:  " << gcrypt_version_str << endl;
+      unlock_cerr_mutex(); 
+  }
+#endif  /* |DEBUG_COMPILE|  */ 
+ 
+  gcry_control (GCRYCTL_ENABLE_QUICK_RANDOM, 0);
+
+  /* this must be called once in the program  */
+
+
+  gcry_control (GCRYCTL_SUSPEND_SECMEM_WARN);
+  gcry_control (GCRYCTL_INIT_SECMEM, 32768, 0);
+  gcry_control (GCRYCTL_RESUME_SECMEM_WARN);
+
+
+  gnutls_global_init ();  /* This must be called once in the program */
+
+
+@q *** (3) Initializations.  @>
+
+@ Initializations.  
+\initials{LDF 2012.10.02.}
+
+\LOG
+\initials{LDF 2012.10.02.}
+Added this section.
+
+\initials{LDF 2013.02.05.}
+Now calling |Handle_Value_Type::initialize_idx_type_map|.
+
+\initials{LDF 2013.02.22.}
+Changed name of |Handle_Value_Type::initialize_idx_type_map| to 
+|initialize_maps|.
+
+\initials{LDF 2013.05.02.}
+Now calling |initialize_signal_maps|.
+
+\initials{LDF 2013.07.28.}
+Now calling |init_gw_code_map|.
+
+\initials{LDF 2014.02.05.}
+Now calling |Group_Type::initialize_maps|.
+\ENDLOG
+
+@<Main@>=
+
+   initialize_signal_maps();
+   Response_Type::initialize_maps();
+   Dublin_Core_Metadata_Type::initialize_maps();
+   Handle_Value_Type::initialize_maps();
+   Scan_Parse_Parameter_Type::initialize_maps();
+   Group_Type::initialize_maps();
+
+   init_gw_code_map();
+
+@q *** (3) Call |listen_local| in its own thread.  @>
+@ Call |listen_local| in its own thread.  Default path for Unix domain socket:
+\filename{/tmp/gwirdsif.sock}.  Can be reset using the command-line option 
+\.{--socket-directory}.
+\initials{LDF 2012.09.19.}
+
+\LOG
+\initials{LDF 2012.09.19.}
+Added this section.
+\ENDLOG
+
+@<Main@>=
+
+   pthread_t listen_local_thread_id;
+
+   status = pthread_create(&listen_local_thread_id,
+                           0, /* Attribute  */
+                           listen_local, 
+                           &listen_local_thread_ctr);
+
+   thread_ctr_id_map[listen_local_thread_ctr] = listen_local_thread_id;
+   thread_id_ctr_map[listen_local_thread_id]  = listen_local_thread_ctr;
+
+@q *** (3) Call |listen_remote_anon| in its own thread.  @>
+@ Call |listen_remote_anon| in its own thread.  Default port 5556.
+\initials{LDF 2012.09.19.}
+
+\LOG
+\initials{LDF 2012.09.19.}
+Added this section.
+
+\initials{LDF 2014.01.31.}
+Commented-out this code:
+It caused problems when using the ``pull request'' thread:
+For some reason, the ``listen'' function for the anonymous remote connections
+reacted to erroneous contacts.  That is, \.{gwirdpcl} hadn't tried to connect
+to the corresponding port.  This caused an endless loop of errors and \.{gwirdsif}
+had to be terminated with \.{kill}.  However, the error didn't occur on every run.
+\par
+@:TODO@> !! TODO: All things considered, there's no reason to allow
+``anonymous'' connections, so I've just commented-out the code.  I suspect it
+wouldn't happen if the client and server were running on different computers.
+On the other hand, it would be nice to know exactly what the problem is.
+\ENDLOG
+
+@<Main@>=
+
+
+#if 0 
+
+   /* Commented-out.  See commented-out code for joining with the thread, below.  
+      \initials{LDF 2014.01.31.}
+   */
+   
+   pthread_t listen_remote_anon_thread_id;
+
+   status = pthread_create(&listen_remote_anon_thread_id,
+                         0, /* Attribute  */
+                         listen_remote_anon, 
+                         &listen_remote_anon_thread_ctr);
+
+   thread_ctr_id_map[listen_remote_anon_thread_ctr] = listen_remote_anon_thread_id;
+   thread_id_ctr_map[listen_remote_anon_thread_id]  = listen_remote_anon_thread_ctr;
+#endif 
+
+
+@q *** (3) Call |listen_remote_X_509| in its own thread.  @>
+@ Call |listen_remote_X_509| in its own thread.  Default port 5557.
+\initials{LDF 2012.09.19.}
+
+\LOG
+\initials{LDF 2012.09.19.}
+Added this section.
+\ENDLOG
+
+@<Main@>=
+
+   pthread_t listen_remote_X_509_thread_id;
+
+
+   status = pthread_create(&listen_remote_X_509_thread_id,
+                         0, /* Attribute  */
+                         listen_remote_X_509, 
+                         &listen_remote_X_509_thread_ctr);
+
+   thread_ctr_id_map[listen_remote_X_509_thread_ctr] = listen_remote_X_509_thread_id;
+   thread_id_ctr_map[listen_remote_X_509_thread_id]  = listen_remote_X_509_thread_ctr;
+
+
+@q *** (3) @>
+@
+@<Main@>=
+
+@q **** (4) @>
+
+   pthread_t pull_request_thread_id;
+
+   if (pull_request_interval > 0)
+   {
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "[gwirdsif] [Thread 0] In `main':  `pull_request_interval' == " 
+                << pull_request_interval << " (> 0)"
+                << endl 
+                << "Will start a thread calling `pull_request'."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+      status = pthread_create(&pull_request_thread_id,
+                              0, /* Attribute  */
+                              pull_request, 
+                              &pull_request_thread_ctr);
+
+      thread_ctr_id_map[pull_request_thread_ctr] = pull_request_thread_id;
+      thread_id_ctr_map[pull_request_thread_id]  = pull_request_thread_ctr;
+
+   }  /* |if (pull_request_interval > 0)|  */
+
+@q **** (4) @>
+
+   else 
+   {
+       lock_cerr_mutex(); 
+       cerr << "[gwirdsif] [Thread 0] In `main':  `pull_request_interval' == 0."
+            << endl 
+            << "Not starting a thread calling `pull_request'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else|  */
+
+
+@q **** (4) @>
+
+@q *** (3) Join with ``listen'' and ``pull request''  threads.  @>
+
+@ Join with ``listen'' and ``pull request'' threads.
+\initials{LDF 2012.09.19.}
+
+\LOG
+\initials{LDF 2012.09.19.}
+Added this section.
+
+\initials{LDF 2014.01.30.}
+Added call to |pthread_join| for |pull_request_thread_id|.
+
+\initials{LDF 2014.01.31.}
+Commented-out code for joining with the ``anonymous remote'' thread.
+\ENDLOG
+
+@<Main@>=
+
+   pthread_join(listen_local_thread_id, 0);
+
+#if 0 
+
+   /* Commented-out.  See commented-out code for creating the thread, above.
+      \initials{LDF 2014.01.31.}
+   */
+
+   pthread_join(listen_remote_anon_thread_id, 0);
+#endif 
+
+   pthread_join(listen_remote_X_509_thread_id, 0);
+
+   if (pull_request_interval > 0)
+   {
+       pthread_join(pull_request_thread_id, 0);
+   }
+
+
+@q ** (2) Clean up before ending.  @>
+@ Clean up before ending.  In normal operation, this could should never be 
+reached.
+\initials{LDF 2012.09.21.}
+
+@:NOTE@> !! PLEASE NOTE:  Calling |jvm->DestroyJavaVM()| in the exit handler 
+|finish_gwirdsif| blocked.  I don't know why.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF Date unknown.}
+Now conditionally compiling code involving the JVM.
+\ENDLOG
+
+@<Main@>=
+
+   gnutls_anon_free_server_credentials (anoncred);
+
+   gnutls_global_deinit ();
+
+   mysql_library_end();
+
+   lock_cerr_mutex(); 
+   cerr << "[gwirdsif] [Thread 0] In `main':  Exiting `gwirdsif' successfully with exit status 0."
+        << endl;
+   unlock_cerr_mutex(); 
+
+
+   exit(0);
+
+}  /* End of |main| definition  */
+
+
+
+@q ** (2) @>
+
+@ Putting gwirdsif together.
+\initials{LDF 2012.06.26.}
+
+@q *** (3) @>
+
+@ This is what's compiled.
+\initials{LDF 2012.06.26.}
+
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+GCRY_THREAD_OPTION_PTHREAD_IMPL;
+gnutls_anon_server_credentials_t anoncred;
+pthread_attr_t attr;
+@<|finish_gwirdsif| definition@>@;@/
+int xxdebug;
+int zzdebug;
+@<Main@>@;@/
+
+@q Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))     @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

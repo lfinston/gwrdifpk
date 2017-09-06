@@ -1,0 +1,407 @@
+@q stpcdcli.web @>
+@q [...]/gwrdifpk/src/stpcdcli.web  @>
+
+@q Created by Laurence D. Finston (LDF) Wed Sep  4 13:26:57 CEST 2013  @>
+
+@q * (1) Top @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+@q ** (2) Include files@>
+
+@ Include files.
+\initials{LDF 2013.09.04.}
+
+@<Include files@>=
+
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <pthread.h>  /* POSIX threads  */
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
+
+#include <mysql.h>
+
+#include <expat.h>
+
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <fstream>
+#include <sstream>   
+#include <string>
+#include <getopt.h>
+
+#include <map>
+#include <vector>
+#include <deque>
+#include <set>
+#include <stack>
+#include <utility>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif 
+
+
+#include "rspercds.h++"
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "helper.h++"
+#include "tanfncs.h++"
+#include "pidfncs.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "usrinftp.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+
+#include "stpclopt.h++"
+
+@q ** (2) Create client-side database tables (gwirdcli).  @>
+
+@ Create client-side database tables (gwirdcli).
+\initials{LDF 2013.09.04.}
+
+@q *** (3) Declaration  @>
+
+@<|create_tables_gwirdcli| declaration@>=
+
+int
+create_tables_gwirdcli(Scan_Parse_Parameter_Type &param);
+
+
+@q *** (3) Definition @>
+@
+@<|create_tables_gwirdcli| definition@>=
+
+int
+create_tables_gwirdcli(Scan_Parse_Parameter_Type &param)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status;
+   stringstream sql_strm;
+
+   stringstream temp_strm;
+
+   MYSQL_RES* result = 0;
+   MYSQL_ROW curr_row;
+
+   size_t result_array_size = 16;
+
+   MYSQL_RES *result_array[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+   unsigned int row_ctr   = 0;
+   unsigned int field_ctr = 0;
+   long int affected_rows = 0;
+
+   vector<string> query_vector;
+
+   vector<unsigned int *> row_ctr_vector;
+   vector<unsigned int *> field_ctr_vector;
+   vector<long int *>     affected_rows_vector;
+
+   vector<string> comment_vector;
+
+   string comma_str;
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+         cerr << "Entering `create_tables_gwirdcli'."
+              << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q **** (4) @>
+
+       sql_strm << "use " << gwirdcli_database_name;
+
+       query_vector.push_back(sql_strm.str());
+
+       row_ctr_vector.push_back(0);
+       field_ctr_vector.push_back(0);
+       affected_rows_vector.push_back(0);
+
+@q **** (4) @>
+@
+@<|create_tables_gwirdcli| definition@>=
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+
+           cerr << "nas_table_create_str == " << nas_table_create_str << endl
+                << "nas_table_insert_str == " << nas_table_insert_str << endl
+                << "handles_table_create_str == " << handles_table_create_str << endl
+                << "handles_table_alter_str[0] == " << handles_table_alter_str[0] << endl
+                << "handles_table_alter_str[1] == " << handles_table_alter_str[1] << endl
+                << "Users_table_create_str == " << Users_table_create_str << endl
+                << "Users_table_insert_str == " << Users_table_insert_str << endl;
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+      query_vector.push_back(nas_table_create_str);
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(0);
+
+      query_vector.push_back(nas_table_insert_str);
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(new long int(0L));
+      comment_vector.push_back("insert nas");
+      sql_strm.str("");
+
+      query_vector.push_back(handles_table_create_str);
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(0);
+
+      query_vector.push_back(handles_table_alter_str[0]);
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(0);
+
+
+      query_vector.push_back(handles_table_alter_str[1]);
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(0);
+
+      query_vector.push_back(Users_table_create_str);
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(0);
+
+      query_vector.push_back(Users_table_insert_str);
+
+      row_ctr_vector.push_back(0);
+      field_ctr_vector.push_back(0);
+      affected_rows_vector.push_back(new long int(0L));
+      comment_vector.push_back("insert Users");
+      sql_strm.str("");
+
+
+@q **** (4) @>
+
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          cerr << "query_vector.size() == " << query_vector.size() << endl;
+
+          for (vector<string>::iterator iter = query_vector.begin();
+               iter != query_vector.end();
+               ++iter)
+          {
+              cerr << *iter << endl;
+
+          }  /* |for|  */
+
+          cerr << endl;
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */           
+
+@q **** (4) @>
+
+      status = param.submit_mysql_queries(query_vector, 
+                                           result_array,
+                                           row_ctr_vector, 
+                                           field_ctr_vector, 
+                                           affected_rows_vector, 
+                                           false);
+
+      if (status != 0)
+      {
+           cerr << "ERROR!  In `create_tables_gwirdcli':  `submit_mysql_queries' failed, "
+                << "returning " << status << "."
+                << endl
+                << "Exiting `create_tables_gwirdcli' unsuccessfully with return value 1."
+                << endl;
+
+           delete_and_clear(result_array, 
+                            result_array_size, 
+                            row_ctr_vector, 
+                            field_ctr_vector,
+                            affected_rows_vector,
+                            query_vector);
+
+           return 1;
+
+      }  /* |if (status != 0)|  */
+
+@q **** (4) @>
+@
+@<|create_tables_gwirdcli| definition@>=
+
+#if DEBUG_COMPILE
+      else if (DEBUG)
+      {
+          cerr << "In `create_tables_gwirdcli':  `submit_mysql_queries' succeeded, returning 0."
+               << endl
+               << "Created tables in `" << gwirdcli_database_name << "' database successfully."
+               << endl;
+
+          int i = 0;
+          int j = 0;
+
+          for (vector<long int *>::iterator iter = affected_rows_vector.begin();
+               iter != affected_rows_vector.end();
+                ++iter)
+          {
+               if (*iter != 0)
+               {
+
+                  cerr << "*affected_rows_vector" << setw(4) << left << temp_strm.str() 
+                       << " == " 
+                       << *affected_rows_vector[i];
+
+                   if (comment_vector.size() > j)
+                      cerr  << "  " << comment_vector[j++];
+
+                   cerr << endl;
+
+               }
+
+               ++i;
+
+          }  /* |for|  */
+
+          cerr << endl;
+
+
+      }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|create_tables_gwirdcli| definition@>=
+
+       delete_and_clear(result_array, 
+                        result_array_size, 
+                        row_ctr_vector, 
+                        field_ctr_vector,
+                        affected_rows_vector,
+                        query_vector);
+
+       sql_strm.str("");
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+         cerr << "Exiting `create_tables_gwirdcli' successfully with return value 0."
+              << endl;
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       return 0;
+
+}  /* End of |create_tables_gwirdcli| definition  */
+
+@q ** (2) This is what's compiled.  @>
+
+@ This is what's compiled.  
+\initials{LDF 2013.09.03.}
+
+@c
+using namespace std;
+@<Include files@>@;@/
+using namespace gwrdifpk;
+@<|create_tables_gwirdcli| definition@>@;@/
+
+
+@q ** (2) This is what's written to the header file `stpcdcli.h'.  @>
+
+@ This is what's written to the header file \filename{stpcdcli.h}.
+\initials{LDF 2013.09.03.}
+
+@(stpcdcli.h@>=
+#ifndef STPCDCLI_H
+#define STPCDCLI_H 1
+@<|create_tables_gwirdcli| declaration@>@;@/
+#endif 
+
+@q (progn (cweb-mode) (outline-minor-mode))                                @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+
+

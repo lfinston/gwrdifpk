@@ -1,0 +1,821 @@
+@q pullrqst.web  @>
+@q [...]/gwrdifpk/src/pullrqst.web  @>
+
+@q Created by Laurence D. Finston (LDF) Thu Jan 30 12:39:18 CET 2014  @>
+
+@q * (1) Top @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@* Pull request function.
+\initials{LDF 2014.01.30.}
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE         
+#endif 
+
+#include <stdlib.h>  /* Standard Library for C  */
+#include <stdio.h>
+#include <errno.h>
+#include <limits.h>
+
+#include <unistd.h>
+
+#if 0 
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <limits.h>
+#endif 
+
+#include <string.h>
+
+#include <algorithm> /* Standard Template Library (STL) for C++  */
+#include <fstream> 
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <string>
+#include <time.h>
+#include <math.h>
+#include <sstream>  
+#include <deque>
+#include <stack>
+#include <vector>
+#include <set>
+
+#include <pthread.h>  /* POSIX threads  */
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
+
+#include <expat.h>
+
+#include <mysql.h>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif 
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "helper.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "usrinftp.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+#include "gntlsfnc.h++"
+#include "ex_rfc2818.h++"
+
+@q ** (2) Pull request thread function.@>
+
+@ Pull request thread function.
+\initials{LDF 2014.01.30.}
+
+@q *** (3) Declaration  @>
+
+@<|pull_request| declaration@>=
+
+void* 
+pull_request(void *v);
+
+@q *** (3) Definition  @>
+@
+@<|pull_request| definition@>=
+
+void* 
+pull_request(void *v)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status = 0;
+
+   bool failed = false;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Entering `pull_request'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   stringstream temp_strm;
+
+   temp_strm << "[Thread " << pull_request_thread_ctr << "]  ";
+
+   string thread_str = temp_strm.str();
+
+   temp_strm.str("");   
+
+@q **** (4) @>
+@
+@<|pull_request| definition@>=
+
+   DEFAULT_CERT_FILENAME  = config_dir;
+   DEFAULT_CERT_FILENAME += "/gwirdsif_cert.pem";
+
+   DEFAULT_KEY_FILENAME   = config_dir;
+   DEFAULT_KEY_FILENAME  += "/gwirdsif_key.pem";
+
+   DEFAULT_CA_FILENAME    = config_dir;
+   DEFAULT_CA_FILENAME   += "/ca_cert.pem";
+
+   DEFAULT_CRL_FILENAME = "";
+
+   string curr_key_filename  = DEFAULT_KEY_FILENAME;
+   string curr_cert_filename = DEFAULT_CERT_FILENAME;
+   string curr_ca_filename   = DEFAULT_CA_FILENAME;
+   string curr_crl_filename  = DEFAULT_CRL_FILENAME;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "cert_filenames.size() == " << cert_filenames.size() << endl 
+            << "key_filenames.size() ==  " << key_filenames.size() << endl 
+            << "ca_filenames.size() ==   " << ca_filenames.size() << endl 
+            << "curr_key_filename ==     " << curr_key_filename << endl
+            << "curr_cert_filename ==    " << curr_cert_filename << endl
+            << "curr_ca_filename ==      " << curr_ca_filename << endl
+            << "curr_crl_filename ==     " << curr_crl_filename << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+@
+@<|pull_request| definition@>=
+
+   gnutls_certificate_credentials_t xcred;
+
+
+   gnutls_certificate_allocate_credentials (&xcred);
+
+   status = gnutls_certificate_set_x509_trust_file (xcred, 
+                                                    curr_ca_filename.c_str(), 
+                                                    GNUTLS_X509_FMT_PEM);   
+   if (status < 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `pull_request':"
+            << endl 
+            << "`gnutls_certificate_set_x509_trust_file' failed returning " 
+            << status << ":" 
+            << endl
+            << gnutls_strerror(status)
+            << endl 
+            << "Exiting thread function unsuccessfully with exit status 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       gnutls_certificate_free_credentials (xcred);
+
+       pthread_exit(0);
+
+   }
+   else if (DEBUG)
+   {
+
+       lock_cerr_mutex(); 
+       cerr << "In `pull_request':"
+            << endl 
+            << "`gnutls_certificate_set_x509_trust_file' returned " << status 
+            << " (the number of certificates processed)."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+
+
+@q **** (4) @>
+
+   status = gnutls_certificate_set_x509_key_file (xcred, 
+                                                  curr_cert_filename.c_str(), 
+                                                  curr_key_filename.c_str(),
+                                                  GNUTLS_X509_FMT_PEM);
+
+   if (status < 0)
+   {
+
+
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `pull_request':"
+            << endl 
+            << "`gnutls_certificate_set_x509_key_file' failed returning " 
+            << status << ":" 
+            << endl
+            << gnutls_strerror(status)
+            << endl 
+            << "Exiting thread function unsuccessfully with exit status 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       gnutls_certificate_free_credentials (xcred);
+
+       pthread_exit(0);
+
+   }
+   else if (DEBUG)
+   {
+
+       lock_cerr_mutex(); 
+       cerr << "In `pull_request':"
+            << endl 
+            << "`gnutls_certificate_set_x509_key_file' succeeded, returning 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */ 
+
+@q **** (4) @>
+@
+@<|pull_request| definition@>=
+
+   MYSQL *mysql_ptr;
+
+   MYSQL_RES* result = 0;
+   MYSQL_ROW curr_row;
+
+#if 0 
+   long int affected_rows;
+#endif 
+
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+
+   stringstream sql_strm;
+
+   mysql_ptr = mysql_init(0);
+
+   vector<Pull_Request_Type> pull_request_vector;
+
+@q **** (4) @>
+
+   if (mysql_ptr)
+   {
+#if DEBUG_COMPILE 
+      if (DEBUG)
+      {
+         lock_cerr_mutex(); 
+         cerr << thread_str << "In `pull_request':  " 
+              << "`mysql_init' succeeded."
+              << endl;
+         unlock_cerr_mutex();
+
+      }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   }  /* |if (mysql_ptr)| */
+
+@q **** (4) @>
+
+   else
+   {
+      lock_cerr_mutex(); 
+      cerr << thread_str << "ERROR!  In `pull_request':" 
+           << endl
+           << "`mysql_init' failed.  Exiting thread unsuccessfully with "
+           << "return value 0."
+           << endl;
+      unlock_cerr_mutex();
+ 
+      pthread_exit(0);
+
+   }   
+
+@q **** (4) Set |mysql_socket_filename|.  @>
+@ Set |mysql_socket_filename|.  
+\initials{LDF 2013.07.14.}
+
+@<|pull_request| definition@>=
+
+   string mysql_socket_filename;
+
+   errno = 0;
+
+   status = access("/var/run/mysqld/mysqld.sock", F_OK);
+
+@q ***** (5) @>
+
+   if (status == -1)
+   {  
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `pull_request':" 
+                 << endl
+                 << "MySQL server socket file `/var/run/mysqld/mysqld.sock' doesn't exist:"
+                 << endl 
+                 << "`access' error: " << strerror(errno)
+                 << endl 
+                 << "Trying `/var/run/mysql/mysql.sock'."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+        errno = 0;
+
+        status = access("/var/run/mysql/mysql.sock", F_OK);
+
+        if (status == -1)
+        {
+             lock_cerr_mutex(); 
+             cerr << thread_str << "ERROR!  In `pull_request':" 
+                  << endl
+                  << "MySQL server socket file `/var/run/mysql/mysql.sock' doesn't exist:"
+                  << endl 
+                  << "`access' error: " << strerror(errno)
+                  << endl
+                  << "Tested for `/var/run/mysqld/mysqld.sock' previously."
+                  << endl
+                  << "Exiting thread unsuccessfully with "
+                  << "return value 0."
+                  << endl;
+             unlock_cerr_mutex();
+
+             mysql_close(mysql_ptr); 
+             mysql_ptr = 0;
+ 
+             pthread_exit(0);
+
+        }  /* |if (status == -1)|  */
+
+@q ****** (6) @>
+ 
+        else
+        {
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << thread_str << "In `pull_request':" 
+                      << endl
+                      << "MySQL server socket file `/var/run/mysql/mysql.sock' exists."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             mysql_socket_filename = "/var/run/mysql/mysql.sock";
+
+        }  /* |else|  */
+
+@q ****** (6) @>
+
+   }  /* |if (status == -1)|  */
+     
+@q ***** (5) @>
+
+   else
+   {
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `pull_request':" 
+                 << endl
+                 << "MySQL server socket file `/var/run/mysqld/mysqld.sock' exists."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        mysql_socket_filename = "/var/run/mysqld/mysqld.sock";         
+
+   }  /* |else|  */
+
+@q ***** (5) @>
+
+@q **** (4) @>
+@
+@<|pull_request| definition@>=
+
+   my_bool reconnect    = 1;
+   unsigned int mysql_timeout = 120;
+
+   mysql_options(mysql_ptr, MYSQL_OPT_RECONNECT, &reconnect); 
+   mysql_options(mysql_ptr, MYSQL_OPT_CONNECT_TIMEOUT, &mysql_timeout); 
+
+   if (!mysql_real_connect(mysql_ptr, 
+                           0, 
+                           mysql_username.c_str(),
+                           mysql_password, 
+                           0,
+                           0, 
+                           mysql_socket_filename.c_str(), 0))
+   {
+      lock_cerr_mutex(); 
+      cerr << thread_str << "ERROR!  In `pull_request':" 
+           << endl
+           << "`mysql_real_connect' failed.  "
+           << "Error:  " << mysql_error(mysql_ptr)
+           << endl 
+           << "Error number:  " << mysql_errno(mysql_ptr)
+           << endl 
+           << "Exiting thread unsuccessfully with "
+           << "return value 0."
+           << endl;
+       unlock_cerr_mutex();
+
+       mysql_close(mysql_ptr); 
+       mysql_ptr = 0;
+
+       pthread_exit(0);
+   }
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << thread_str << "In `pull_request':"
+           << endl
+           << "`mysql_real_connect' succeeded."
+           << endl; 
+      unlock_cerr_mutex();
+   } 
+
+#endif /* |DEBUG_COMPILE|  */
+
+@q **** (4) Main loop.  @>
+
+@ Main loop.  
+\initials{LDF 2014.01.30.}
+
+@<|pull_request| definition@>=
+
+    for (;;)
+    {
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `pull_request':  Entering main loop."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|pull_request| definition@>=
+
+        pull_request_vector.clear();
+
+        status = Pull_Request_Type::get_expired(mysql_ptr, 
+                                                pull_request_vector, 
+                                                true, 
+                                                thread_str);
+
+@q ***** (5) @>
+@
+@<|pull_request| definition@>=
+
+        if (status == 2)
+        {
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `pull_request':" 
+                     << endl
+                     << "`Pull_Request_Type::get_expired' returned 2:"
+                     << endl 
+                     << "No expired pull requests.  Continuing."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            goto END_OUTER_LOOP;
+
+        }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|pull_request| definition@>=
+
+        if (status != 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  In `pull_request':" 
+                 << endl
+                 << "`Pull_Request_Type::get_expired' failed, returning " << status << "."
+                 << endl 
+                 << "Breaking out of loop."
+                 << endl;
+             unlock_cerr_mutex();
+
+             failed = true;
+
+             break;
+
+        }  /* |if (status != 0)|  */
+
+@q ***** (5) @>
+@
+@<|pull_request| definition@>=
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `pull_request':" 
+                 << endl
+                 << "`Pull_Request_Type::get_expired' succeeded, returning 0."
+                 << endl
+                 << "`pull_request_vector.size()' == " << pull_request_vector.size()
+                 << endl;
+
+             if (pull_request_vector.size() > 0)
+             {
+                 cerr << "`pull_request_vector':" << endl;
+
+                 for (vector<Pull_Request_Type>::iterator iter = pull_request_vector.begin();
+                      iter != pull_request_vector.end();
+                      ++iter)
+                  {
+                      iter->show();
+
+                  }
+                      cerr << endl;
+
+             }
+
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+
+@ Inner |for| loop.
+\initials{LDF 2014.02.10.}
+
+@<|pull_request| definition@>=
+
+        for (vector<Pull_Request_Type>::iterator iter = pull_request_vector.begin();
+             iter != pull_request_vector.end();
+             ++iter)
+        {
+@q ****** (6) @>
+
+            status = iter->contact_pull_client(mysql_ptr, xcred, thread_str);
+
+@q ****** (6) @>
+
+            if (status == 2)
+            {
+#if DEBUG_COMPILE
+                if (DEBUG)   
+                {
+                    lock_cerr_mutex(); 
+                    cerr << thread_str << "NOTICE!  In `pull_request':" 
+                         << endl
+                         << "`Pull_Request_Type::contact_pull_client' failed, returning 2." 
+                         << endl 
+                         << "Failed to contact pull client.  It may not be on-line."
+                         << endl
+                         << "Continuing."
+                         << endl;
+                    unlock_cerr_mutex(); 
+
+                }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+                continue;
+
+            }  /* |if (status == 2)|  */
+
+@q ****** (6) @>
+@
+@<|pull_request| definition@>=
+
+            else if (status != 0)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `pull_request':" 
+                     << endl
+                     << "`Pull_Request_Type::contact_pull_client' failed, returning " 
+                     << status << "."
+                     << endl 
+                     << "Will try to continue."
+                     << endl;
+                 unlock_cerr_mutex();
+
+                 continue;
+
+            }  /* |else if (status != 0)|  */
+
+
+@q ****** (6) @>
+@
+@<|pull_request| definition@>=
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `pull_request':" 
+                     << endl
+                     << "`Pull_Request_Type::contact_pull_client' succeeded, returning 0." 
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+        }  /* inner |for|  */
+
+@q ***** (5) @>
+@
+@<|pull_request| definition@>=
+
+END_OUTER_LOOP:
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `pull_request':" 
+                 << endl
+                 << "Going to sleep for `pull_request_interval' == " 
+                 << pull_request_interval << " seconds."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        sleep(pull_request_interval);
+
+@q ***** (5) @>
+
+    }  /* outer |for|  */
+
+
+@q **** (4) @>
+
+@ Normally, this code should never be reached.
+\initials{LDF 2014.01.30.}
+
+@<|pull_request| definition@>=
+
+   gnutls_certificate_free_credentials (xcred);
+
+   if (result)
+   {
+      mysql_free_result(result);
+      result = 0;
+   }
+
+   mysql_close(mysql_ptr);
+   mysql_ptr = 0;
+
+   if (failed)
+   {
+       lock_cerr_mutex(); 
+       cerr << "In `pull_request':  `failed' == `true'."
+            << endl 
+            << "Exiting thread unsuccessfully with exit status 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (failed)|  */
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `pull_request' thread with exit status 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   pthread_exit(0);
+
+}  /* End of |pull_request| definition  */
+
+
+
+@q *** (3) @>
+
+@q ** (2) Putting pullrqst together.  @>
+@ Putting pullrqst together.  
+
+This is what's compiled.
+\initials{LDF 2013.04.09.}
+@c 
+using namespace std;
+@<Include files@>@;@/
+using namespace gwrdifpk;
+@<|pull_request| declaration@>@;@/
+@<|pull_request| definition@>@;@/
+
+
+@ This is what's written to the header file \filename{pullrqst.h}.
+\initials{LDF 2013.04.09.}
+
+@(pullrqst.h@>=
+#ifndef PULLRQST_H
+#define PULLRQST_H 1
+using namespace std;
+@<|pull_request| declaration@>@;@/
+#endif 
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))                          @>
+
+@q * (1) Local variables for Emacs @>
+
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+

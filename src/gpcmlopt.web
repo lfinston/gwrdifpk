@@ -1,0 +1,1158 @@
+@q gpcmlopt.web  @>
+@q [...]/gwrdifpk/src/gpcmlopt.web  @>
+
+@q Created by Laurence D. Finston (LDF) Wed Oct 30 09:24:22 CET 2013 @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q * (1) Command line option processing for `genpids'.  @>
+@* Command line option processing for \.{genpids}.
+
+\LOG
+\initials{LDF 2013.10.30.}
+Added this file.
+\ENDLOG
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/mman.h>
+
+#include <getopt.h> 
+#include <limits.h> 
+
+#include <errno.h> 
+
+#include <fstream>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <string>
+#include <string.h>
+#include <time.h>
+#include <math.h>
+#include <sstream>   
+
+#include <deque>
+#include <vector>
+
+#include <pthread.h>
+
+#include <mysql.h>
+
+#if HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+
+#if 0 
+#include "utilfncs.h++"
+#endif 
+
+#include "hndlvltp.h++"
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif 
+
+@q * (0) Command-Line Options Processing for `genpids'.  @>
+@ Command-Line Options Processing for \.{genpids}.  
+\initials{LDF 2013.10.30.}
+
+@q ** (2) Process Command Line Options @>
+@ Process Command Line Options.
+\initials{LDF 2013.10.30.}
+
+\LOG
+\initials{LDF 2013.10.30.}
+Added this function.
+\ENDLOG
+
+@q *** (3) Declaration  @>
+
+@<|process_command_line_options_genpids| declaration@>=
+
+int
+process_command_line_options_genpids(int argc, char* argv[], MYSQL *&mysql_ptr);
+
+@q *** (3) Definition  @>
+@
+@<|process_command_line_options_genpids| definition@>=
+int
+process_command_line_options_genpids(int argc, char* argv[], MYSQL *&mysql_ptr)
+{
+
+   bool DEBUG = false;  /* |true|  */
+
+   int status = 0;
+
+@q **** (4) @>
+
+   int option_ctr;
+   int digit_optind = 0;
+
+   size_t pos;
+   char *temp_str = 0;
+
+@q *** (3) Index constants.@>
+@ Index constants.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2013.10.30.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options_genpids| definition@>=
+
+  const unsigned short PID_INDEX               =  0;
+  const unsigned short PREFIX_INDEX            =  1;
+  const unsigned short SUFFIX_ADDITIONAL_INDEX =  2; 
+  const unsigned short INSTITUTE_INDEX         =  3;
+  const unsigned short SUPPRESS_PROMPT_INDEX   =  4;
+  const unsigned short NUMBER_OF_PIDS_INDEX    =  5;
+  const unsigned short FIFO_PATHNAME_INDEX     =  6;
+  const unsigned short USER_ID_INDEX           =  7;
+  const unsigned short USERNAME_INDEX          =  8; 
+  const unsigned short QUERY_DATABASE_INDEX    =  9; 
+  const unsigned short HELP_INDEX              = 10;
+  const unsigned short VERSION_INDEX           = 11;
+
+@q *** (3) Option struct.@>
+@ Option struct.
+\initials{LDF 2012.07.02.}
+
+@<|process_command_line_options_genpids| definition@>=
+
+  static struct option long_options[] = {
+    {"pid", 1, 0, 0},
+    {"prefix", 1, 0, 0},
+    {"suffix-additional", 1, 0, 0},
+    {"institute", 1, 0, 0},
+    {"suppress-prompt", 0, 0, 0},
+    {"number-of-pids", 1, 0, 0},
+    {"fifo-pathname", 1, 0, 0},
+    {"user-id", 1, 0, 0},
+    {"username", 1, 0, 0},
+    {"query-database", 0, 0, 0},
+    {"help", 0, 0, 0},
+    {"version", 0, 0, 0},
+    {0, 0, 0, 0}
+  };
+
+  int option_index = 0;
+
+  int this_option_optind = optind ? optind : 1;
+
+@q *** (3) Loop for handling options.@>
+@ Loop for handling options.
+\initials{LDF 2012.07.02.}
+
+@<|process_command_line_options_genpids| definition@>=
+
+  while (1) 
+  {
+
+@q **** (4) @>
+
+    option_ctr = getopt_long_only (argc,  
+                                   argv, "",
+                                   long_options, 
+                                   &option_index);
+#if DEBUG_COMPILE 
+    if (DEBUG)
+    {
+        cerr << "[Initial Thread] option_ctr == " << option_ctr << endl
+             << "option_index == " << option_index << endl;
+
+        if (optarg)
+        {
+
+          cerr << "optarg == " << optarg << endl;
+
+        }  /* |if (optarg)|  */
+
+    }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q **** (4) @>
+
+    if (option_ctr == -1)
+      {
+#if DEBUG_COMPILE 
+        if (DEBUG)
+        {
+
+           cerr << "[Initial Thread] No more option arguments." << endl;
+
+        }
+#endif  /* |DEBUG_COMPILE|  */ 
+        break;
+      }
+
+@q **** (4) Option.  @>
+@ Option.  
+\initials{LDF 2008.09.09.}
+
+@<|process_command_line_options_genpids| definition@>=
+
+    else if (option_ctr == 0)
+    {
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE 
+      if (DEBUG)
+        {
+
+          cerr << "[Initial Thread] option " << long_options[option_index].name;
+
+          if (optarg)
+          {
+            cerr << " with arg " << optarg;
+          }
+
+          cerr << endl;
+
+        }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) pid.  @>
+@ \.{pid}.
+\initials{LDF 2013.10.30.}
+
+@<|process_command_line_options_genpids| definition@>=
+
+        if (option_index == PID_INDEX)        
+        {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+
+               cerr << "[Initial Thread] `option_index' "
+                    << "== `PID_INDEX'" 
+                    << endl;
+ 
+               if (optarg)
+                  cerr << "optarg == " << optarg << endl;
+
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            pid_str = optarg;
+ 
+@q ****** (6) @>
+
+
+        } /* |if (option_index == PID_INDEX)|  */
+
+@q ***** (5) prefix.  @>
+@ \.{prefix}.
+\initials{LDF 2013.10.30.}
+
+@<|process_command_line_options_genpids| definition@>=
+
+        else if (option_index == PREFIX_INDEX)        
+        {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+
+               cerr << "[Initial Thread] `option_index' "
+                    << "== `PREFIX_INDEX'" 
+                    << endl;
+ 
+               if (optarg)
+                  cerr << "optarg == " << optarg << endl;
+
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            prefix_str = optarg;
+ 
+@q ****** (6) @>
+
+
+        } /* |else if (option_index == PREFIX_INDEX)|  */
+
+
+@q ***** (5) institute.  @>
+@ \.{institute}.
+\initials{LDF 2013.10.30.}
+
+@<|process_command_line_options_genpids| definition@>=
+
+        else if (option_index == INSTITUTE_INDEX)        
+        {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+
+               cerr << "`option_index' "
+                    << "== `INSTITUTE_INDEX'" 
+                    << endl;
+ 
+               if (optarg)
+                  cerr << "optarg == " << optarg << endl;
+
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            if (strlen(optarg) != 4)
+            {
+                cerr << "[genpids] ERROR!  In `process_command_line_options_genpids':  "
+                     << "Institute string argument has invalid length:  "
+                     << strlen(optarg) << " characters (exactly 4 required)."
+                     << endl
+                     << "Exiting `genpids' unsuccessfully with exit status 1."
+                     << endl;
+
+                 mysql_close(mysql_ptr); 
+                 mysql_library_end(); 
+
+                 exit(1);
+            }
+            else
+            {
+                for (int i = 0; i < strlen(optarg); ++i)
+                   institute_str += toupper(optarg[i]);
+
+#if DEBUG_COMPILE
+                if (DEBUG)
+                {
+                    cerr << "[genpids] In `process_command_line_options_genpids':  "
+                         << "`institute_str' == "
+                         << institute_str << "."
+                         << endl;
+
+                }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            }  /* |else|  */
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == INSTITUTE_INDEX)|  */
+
+
+@q ***** (5) suffix-additional.  @>
+@ \.{suffix-additional}.
+\initials{LDF 2013.10.30.}
+
+@<|process_command_line_options_genpids| definition@>=
+
+        else if (option_index == SUFFIX_ADDITIONAL_INDEX)        
+        {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+
+               cerr << "`option_index' "
+                    << "== `SUFFIX_ADDITIONAL_INDEX'" 
+                    << endl;
+ 
+               if (optarg)
+                  cerr << "optarg == " << optarg << endl;
+
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            if (strlen(optarg) > 24)
+            {
+                cerr << "[genpids] ERROR!  In `process_command_line_options_genpids':  "
+                     << "Additional suffix string argument too long:  "
+                     << strlen(optarg) << " characters (maximum 24)."
+                     << endl
+                     << "Exiting `genpids' unsuccessfully with exit status 1."
+                     << endl;
+
+                 mysql_close(mysql_ptr); 
+                 mysql_library_end(); 
+
+                 exit(1);
+            }
+
+@q ****** (6) @>
+
+            for (int i = 0; i < strlen(optarg); ++i)
+            {
+                 if (!(isalnum(optarg[i]) || optarg[i] == '-'))
+                 {
+                     cerr << "[genpids] ERROR!  In `process_command_line_options_genpids':  "
+                          << "Additional suffix string argument contains invalid "
+                          << "character:  " << optarg[i]
+                          << endl 
+                          << "Only alphabetical characters and `-' are allowed."
+                          << endl
+                          << "Exiting `genpids' unsuccessfully with exit status 1."
+                          << endl;
+
+                     mysql_close(mysql_ptr); 
+                     mysql_library_end(); 
+
+                     exit(1);
+
+                 }
+                 else if (islower(optarg[i]))
+                 {
+                      suffix_additional_str += toupper(optarg[i]);
+                 }
+                 else 
+                    suffix_additional_str += optarg[i];
+
+            }  /* |for|  */
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+                cerr << "[genpids] In `process_command_line_options_genpids':  "
+                     << "`suffix_additional_str' == " << suffix_additional_str
+                     << endl;
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == SUFFIX_ADDITIONAL_INDEX)|  */
+
+
+@q ***** (5) suppress-prompt.  @>
+@ \.{suppress-prompt}.
+\initials{LDF 2013.10.30.}
+
+This option sets the global variable 
+|unsigned int suppress_prompt|.
+\initials{LDF 2013.10.30.}
+
+@<|process_command_line_options_genpids| definition@>=
+
+        else if (option_index == SUPPRESS_PROMPT_INDEX)        
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+
+                cerr << "[Thread 0] In `process_command_line_options':  "
+                     << "`option_index' "
+                     << "== `SUPPRESS_PROMPT_INDEX'." 
+                     << endl;
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+            suppress_prompt = 1U;
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == SUPPRESS_PROMPT_INDEX)|  */
+
+@q ***** (5) number-of-pids.  @>
+@ \.{number-of-pids}.
+\initials{LDF 2013.10.30.}
+
+This option sets the global variable 
+|unsigned int number_of_pids|.
+\initials{LDF 2013.10.30.}
+
+@<|process_command_line_options_genpids| definition@>=
+
+        else if (option_index == NUMBER_OF_PIDS_INDEX)        
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+
+                cerr << "[Thread 0] In `process_command_line_options':  "
+                     << "`option_index' "
+                     << "== `NUMBER_OF_PIDS_INDEX'." 
+                     << endl;
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+            number_of_pids = atoi(optarg);
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == NUMBER_OF_PIDS_INDEX)|  */
+
+@q ***** (5) fifo-pathname.  @>
+@ \.{fifo-pathname}.
+\initials{LDF 2013.10.30.}
+
+@<|process_command_line_options_genpids| definition@>=
+
+        else if (option_index == FIFO_PATHNAME_INDEX)        
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+
+                cerr << "[Thread 0] In `process_command_line_options':  "
+                     << "`option_index' "
+                     << "== `FIFO_PATHNAME_INDEX'." 
+                     << endl;
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+            fifo_pathname = optarg;
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                 cerr << "[genpids] In `process_command_line_options_genpids':  "
+                      << "`fifo_pathname' == " << fifo_pathname
+                      << endl;
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == FIFO_PATHNAME_INDEX)|  */
+
+@q ***** (5) user-id.  @>
+@ \.{user-id}.
+\initials{LDF 2013.10.30.}
+
+@<|process_command_line_options_genpids| definition@>=
+
+        else if (option_index == USER_ID_INDEX)        
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+
+                cerr << "[Thread 0] In `process_command_line_options':  "
+                     << "`option_index' "
+                     << "== `USER_ID_INDEX'." 
+                     << endl;
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+       errno = 0;
+       user_id = strtol(optarg, 0, 10);
+
+       if (user_id == LONG_MAX || user_id == LONG_MIN)
+       {
+           cerr << "[genpids] ERROR!  In `process_command_line_options_genpids':  "
+                << "`strtoul' failed, returning ";
+           
+           if (user_id == LONG_MAX)
+               cerr << "`LONG_MAX':" << endl;
+           else
+               cerr << "`LONG_MIN':" << endl;
+
+           cerr << strerror(errno)
+                << endl
+                << "Failed to set `user_id'.  Exiting `genpids' unsuccessfully with "
+                << "exit status 1."
+                << endl;
+  
+           mysql_close(mysql_ptr); 
+           mysql_library_end(); 
+
+           exit(1);
+
+       }  /* |if (user_id == LONG_MAX || user_id == LONG_MIN)|  */
+
+@q ****** (6) @>
+@
+@<|process_command_line_options_genpids| definition@>=
+
+       if (user_id > INT_MAX)
+       {
+           cerr << "[genpids] ERROR!  In `process_command_line_options_genpids':  "
+                << "`user_id' == " << user_id << " (> `INT_MAX')"
+                << endl
+                << "This is not permitted. Exiting `genpids' unsuccessfully with "
+                << "exit status 1."
+                << endl;
+  
+           mysql_close(mysql_ptr); 
+           mysql_library_end(); 
+
+           exit(1);
+
+       }  /* |if (user_id > INT_MAX)|  */
+
+@q ****** (6) @>
+@
+@<|process_command_line_options_genpids| definition@>=
+
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+           cerr << "[genpids] In `process_command_line_options_genpids':  "
+                << "`user_id' == " << user_id
+                << endl;
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == USER_ID_INDEX)|  */
+
+
+@q ***** (5) username.  @>
+@ \.{username}.
+\initials{LDF 2013.10.30.}
+
+@<|process_command_line_options_genpids| definition@>=
+
+        else if (option_index == USERNAME_INDEX)        
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+
+                cerr << "[Thread 0] In `process_command_line_options':  "
+                     << "`option_index' "
+                     << "== `USERNAME_INDEX'." 
+                     << endl;
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+            username = optarg;
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                 cerr << "[genpids] In `process_command_line_options_genpids':  "
+                      << "`username' == " << username
+                      << endl;
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == USERNAME_INDEX)|  */
+
+@q ***** (5) query-database.  @>
+@ \.{query-database}.
+\initials{LDF 2013.10.30.}
+
+@<|process_command_line_options_genpids| definition@>=
+
+        else if (option_index == QUERY_DATABASE_INDEX)        
+        {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+
+                cerr << "[Thread 0] In `process_command_line_options':  "
+                     << "`option_index' "
+                     << "== `QUERY_DATABASE_INDEX'." 
+                     << endl;
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+            query_database = true;
+
+@q ****** (6) @>
+
+        } /* |else if (option_index == QUERY_DATABASE_INDEX)|  */
+
+
+@q ***** (5) help.  @>
+@ \.{help}.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options_genpids| definition@>=
+
+        else if (option_index == HELP_INDEX)        
+        {
+
+@q ****** (6) @>
+
+
+#if DEBUG_COMPILE 
+            if (DEBUG) 
+            {
+
+               cerr << "[Initial Thread] `option_index' "
+                    << "== `HELP_INDEX'" 
+                    << endl;
+
+            }
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            /* !! TODO: LDF 2012.01.10.  Add explanatory text.  */
+
+@q ****** (6) @>
+
+            cout << "Usage:  optdbcli [OPTION] ..." 
+                 << endl;
+
+            exit(0);
+
+        } /* |else if (option_index == HELP_INDEX)|  */
+
+@q ***** (5) version.  @>
+@ \.{version}.
+\initials{LDF 2012.07.02.}
+
+\LOG
+\initials{LDF 2012.07.02.}
+Added this section.
+\ENDLOG
+
+@<|process_command_line_options_genpids| definition@>=
+
+        else if (option_index == VERSION_INDEX)        
+        {
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+            if (DEBUG) 
+            {
+
+               cerr << "[Initial Thread] `option_index' "
+                    << "== `VERSION_INDEX'" 
+                    << endl;
+
+            }
+#endif  /* |DEBUG_COMPILE|  */
+
+            cout << "genpids 1.0"
+                    << endl
+                    << "Author:  Laurence D. Finston"
+                    << endl 
+                    << "Copyright (C) 2014 Gesellschaft fuer wissenschaftliche "
+                    << "Datenverarbeitung mbH "
+                    << "Goettingen"
+                    << endl;
+
+            exit(0);
+
+        }  /* |else if (option_index == VERSION_INDEX)|  */
+
+@q ***** (5) Invalid option_index value.@>
+@ Invalid {\tt option\_index} value.
+
+@<|process_command_line_options_genpids| definition@>=
+
+        else 
+        {
+
+          cerr << "[Initial Thread] WARNING!  In `process_command_line_options':"
+               << endl 
+               << "`option_index' has invalid value: "
+               << option_index << endl
+               << "Will try to continue." 
+               << endl;
+
+        }
+
+@q ***** (5) @>
+
+      }  /* |else if (option_ctr == 0)|  */
+
+
+@q **** (4) Ambiguous option.@>
+@ Ambiguous option.
+\initials{LDF 2012.07.02.}
+
+@<|process_command_line_options_genpids| definition@>=
+
+    else if (option_ctr == '?')
+    {
+
+        cerr << "[Initial Thread] WARNING! In `process_command_line_options':"
+             << endl
+             << "`getopt_long_only' returned ambiguous match.  "
+             << "Breaking."
+             << endl;
+
+        break;
+
+    }  /* |else if (option_ctr == '?')|  */
+
+@q **** (4) Invalid option.@>
+@ Invalid option.
+
+@<|process_command_line_options_genpids| definition@>=
+
+    else
+    {
+#if DEBUG_COMPILE
+        if (DEBUG) 
+        {
+
+           cerr << "[Initial Thread] `getopt_long_only' returned invalid option."
+                << endl;
+
+        }
+#endif  /* |DEBUG_COMPILE|  */
+    }
+
+@q **** (4) End of while loop.@>
+@ End of while loop.
+
+@<|process_command_line_options_genpids| definition@>=
+
+#if DEBUG_COMPILE
+    if (DEBUG) 
+    {
+
+       cerr << "[Initial Thread] End of option processing" << endl;
+
+    }
+#endif  /* |DEBUG_COMPILE|  */
+
+
+@q **** (4) @>
+
+    } /* |while|  */
+  
+@q *** (3) Non-option command line arguments.   @>
+@q *** (3) Handle additional type-value pairs.  @>
+
+@ Non-option command line arguments.  
+\initials{LDF 2012.07.02.}
+
+Handle additional type-value pairs.
+\initials{LDF 2013.10.30.}
+
+@<|process_command_line_options_genpids| definition@>=
+        
+@q **** (4) @>
+
+  if (optind < argc)
+  {
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+
+          cerr << "[Initial Thread] non-option ARGV-elements:" << endl;
+
+       }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+    
+       int j;
+
+       unsigned int curr_type_ctr  = 0;
+       unsigned int other_type_ctr = Handle_Value_Type::OTHER_HANDLE_VALUE_TYPE_INDEX;
+
+       map<string, unsigned int>::const_iterator iter;
+
+@q ***** (5) @>
+
+       for (int i = optind; i < argc;  i += 2)
+       {
+@q ****** (6) @>
+
+           j = i + 1;
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               cerr << "[genpids] In `process_command_line_options_genpids':  " << endl
+                    << "argv[" << i << "] == " << argv[i] << endl;
+
+           }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+          if (argc <= j)
+          {
+               cerr << "[genpids] WARNING!  In `process_command_line_options_genpids':"
+                    << endl 
+                    << "No value supplied for `type' == `" << argv[i] << "'."
+                    << endl 
+                    << "Can't pass type/value pair to `generate_pids'."
+                    << endl
+                    << "Continuing."
+                    << endl;
+
+                break;
+
+          }  /* |if (argc <= j)| */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+          if (DEBUG)
+          {
+              cerr << "[genpids] In `process_command_line_options_genpids':"
+                   << endl 
+                   << "`type' == `" << argv[i] << "'"
+                   << endl
+                   << "`value' == `" << argv[j] << "'"
+                   << endl;
+
+          }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */          
+
+@q ****** (6) @>
+@
+@<|process_command_line_options_genpids| definition@>=
+
+          iter = Handle_Value_Type::type_idx_map.find(string(argv[i]));
+
+          if (iter != Handle_Value_Type::type_idx_map.end())
+          {
+#if DEBUG_COMPILE
+              if (DEBUG) 
+              {
+                  cerr << "[genpids] In `process_command_line_options_genpids':"
+                       << endl 
+                       << "`type' == `" << argv[i] << "' found in "
+                       << "`Handle_Value_Type::type_idx_map'."
+                       << endl
+                       << "`idx' == " << iter->second 
+                       << " (" << Handle_Value_Type::idx_type_map[iter->second] << ")"
+                       << endl;
+
+              }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+              hvt.idx = iter->second;
+
+          }  /* |if (iter != Handle_Value_Type::type_idx_map.end())|  */
+
+@q ******* (7) @>
+
+          else
+          {
+#if DEBUG_COMPILE
+              if (DEBUG) 
+              {
+                  cerr << "[genpids] In `process_command_line_options_genpids':"
+                       << endl 
+                       << "`type' == `" << argv[i] << "' "
+                       << "not found in `Handle_Value_Type::type_idx_map'."
+                       << endl
+                       << "Setting `hvt.idx' to " << other_type_ctr << "."
+                       << endl;
+
+              }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+              hvt.idx      = other_type_ctr++;
+
+          }  /* |else|  */
+
+@q ****** (6) @>
+
+          hvt.type     = argv[i];
+          hvt.data_str = argv[j];
+
+          hvt_vector.push_back(hvt);
+
+
+@q ****** (6) @>
+@
+@<|process_command_line_options_genpids| definition@>=
+
+@q ****** (6) @>
+
+
+       }  /* |for| */ 
+   
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+@q ****** (6) @>
+
+           if (hvt_vector.size() > 0)
+           {
+               cerr << "[genpids] In `process_command_line_options_genpids':"
+                    << endl 
+                    << "`hvt_vector.size()' == " << hvt_vector.size() << " (> 0)"
+                    << endl
+                    << "`hvt_vector':"
+                    << endl;
+            
+               for (vector<Handle_Value_Triple>::const_iterator iter = hvt_vector.begin();
+                    iter != hvt_vector.end();
+                    ++iter)
+               {
+                    cerr << "idx:  " << setw(3) << iter->idx 
+                         << " | " << "type:  " << setw(16) << iter->type 
+                         << " | data_str:  " << iter->data_str
+                         << endl;
+               }
+
+               cerr << endl;
+
+           }  /* |if (hvt_vector.size() > 0)|  */
+
+@q ****** (6) @>
+
+           else
+           {
+               cerr << "[genpids] In `process_command_line_options_genpids':"
+                    << endl 
+                    << "`hvt_vector.size()' == 0."
+                    << endl;
+
+           }
+
+@q ****** (6) @>
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+  } /* |if (optind < argc)|  */
+
+@q ***** (5) @>
+
+@q **** (4) @>
+
+   return 0;
+
+}  /* End of |process_command_line_options_genpids| definition  */
+
+
+@q *** (3) @>
+
+@q ** (2) Putting ``Command-line option processing'' together.@>
+
+@ Putting ``Command-line option processing'' together.
+\initials{LDF 2012.07.02.}
+
+@q *** (3) @>
+
+This is what's compiled.
+\initials{LDF 2012.07.02.}
+
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+
+extern string pid_str;
+extern string prefix_str;
+extern string institute_str;
+extern string suffix_additional_str;
+extern string fifo_pathname;
+extern long int user_id;
+extern string username; 
+extern unsigned int number_of_pids;
+extern vector<Handle_Value_Triple> hvt_vector;
+extern Handle_Value_Triple hvt;
+extern bool query_database;
+
+@<|process_command_line_options_genpids| declaration@>@;@/
+@<|process_command_line_options_genpids| definition@>@;
+
+@q *** (3) @>
+
+@ This is what's written to the header file \filename{gpcmlopt.h} (which is 
+renamed to \filename{gpcmlopt.h++} if it has changed).
+\initials{LDF 2013.10.30.}
+
+@(gpcmlopt.h@>=
+@<|process_command_line_options_genpids| declaration@>@;@/
+
+@q (progn (cweb-mode) (outline-minor-mode))                                @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+

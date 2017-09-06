@@ -1,0 +1,3130 @@
+@q pullrstp.web  @>
+
+@q Created by Laurence D. Finston (LDF) Mon Feb 10 19:06:19 CET 2014  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+@q * (0) |class Pull_Response_Type| (pullrqtp.web).  @>
+
+@*  {\bf class Pull\_Response\_Type} (pullrqtp\PERIOD web).
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <errno.h>
+#include <math.h>
+#include <time.h>
+#include <limits.h>
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
+
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <fstream>
+#include <sstream>   
+#include <string>
+#include <vector>
+#include <deque>
+#include <stack>
+#include <set>
+
+#include <pthread.h>
+#include <expat.h>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#include <mysql.h>
+
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif 
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "helper.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "gntlsfnc.h++"
+#include "ex_rfc2818.h++"
+#include "pullpttp.h++"
+
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "rspnstp.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+
+@q ** (2) |class Pull_Response_Type| declaration.  @>
+
+@ {\bf class Pull\_Response\_Type} declaration.
+\initials{LDF 2014.02.10.}
+
+\LOG
+\initials{LDF 2014.02.10.}
+Added this |class| declaration.
+
+\initials{LDF 2014.02.11.}
+Added |string Distinguished_Name|.
+
+\initials{LDF 2014.02.14.}
+Added |int pull_request_id|.  It {\it does not\/} correspond to a field in the
+\.{gwirdcli.Pull\_Responses} database table.  It is sent by the server to 
+the client as part of a ``pull request'' and set in |Pull_Response::set|.
+
+\initials{LDF 2014.02.20.}
+Added |static unsigned int PULL_INTERVAL|.
+\ENDLOG 
+
+@<|class Pull_Response_Type| declaration@>=
+
+class Pull_Response_Type
+{
+
+    friend void* pull_response(void *v);
+    friend int xxparse(yyscan_t parameter);
+    friend class Scan_Parse_Parameter_Type;
+
+    int pull_response_id;
+    int user_id;
+    string username;
+    string server_hostname;
+    string server_ip_address;
+    string client_hostname;
+    string client_ip_address;
+    string Distinguished_Name;
+
+    int pull_interval;
+    time_t latest_pull;
+    time_t created;
+    time_t last_modified;
+
+    bool force_flag;
+
+    int pull_request_id;
+
+    vector<Pull_Path_Type> pull_path_vector;
+
+   public:
+
+    static const int DEFAULT_PULL_INTERVAL;
+
+    static const unsigned int LATEST_PULL;
+    static const unsigned int PULL_INTERVAL;
+    static const unsigned int CREATED;
+    static const unsigned int LAST_MODIFIED;
+    static const unsigned int CHECKSUMS;
+
+   @<|Pull_Response_Type| function declarations@>@;@/ 
+
+};
+
+@q *** (3) Initialize static |Pull_Response_Type| data members.  @>
+
+@ Initialize static |Pull_Response_Type| data members.
+\initials{LDF 2014.02.10.}
+
+\LOG
+\initials{LDF 2014.02.10.}
+Added this section.
+\ENDLOG
+
+@<Initialize static |Pull_Response_Type| data members@>=
+
+   const int Pull_Response_Type::DEFAULT_PULL_INTERVAL    = 86400;  /* One day in seconds.  
+                                                                       \initials{LDF 2014.02.07.}
+                                                                    */
+   const unsigned int Pull_Response_Type::LATEST_PULL     =  1U;
+   const unsigned int Pull_Response_Type::PULL_INTERVAL   =  2U;
+   const unsigned int Pull_Response_Type::CREATED         =  4U;
+   const unsigned int Pull_Response_Type::LAST_MODIFIED   =  8U;
+   const unsigned int Pull_Response_Type::CHECKSUMS       = 16U;
+
+
+@q *** (3) Constructors.  @>
+
+@ Constructors.
+\initials{LDF 2014.02.10.}
+
+\LOG
+\initials{LDF 2014.02.10.}
+Added this section.
+\ENDLOG
+
+@q **** (4) Default constructor.  @>
+@ Default constructor.
+\initials{LDF 2014.02.10.}
+
+\LOG
+\initials{LDF 2014.02.10.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Declaration  @>
+
+@<|Pull_Response_Type| function declarations@>=
+
+Pull_Response_Type(void);
+
+@q ***** (5) Definition  @>
+@
+@<|Pull_Response_Type| constructor definition@>=
+
+Pull_Response_Type::Pull_Response_Type(void)
+{
+    pull_response_id = user_id = pull_interval = pull_request_id = 0;
+    latest_pull = created = last_modified = static_cast<time_t>(0); 
+
+    force_flag = false;
+
+    return;
+
+}  /* End of |Pull_Response_Type| default constructor definition  */
+
+
+@q *** (3) Set.  @>
+@ Set (|set|).
+\initials{LDF 2014.02.11.}
+
+\LOG
+\initials{LDF 2014.02.11.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Pull_Response_Type| function declarations@>=
+int
+set(string s, const string &server_ip_address, string thread_str = "");
+
+@q **** (4) Definition  @>
+@
+@<|Pull_Response_Type::set| definition@>=
+int
+Pull_Response_Type::set(string s, const string &test_server_ip_address, string thread_str)
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status = 0;
+   
+   string temp_str;
+
+   unsigned long int temp_val;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Pull_Response_Type::set'."
+            << endl 
+            << "`s' == " << s
+            << endl
+            << "`test_server_ip_address' == " << test_server_ip_address
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::set| definition@>=
+
+   size_t pos = s.find("PULL REQUEST ");
+
+   if (pos == string::npos)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR! In `Pull_Response_Type::set':"
+            << endl 
+            << "`string::find' failed, returning `string::npos'."
+            << endl
+            << "Not a pull request."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex();
+
+       return 1; 
+
+   }  /* |if (pos == string::npos)|  */
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::set| definition@>=
+
+   s.erase(0, strlen("PULL REQUEST "));
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Pull_Response_Type::set':"
+            << endl 
+            << "After `string::erase':  `s' == " << s
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2014.02.14.}
+Added this section.
+\ENDLOG
+
+@<|Pull_Response_Type::set| definition@>=
+
+@q ****** (6) @>
+
+   pos = s.find("\037");
+
+   if (pos == string::npos)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR! In `Pull_Response_Type::set':"
+            << endl 
+            << "`string::find' failed, returning `string::npos'."
+            << endl
+            << "Failed to set `pull_request_id'."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex();
+
+       return 1; 
+
+   }
+ 
+@q ****** (6) @>
+@
+@<|Pull_Response_Type::set| definition@>=
+
+   temp_str = s.substr(0, pos);
+   
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "temp_str == " << temp_str << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Pull_Response_Type::set| definition@>=
+
+   errno = 0;
+   temp_val = strtoul(temp_str.c_str(), 0, 10);
+
+   if (temp_val == ULONG_MAX)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR! In `Pull_Response_Type::set':"
+            << endl 
+            << "`strtoul' failed, returning `ULONG_MAX':"
+            << endl
+            << strerror(errno)
+            << endl 
+            << "Failed to set `pull_request_id'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1; 
+
+   }  /* |if (temp_val == ULONG_MAX)|  */
+   
+
+@q ****** (6) @>
+@
+@<|Pull_Response_Type::set| definition@>=
+
+   else if (temp_val > INT_MAX)
+   {
+       cerr << thread_str << "ERROR! In `Pull_Response_Type::set':"
+            << endl 
+            << "`strtoul' returned `temp_val' == " << temp_val << " (> `INT_MAX')"
+            << endl
+            << "Value out of range for `pull_request_id'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1; 
+
+   }  /* |else if (temp_val > INT_MAX)|  */
+
+
+@q ****** (6) @>
+@
+@<|Pull_Response_Type::set| definition@>=
+
+   else if (temp_val == 0)
+   {
+       cerr << thread_str << "ERROR! In `Pull_Response_Type::set':"
+            << endl 
+            << "`strtoul' returned `temp_val' == 0." 
+            << endl
+            << "Invalid value for `pull_request_id'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 1; 
+
+   }  /* |else if (temp_val == 0)|  */
+
+
+@q ****** (6) @>
+@
+@<|Pull_Response_Type::set| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Pull_Response_Type::set':"
+            << endl 
+            << "`temp_val' == " << temp_val
+            << endl
+            << "Will set `pull_request_id'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   pull_request_id = static_cast<int>(temp_val);
+
+   s.erase(0, pos + 1);
+
+@q ****** (6) @>
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::set| definition@>=
+
+   pos = s.find("\037");
+
+   if (pos == string::npos)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR! In `Pull_Response_Type::set':"
+            << endl 
+            << "`string::find' failed, returning `string::npos'."
+            << endl
+            << "Failed to set `server_ip_address'."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex();
+
+       return 1; 
+
+   }
+ 
+   server_ip_address = s.substr(0, pos);
+   
+   s.erase(0, pos + 1);
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::set| definition@>=
+
+   pos = s.find("\037");
+
+   if (pos == string::npos)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR! In `Pull_Response_Type::set':"
+            << endl 
+            << "`string::find' failed, returning `string::npos'."
+            << endl
+            << "Failed to set `server_hostname'."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex();
+
+       return 1; 
+
+   }
+ 
+   server_hostname = s.substr(0, pos);
+   
+   s.erase(0, pos + 1);
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::set| definition@>=
+
+   pos = s.find("\037");
+
+   if (pos == string::npos)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR! In `Pull_Response_Type::set':"
+            << endl 
+            << "`string::find' failed, returning `string::npos'."
+            << endl
+            << "Failed to set `Distinguished_Name'."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex();
+
+       return 1; 
+
+   }
+ 
+   Distinguished_Name = s.substr(0, pos);
+   
+   s.erase(0, pos + 1);
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::set| definition@>=
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Pull_Response_Type::set':"
+            << endl 
+            << "`s'                      == \"" << s << "\""
+            << endl 
+            << "`server_ip_address'      == \"" << server_ip_address << "\""
+            << endl 
+            << "`test_server_ip_address' == \"" << test_server_ip_address << "\""
+            << endl 
+            << "`server_hostname'        == \"" << server_hostname << "\""
+            << endl 
+            << "`Distinguished_Name'     == \"" << Distinguished_Name << "\""
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::set| definition@>=
+
+   if (server_ip_address.empty())
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR! In `Pull_Response_Type::set':"
+            << endl 
+            << "`server_ip_address' is empty.  This isn't permitted."
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex();
+
+       return 1; 
+
+   }  /* |if (server_ip_address.empty())|  */
+   
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::set| definition@>=
+
+   else if (server_ip_address != test_server_ip_address)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR! In `Pull_Response_Type::set':"
+            << endl 
+            << "Server IP address mismatch:"
+            << endl 
+            <<"`server_ip_address'      == " << server_ip_address
+            << endl 
+            <<"`test_server_ip_address' == " << test_server_ip_address
+            << endl 
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex();
+
+       return 1; 
+
+   }  /* |else if|  */
+ 
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::set| definition@>=
+
+
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::set| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting `Pull_Response_Type::set' successfully "
+            << "with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+   return 0;
+
+}  /* End of |Pull_Response_Type::set| definition  */
+
+@q *** (3) Assignment operator.  @>
+@ Assignment operator.
+\initials{LDF 2014.02.10.}
+
+\LOG
+\initials{LDF 2014.02.10.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Pull_Response_Type| function declarations@>=
+
+const Pull_Response_Type&
+operator=(const Pull_Response_Type &p);
+
+@q **** (4) Definition  @>
+@
+@<|Pull_Response_Type::operator=| definition@>=
+const Pull_Response_Type&
+Pull_Response_Type::operator=(const Pull_Response_Type &p)
+{
+
+    pull_response_id   = p.pull_response_id;
+    user_id            = p.user_id;
+    username           = p.username;
+    server_hostname    = p.server_hostname;
+    server_ip_address  = p.server_ip_address;
+    client_hostname    = p.client_hostname;
+    client_ip_address  = p.client_ip_address;
+    Distinguished_Name = p.Distinguished_Name;
+    pull_interval      = p.pull_interval;
+    latest_pull        = p.latest_pull;
+    created            = p.created;
+    last_modified      = p.last_modified;
+    force_flag         = p.force_flag;
+    pull_request_id   = p.pull_request_id;
+
+    pull_path_vector   = p.pull_path_vector;
+
+    return p;
+
+} /* End of |Pull_Response_Type::operator=| definition  */
+
+
+@q *** (3) Clear.  @>
+@ Clear.
+\initials{LDF 2014.02.10.}
+
+\LOG
+\initials{LDF 2014.02.10.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Pull_Response_Type| function declarations@>=
+
+void
+clear(void);
+
+@q **** (4) Definition  @>
+@
+@<|Pull_Response_Type::clear| definition@>=
+
+void
+Pull_Response_Type::clear(void)
+{
+
+    pull_response_id = user_id = pull_request_id = 0;
+    pull_interval = 0;
+    latest_pull = created = last_modified = static_cast<time_t>(0); 
+
+    username = server_hostname = server_ip_address = client_hostname = client_ip_address 
+       = Distinguished_Name = "";
+
+    force_flag = false;
+
+    pull_path_vector.clear();
+
+    return;
+
+}  /* End of |Pull_Response_Type::clear| definition  */
+
+
+@q *** (3) Show.  @>
+@ Show.
+\initials{LDF 2014.02.10.}
+
+\LOG
+\initials{LDF 2014.02.10.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Pull_Response_Type| function declarations@>=
+
+void
+show(string s = "");
+
+@q **** (4) Definition  @>
+@
+@<|Pull_Response_Type::show| definition@>=
+
+void
+Pull_Response_Type::show(string s)
+{
+
+    if (s.empty())
+       s = "Pull_Response_Type:";
+
+    cerr << s 
+         << endl 
+         << "pull_response_id:         " << pull_response_id
+         << endl 
+         << "user_id:                  " << user_id
+         << endl 
+         << "username:                 " << username
+         << endl 
+         << "Distinguished_Name:       " << Distinguished_Name
+         << endl 
+         << "pull_interval:            " << pull_interval
+         << endl 
+         << "latest_pull:              " << latest_pull;
+
+    if (latest_pull > 0)
+         cerr << "   " << convert_seconds(latest_pull, true);
+
+    cerr << endl 
+         << "created:                  " << created;
+
+    if (created > 0)
+         cerr << "   " << convert_seconds(created, true);
+
+    cerr << endl 
+         << "last_modified:            " << last_modified;
+
+    if (last_modified > 0)
+       cerr << "   " << convert_seconds(last_modified, true);
+         
+    cerr << endl 
+         << "server_hostname:          " << server_hostname
+         << endl 
+         << "server_ip_address:        " << server_ip_address
+         << endl 
+         << "client_hostname:          " << client_hostname
+         << endl 
+         << "client_ip_address:        " << client_ip_address
+         << endl 
+         << "force_flag:               " << force_flag
+         << endl
+         << "pull_request_id:          " << pull_request_id
+         << endl 
+         << "pull_path_vector.size():  " << pull_path_vector.size()
+         << endl << endl;
+
+    if (pull_path_vector.size() > 0)
+    {
+        cerr << "pull_path_vector:"
+             << endl;
+
+        for (vector<Pull_Path_Type>::iterator iter = pull_path_vector.begin();
+             iter != pull_path_vector.end();
+             ++iter)
+        {
+            iter->show();
+            cerr << endl;
+        }
+
+        cerr << endl;
+    }
+
+
+    return;
+
+}  /* End of |Pull_Response_Type::show| definition  */
+
+@q **** (4) @>
+
+@q *** (3) Get pull response from database (|get_pull_response_from_database|).  @>
+@ Get pull response from database (|get_pull_response_from_database|).
+\initials{LDF 2014.02.11.}
+
+\LOG
+\initials{LDF 2014.02.11.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Pull_Response_Type| function declarations@>=
+int
+get_pull_response_from_database(MYSQL *&mysql_ptr, 
+                                bool expired = false,
+                                bool create_new = false,
+                                string thread_str = "");
+
+@q **** (4) Definition  @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+int
+Pull_Response_Type::get_pull_response_from_database(MYSQL *&mysql_ptr, 
+                                                    bool expired, 
+                                                    bool create_new,
+                                                    string thread_str)
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   stringstream sql_strm;
+
+   MYSQL_RES *result = 0;
+   MYSQL_ROW curr_row;
+
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+   long int affected_rows;
+ 
+   unsigned long int temp_val = 0UL;
+
+   int status = 0;
+
+   time_t curr_time = static_cast<time_t>(0);
+
+   int ret_val = 0;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Pull_Response_Type::get_pull_response_from_database'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   sql_strm << "select P.pull_response_id, P.user_id, U.username, U.Distinguished_Name, "
+            << "P.server_hostname, P.server_ip_address, "
+            << "P.client_hostname, P.client_ip_address, "
+            << "P.pull_interval, unix_timestamp(P.latest_pull), "
+            << "unix_timestamp(P.created), unix_timestamp(P.last_modified) from "
+            << "gwirdcli.Pull_Responses as P, gwirdcli.Users as U "
+            << "where P.user_id = U.user_id";
+
+   if (pull_response_id > 0)
+   {
+       sql_strm << " and P.pull_response_id = " << pull_response_id;
+   }
+   if (user_id > 0)
+   {
+       sql_strm << " and P.user_id = " << user_id;
+   }
+   if (!server_ip_address.empty())
+   {
+       sql_strm << " and P.server_ip_address = '" << server_ip_address << "'";
+   }
+   if (!server_hostname.empty())
+   {
+       sql_strm << " and P.server_hostname = '" << server_hostname << "'";
+   }
+   if (!Distinguished_Name.empty())
+   {
+       sql_strm << " and U.Distinguished_Name = '" << Distinguished_Name << "'";
+   }
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   if (expired)
+   {
+@q ****** (6) @>
+
+       errno = 0;
+       curr_time = time(0);
+
+       if (curr_time == static_cast<time_t>(-1))
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+                << "`time' failed, returning `(time_t) -1':"
+                << endl
+                << strerror(errno)
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           return 1;
+       }
+
+@q ****** (6) @>
+
+       sql_strm << " and (P.latest_pull = 0 "
+                << "or unix_timestamp(P.latest_pull) + P.pull_interval < " << curr_time << ")";
+
+   }  /* |if (expired)|  */
+
+@q ***** (5) @>
+
+   sql_strm << " order by P.pull_response_id";
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Pull_Response_Type::get_pull_response_from_database':"
+            << endl
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+    status = submit_mysql_query(sql_strm.str(), 
+                                result, 
+                                mysql_ptr, 
+                                &row_ctr, 
+                                &field_ctr, 
+                                0, 
+                                thread_str);
+
+    if (status != 0)
+    {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Failed to query `gwirdcli' database."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+          mysql_free_result(result); 
+
+       return 1;
+
+    }  /* |if (status != 0)|  */
+
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+           << "In `Pull_Response_Type::get_pull_response_from_database':"
+           << "`submit_mysql_query' succeeded, returning 0."
+           << endl
+           << "`row_ctr'   == " << row_ctr
+           << endl
+           << "`field_ctr' == " << field_ctr
+           << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   if (row_ctr == 0 && create_new == false)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "WARNING!  In `Pull_Response_Type::get_pull_response_from_database':"
+            << "`row_ctr' == 0 and `create_new' == false:"
+            << endl
+            << "No corresponding rows found.  Not creating a new pull response."
+            << endl
+            << "Exiting function with return value 4."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+
+       return 4;
+
+   }  /* |if (row_ctr == 0 && create_new == false)|  */
+
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2014.02.19.}
+Added this section.
+\ENDLOG
+
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   else if (row_ctr == 0 && create_new == true)
+   {
+@q ****** (6) @>
+
+@q ****** (6) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+       status = write_pull_response_to_database(mysql_ptr, true, thread_str);
+
+       if (status != 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+               << endl 
+               << "`Pull_Response_Type::write_pull_response_to_database' failed, "
+               << "returning " << status << "."
+               << endl
+               << "Exiting function unsuccessfully with return value 1."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          return 1;
+
+       }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Pull_Response_Type::get_pull_response_from_database':"
+                << endl 
+                << "`Pull_Response_Type::write_pull_response_to_database' succeeded, "
+                << "returning 0."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       return 2;
+
+@q ****** (6) @>
+
+   }  /* |if (row_ctr == 0 && create_new == true)|  */
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   else if (row_ctr > 1)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "WARNING!  In `Pull_Response_Type::get_pull_response_from_database':"
+            << "`row_ctr' == " << row_ctr << " (> 1):"
+            << endl
+            << "This shouldn't be possible."
+            << endl 
+            << "Exiting function with return value 3."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+
+       return 3;
+
+   }  /* |else if (row_ctr > 1)|  */
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `Pull_Response_Type::get_pull_response_from_database':"
+            << "`row_ctr' == 1.  Calling `mysql_fetch_row'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   curr_row = mysql_fetch_row(result);
+
+   if (curr_row == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+            << "`mysql_fetch_row' failed, returning NULL."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+
+       return 1;
+
+   }  /* |if (curr_row == 0)|  */
+
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   field_ctr = 0;
+
+@q ***** (5) |pull_response_id|.  @>
+
+@ |pull_response_id|.  
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Can't set `pull_response_id'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+
+       return 1;        
+   }
+   else
+   {
+@q ****** (6) @>
+
+       errno = 0;
+       temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+                << "`strtoul' failed, returning `ULONG_MAX'."
+                << endl
+                << "Failed to set `pull_response_id'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result); 
+
+           return 1;        
+
+       }
+
+@q ****** (6) @>
+
+       else if (temp_val > UINT_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+                << "`temp_val' == " << temp_val << " (> UINT_MAX):"
+                << endl
+                << "Value out of range.  Failed to set `pull_response_id'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result); 
+
+           return 1;        
+
+       }
+
+@q ****** (6) @>
+
+       else if (temp_val == 0UL)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+                << "`temp_val' == 0." 
+                << endl
+                << "Failed to retrieve pull response from database."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result); 
+
+           return 1;        
+
+       }
+
+@q ****** (6) @>
+
+       pull_response_id = temp_val;
+
+       temp_val = 0UL;
+
+@q ****** (6) @>
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+@q ***** (5) |user_id|.  @>
+
+@ |user_id|.  
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Can't set `user_id'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+
+       return 1;        
+   }
+   else
+   {
+@q ****** (6) @>
+
+       errno = 0;
+       temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+                << "`strtoul' failed, returning `ULONG_MAX'."
+                << endl
+                << "Failed to set `user_id'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result); 
+
+           return 1;        
+
+       }
+@q ****** (6) @>
+
+       else if (temp_val > UINT_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+                << "`temp_val' == " << temp_val << " (> UINT_MAX):"
+                << endl
+                << "Value out of range.  Failed to set `user_id'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result); 
+
+           return 1;        
+
+       }
+
+@q ****** (6) @>
+
+       user_id = temp_val;
+
+       temp_val = 0UL;
+   
+@q ****** (6) @>
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+@q ***** (5) |username|.  @>
+
+@ |username|.  
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Can't set `username'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+
+       return 1;        
+   }
+   else
+   {
+
+       username = curr_row[field_ctr];
+
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+@q ***** (5) |Distinguished_Name|.  @>
+
+@ |Distinguished_Name|.  
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Can't set `Distinguished_Name'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+
+       return 1;        
+   }
+   else
+   {
+
+       Distinguished_Name = curr_row[field_ctr];
+
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+@q ***** (5) |server_hostname|.  @>
+
+@ |server_hostname|.  
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Can't set `server_hostname'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+
+       return 1;        
+   }
+   else
+   {
+
+       server_hostname = curr_row[field_ctr];
+
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+@q ***** (5) |server_ip_address|.  @>
+
+@ |server_ip_address|.  
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Can't set `server_ip_address'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+
+       return 1;        
+   }
+   else
+   {
+
+       server_ip_address = curr_row[field_ctr];
+
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+
+@q ***** (5) |client_hostname|.  @>
+
+@ |client_hostname|.  
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Can't set `client_hostname'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+
+       return 1;        
+   }
+   else
+   {
+
+       client_hostname = curr_row[field_ctr];
+
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+@q ***** (5) |client_ip_address|.  @>
+
+@ |client_ip_address|.  
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Can't set `client_ip_address'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+
+       return 1;        
+   }
+   else
+   {
+
+       client_ip_address = curr_row[field_ctr];
+
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+@q ***** (5) |pull_interval|.  @>
+
+@ |pull_interval|.  
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Can't set `pull_interval'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+
+       return 1;        
+   }
+   else
+   {
+@q ****** (6) @>
+
+       errno = 0;
+       temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+                << "`strtoul' failed, returning `ULONG_MAX'."
+                << endl
+                << "Failed to set `pull_interval'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result); 
+
+           return 1;        
+
+       }
+@q ****** (6) @>
+
+       else if (temp_val > UINT_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+                << "`temp_val' == " << temp_val << " (> UINT_MAX):"
+                << endl
+                << "Value out of range.  Failed to set `pull_interval'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result); 
+
+           return 1;        
+
+       }
+
+@q ****** (6) @>
+
+       pull_interval = temp_val;
+
+       temp_val = 0UL;
+   
+@q ****** (6) @>
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+@q ***** (5) |latest_pull|.  @>
+
+@ |latest_pull|.  
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Can't set `latest_pull'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+
+       return 1;        
+   }
+   else
+   {
+@q ****** (6) @>
+
+       errno = 0;
+       temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+                << "`strtoul' failed, returning `ULONG_MAX'."
+                << endl
+                << "Failed to set `latest_pull'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result); 
+
+           return 1;        
+
+       }
+
+@q ****** (6) @>
+
+       latest_pull = temp_val;
+
+       temp_val = 0UL;
+   
+@q ****** (6) @>
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+@q ***** (5) |created|.  @>
+
+@ |created|.  
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Can't set `created'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+
+       return 1;        
+   }
+   else
+   {
+@q ****** (6) @>
+
+       errno = 0;
+       temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+                << "`strtoul' failed, returning `ULONG_MAX'."
+                << endl
+                << "Failed to set `created'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result); 
+
+           return 1;        
+
+       }
+
+@q ****** (6) @>
+
+       created = temp_val;
+
+       temp_val = 0UL;
+   
+@q ****** (6) @>
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+@q ***** (5) |last_modified|.  @>
+
+@ |last_modified|.  
+\initials{LDF 2014.02.11.}
+
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   if (curr_row[field_ctr] == 0 || strlen(curr_row[field_ctr]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+            << "`curr_row[" << field_ctr << "]' is NULL or empty."
+            << endl
+            << "Can't set `last_modified'."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+
+       return 1;        
+   }
+   else
+   {
+@q ****** (6) @>
+
+       errno = 0;
+       temp_val = strtoul(curr_row[field_ctr], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+                << "`strtoul' failed, returning `ULONG_MAX'."
+                << endl
+                << "Failed to set `last_modified'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result); 
+
+           return 1;        
+
+       }
+
+@q ****** (6) @>
+
+       last_modified = temp_val;
+
+       temp_val = 0UL;
+   
+@q ****** (6) @>
+
+   }  /* |else|  */
+
+   ++field_ctr;
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   mysql_free_result(result); 
+   result = 0;
+   sql_strm.str("");
+
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   sql_strm << "select P.pull_path_id, P.pull_response_id, P.owner_id, "
+            << "U.username, U.Distinguished_Name, "
+            << "P.local_path, P.remote_path, P.checksum_sha224, unix_timestamp(P.created), "
+            << "unix_timestamp(P.last_modified) "
+            << "from gwirdcli.Pull_Paths as P, gwirdcli.Users as U "
+            << "where P.pull_response_id = " << pull_response_id << " "
+            << "and P.owner_id = U.user_id "
+            << "order by P.pull_response_id";
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `Pull_Response_Type::get_pull_response_from_database':"
+            << endl
+            << "`sql_strm.str()' == " << sql_strm.str() 
+            << endl;
+
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+    status = submit_mysql_query(sql_strm.str(), 
+                                result, 
+                                mysql_ptr, 
+                                &row_ctr, 
+                                &field_ctr, 
+                                0, 
+                                thread_str);
+
+    if (status != 0)
+    {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+            << "`submit_mysql_query' failed, returning " << status << "."
+            << endl
+            << "Failed to query `gwirdcli' database."
+            << endl
+            << "Exiting function unsuccessfully with return value 1."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       if (result)
+          mysql_free_result(result); 
+
+       return 1;
+
+    }  /* |if (status != 0)|  */
+
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+           << "In `Pull_Response_Type::get_pull_response_from_database':"
+           << "`submit_mysql_query' succeeded, returning 0."
+           << endl
+           << "`row_ctr'   == " << row_ctr
+           << endl
+           << "`field_ctr' == " << field_ctr
+           << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   if (row_ctr == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `Pull_Response_Type::get_pull_response_from_database':"
+            << endl 
+            << "`row_ctr' == 0:  No pull paths found."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result); 
+       result = 0;
+
+   }  /* |if (row_ctr == 0)|  */
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   Pull_Path_Type curr_pull_path;
+
+   for (int i = 0; i < row_ctr; ++i)
+   {
+@q ****** (6) @>
+
+       curr_pull_path.clear();
+
+       curr_row = mysql_fetch_row(result);
+
+       if (curr_row == 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+                << "`mysql_fetch_row' failed, returning NULL."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result); 
+
+           return 1;
+
+       }  /* |if (curr_row == 0)|  */
+
+@q ****** (6) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+       status = curr_pull_path.set(curr_row);
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Pull_Response_Type::get_pull_response_from_database':"
+                << "`Pull_Path_Type::set' failed, returning " << status << "."
+                << endl
+                << "Failed to set `curr_pull_path'."
+                << endl
+                << "Exiting function unsuccessfully with return value 1."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           mysql_free_result(result); 
+
+           return 1;
+
+       }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Pull_Response_Type::get_pull_response_from_database':"
+                << "`Pull_Path_Type::set' succeeded, returning 0."
+                << endl;
+
+           curr_pull_path.show("curr_pull_path:");
+                
+
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       pull_path_vector.push_back(curr_pull_path);
+
+@q ****** (6) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+
+   }  /* |for|  */
+
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+   field_ctr = 0;
+
+   mysql_free_result(result); 
+   result = 0;
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "Exiting `Pull_Response_Type::get_pull_response_from_database' successfully "
+            << "with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |Pull_Response_Type::get_pull_response_from_database| definition  */
+
+@q *** (3) Update database (|update_database|).  @>
+@ Update database (|update_database|).  
+\initials{LDF 2014.02.12.}
+
+@q **** (4) Declaration  @>
+
+@<|Pull_Response_Type| function declarations@>=
+int
+update_database(unsigned int flags,
+                Scan_Parse_Parameter_Type &param, 
+                int int_val = 0,
+                string thread_str = "");
+
+
+@q **** (4) Definition  @>
+@
+@<|Pull_Response_Type::update_database| definition@>=
+int
+Pull_Response_Type::update_database(unsigned int flags,
+                                    Scan_Parse_Parameter_Type &param, 
+                                    int int_val,
+                                    string thread_str)
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   int status;
+
+   MYSQL_RES *result = 0;
+   MYSQL_ROW curr_row;
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+   long int affected_rows;
+
+   stringstream sql_strm;
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "Entering `Pull_Response_Type::update_database'."
+            << endl
+            << "`flags' == " << flags
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::update_database| definition@>=
+
+   if (flags == 0U)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "WARNING!  In `Pull_Response_Type::update_database':"
+            << endl
+            << "`flags' == 0.  Nothing to update."
+            << endl
+            << "Exiting function unsuccessfully with return value 3."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 3;
+       
+   }  /* |if (flags == 0U)|  */
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::update_database| definition@>=
+
+   else if (!(flags & LATEST_PULL || flags & CHECKSUMS || flags & PULL_INTERVAL))
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "WARNING!  In `Pull_Response_Type::update_database':"
+            << endl
+            << "Neither the `LATEST_PULL', nor the `CHECKSUMS', nor the `PULL_INTERVAL' "
+            << "bit is set in `flags':"
+            << endl
+            << "`flags' == " << flags << " " << oct << flags << " (octal)" << dec
+            << endl
+            << "This case hasn't been accounted for yet."
+            << endl 
+            << "Exiting function with return value 2."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return 2;
+       
+   }  /* |else if|  */
+
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::update_database| definition@>=
+
+   if (flags & LATEST_PULL)
+   {
+@q ****** (6) @>
+
+         sql_strm << "update gwirdcli.Pull_Responses set latest_pull = now() "
+                  << "where pull_response_id = " << pull_response_id;
+
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+      status = param.submit_mysql_query(sql_strm.str(), result, 0, 0, &affected_rows);
+
+@q ****** (6) @>
+
+      if (status != 0)
+      {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Response_Type::update_database':"
+               << endl
+               << "`Scan_Parse_Parameter_Type::submit_mysql_query' failed, returning "
+               << status << "."
+               << endl
+               << "Failed to update `gwirdcli.Pull_Responses' database table."
+               << endl
+               << "Exiting function unsuccessfully with return value 1."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          if (result)
+              mysql_free_result(result); 
+
+          return 1;
+
+      }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+      else if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "In `Pull_Response_Type::update_database':"
+               << endl
+               << "`Scan_Parse_Parameter_Type::submit_mysql_query' succeeded, returning 0."
+               << endl
+               << "Updated `gwirdcli.Pull_Responses' database table successfully."
+               << endl
+               << "`affected_rows' == " << affected_rows
+               << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Pull_Response_Type::update_database| definition@>=
+
+      sql_strm.str("");
+      mysql_free_result(result); 
+      result = 0;
+
+@q ****** (6) @>
+
+   }  /* |if (flags & LATEST_PULL)|  */ 
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::update_database| definition@>=
+
+   if (flags & PULL_INTERVAL)
+   {
+@q ****** (6) @>
+
+         sql_strm << "update gwirdcli.Pull_Responses set pull_interval = "
+                  << int_val << " where pull_response_id = " 
+                  << pull_response_id;
+
+#if DEBUG_COMPILE
+      if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+      status = param.submit_mysql_query(sql_strm.str(), result, 0, 0, &affected_rows);
+
+@q ****** (6) @>
+
+      if (status != 0)
+      {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Response_Type::update_database':"
+               << endl
+               << "`Scan_Parse_Parameter_Type::submit_mysql_query' failed, returning "
+               << status << "."
+               << endl
+               << "Failed to update `gwirdcli.Pull_Responses' database table."
+               << endl
+               << "Exiting function unsuccessfully with return value 1."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          if (result)
+              mysql_free_result(result); 
+
+          return 1;
+
+      }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+      else if (DEBUG)
+      {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "In `Pull_Response_Type::update_database':"
+               << endl
+               << "`Scan_Parse_Parameter_Type::submit_mysql_query' succeeded, returning 0."
+               << endl
+               << "Updated `gwirdcli.Pull_Responses' database table successfully."
+               << endl
+               << "`affected_rows' == " << affected_rows
+               << endl;
+          unlock_cerr_mutex(); 
+
+      }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Pull_Response_Type::update_database| definition@>=
+
+      sql_strm.str("");
+      mysql_free_result(result); 
+      result = 0;
+
+@q ****** (6) @>
+
+   }  /* |if (flags & PULL_INTERVAL)|  */ 
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::update_database| definition@>=
+
+   if (flags & CHECKSUMS)
+   {
+@q ****** (6) @>
+
+      for (vector<Pull_Path_Type>::iterator iter = pull_path_vector.begin();
+           iter != pull_path_vector.end();
+           ++iter)
+      {
+@q ******* (7) @>
+
+          if (iter->checksum_sha224 == iter->new_checksum_sha224)
+          {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << thread_str 
+                      << "In `Pull_Response_Type::update_database':"
+                      << endl
+                      << "`iter->checksum_sha224' == `iter->new_checksum_sha224' == " 
+                      << iter->new_checksum_sha224
+                      << endl
+                      << "Not updating checksum in database."
+                      << endl
+                      << "Continuing loop."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             continue;
+
+@q ******** (8) @>
+
+          }  /* |if|  */
+
+@q ******* (7) @>
+
+          else if (iter->new_checksum_sha224.empty())
+          {
+#if DEBUG_COMPILE
+              if (DEBUG) 
+              {
+                  lock_cerr_mutex(); 
+                  cerr << thread_str 
+                       << "In `Pull_Response_Type::update_database':"
+                       << endl
+                       << "`iter->new_checksum_sha224' is empty."
+                       << endl 
+                       << endl
+                       << "Not updating checksum in database."
+                       << endl
+                       << "Continuing loop."
+                       << endl;
+                  unlock_cerr_mutex(); 
+
+              }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+              continue;
+
+          }  /* |else if|  */
+          
+@q ******* (7) @>
+
+          else if (!iter->new_checksum_sha224.empty())
+          {
+@q ******** (8) @>
+
+              sql_strm.str("");
+
+              sql_strm << "update gwirdcli.Pull_Paths set checksum_sha224 = "
+                       << "'" << iter->new_checksum_sha224 << "', "
+                       << "last_modified = now() where pull_path_id = "
+                       << iter->pull_path_id;
+
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+              if (DEBUG)  
+              {
+                  lock_cerr_mutex(); 
+                  cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+                  unlock_cerr_mutex(); 
+
+              }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */               
+
+@q ******** (8) @>
+@
+@<|Pull_Response_Type::update_database| definition@>=
+
+              status = param.submit_mysql_query(sql_strm.str(), result, 0, 0, &affected_rows);
+
+@q ******** (8) @>
+
+              if (status != 0)
+              {
+                  lock_cerr_mutex(); 
+                  cerr << thread_str 
+                       << "ERROR!  In `Pull_Response_Type::update_database':"
+                       << endl
+                       << "`Scan_Parse_Parameter_Type::submit_mysql_query' failed, returning "
+                       << status << "."
+                       << endl
+                       << "Failed to update `gwirdcli.Pull_Paths' database table."
+                       << endl
+                       << "Exiting function unsuccessfully with return value 1."
+                       << endl;
+                  unlock_cerr_mutex(); 
+
+                  if (result)
+                      mysql_free_result(result); 
+
+                  return 1;
+
+              }  /* |if (status != 0)|  */
+
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+              else if (DEBUG)
+              {
+                  lock_cerr_mutex(); 
+                  cerr << thread_str 
+                       << "In `Pull_Response_Type::update_database':"
+                       << endl
+                       << "`Scan_Parse_Parameter_Type::submit_mysql_query' succeeded, returning 0."
+                       << endl
+                       << "Updated `gwirdcli.Pull_Responses' database table successfully."
+                       << endl
+                       << "`affected_rows' == " << affected_rows
+                       << endl;
+                  unlock_cerr_mutex(); 
+
+              }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******** (8) @>
+@
+@<|Pull_Response_Type::update_database| definition@>=
+
+              sql_strm.str("");
+              mysql_free_result(result); 
+              result = 0;
+
+@q ******** (8) @>
+
+          }  /* |else if (!iter->new_checksum_sha224.empty())|  */
+
+
+
+@q ******* (7) @>
+
+      }  /* |for|  */
+
+@q ****** (6) @>
+
+   }  /* |if (flags & CHECKSUMS)|  */
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::update_database| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "Exiting `Pull_Response_Type::update_database' successfully "
+            << "with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |Pull_Response_Type::update_database| definition  */
+
+@q *** (3) Write pull response to database (|write_pull_response_to_database|).  @>
+@ Write pull response to database (|write_pull_response_to_database|).
+\initials{LDF 2014.02.19.}
+
+\LOG
+\initials{LDF 2014.02.19.}
+Added this function.
+\ENDLOG
+
+@q **** (4) Declaration  @>
+
+@<|Pull_Response_Type| function declarations@>=
+int
+write_pull_response_to_database(MYSQL *&mysql_ptr, 
+                                bool lock = false,
+                                string thread_str = "");
+
+@q **** (4) Definition  @>
+@
+@<|Pull_Response_Type::write_pull_response_to_database| definition@>=
+int
+Pull_Response_Type::write_pull_response_to_database(MYSQL *&mysql_ptr, 
+                                                    bool lock, 
+                                                    string thread_str)
+{
+@q ***** (5) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   stringstream sql_strm;
+
+   MYSQL_RES *result = 0;
+   MYSQL_ROW curr_row;
+
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+   long int affected_rows;
+ 
+   int status = 0;
+
+   int ret_val = 0;
+
+   unsigned long int temp_val = 0U;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `Pull_Response_Type::write_pull_response_to_database'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+\initials{LDF 2014.02.19.}
+
+@<|Pull_Response_Type::write_pull_response_to_database| definition@>=
+
+   if (lock == true)
+   {
+@q ****** (6) @>
+
+       pthread_mutex_lock(&sql_lock_tables_mutex);
+
+       sql_strm << "lock tables gwirdcli.Pull_Responses write";
+
+       status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, 0);
+
+       if (status != 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Response_Type::write_pull_response_to_database':"
+               << "`submit_mysql_query' failed, returning " << status << "."
+               << endl
+               << "Failed to lock `gwirdcli.Pull_Responses' database table."
+               << endl
+               << "Exiting function unsuccessfully with return value 1."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          if (result)
+             mysql_free_result(result); 
+
+          pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+          return 1;
+
+       }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Pull_Response_Type::write_pull_response_to_database':"
+                << "`submit_mysql_query' succeeded, returning 0:"
+                << endl
+                << "Locked `gwirdcli.Pull_Responses' database table successfully."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        mysql_free_result(result); 
+        result = 0;
+        sql_strm.str("");
+
+
+   }  /* |if (lock == true)|  */
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::write_pull_response_to_database| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `Pull_Response_Type::write_pull_response_to_database':"
+            << endl
+            << "`lock' == `false'.  Not locking database tables."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::write_pull_response_to_database| definition@>=
+
+   if (pull_response_id == 0)
+   {
+@q ****** (6) @>
+
+       sql_strm << "select pull_response_id from gwirdcli.Pull_Responses "
+                << "order by pull_response_id desc limit 1";
+
+       status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, &row_ctr, &field_ctr);
+
+       if (status != 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Response_Type::write_pull_response_to_database':"
+               << "`submit_mysql_query' failed, returning " << status << "."
+               << endl
+               << "Failed to query `gwirdcli' database."
+               << endl
+               << "Will try to unlock tables."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          if (result)
+          {
+             mysql_free_result(result); 
+             result = 0;
+          }
+
+          ret_val = 1;
+
+          goto UNLOCK_TABLES;
+
+       }  /* |if (status != 0)|  */
+
+
+@q ****** (6) @>
+@
+@<|Pull_Response_Type::write_pull_response_to_database| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+               << "In `Pull_Response_Type::write_pull_response_to_database':"
+               << "`submit_mysql_query' succeeded, returning 0."
+               << endl
+               << "`row_ctr'   == " << row_ctr
+               << endl
+               << "`field_ctr' == " << field_ctr
+               << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Pull_Response_Type::write_pull_response_to_database| definition@>=
+
+       if (row_ctr == 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Response_Type::write_pull_response_to_database':"
+               << "`row_ctr' == 0."
+               << endl
+               << "Failed to retrieve `pull_response_id' from `gwirdcli.Pull_Responses' "
+               << "database table."
+               << endl
+               << "Will try to unlock tables."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          if (result)
+          {
+             mysql_free_result(result); 
+             result = 0;
+          }
+
+          ret_val = 1;
+
+          goto UNLOCK_TABLES;
+
+       }  /* |if (row_ctr == 0)|  */
+
+
+@q ****** (6) @>
+@
+@<|Pull_Response_Type::write_pull_response_to_database| definition@>=
+
+       curr_row = mysql_fetch_row(result);
+
+       if (curr_row == 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Response_Type::write_pull_response_to_database':"
+               << "`mysql_fetch_row' failed, returning NULL."
+               << endl
+               << "Will try to unlock tables."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          mysql_free_result(result); 
+          result = 0;
+
+          ret_val = 1;
+
+          goto UNLOCK_TABLES;
+
+       }  /* |if (curr_row == 0)|  */
+
+       
+@q ****** (6) @>
+@
+@<|Pull_Response_Type::write_pull_response_to_database| definition@>=
+ 
+       if (curr_row[0] == 0 || strlen(curr_row[0]) == 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Response_Type::write_pull_response_to_database':"
+               << "`curr_row[0]' is NULL or empty."
+               << endl
+               << "Will try to unlock tables."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          mysql_free_result(result); 
+          result = 0;
+
+          ret_val = 1;
+
+          goto UNLOCK_TABLES;
+
+       }  /* |if|  */
+
+@q ****** (6) @>
+@
+@<|Pull_Response_Type::write_pull_response_to_database| definition@>=
+
+       errno = 0;
+       temp_val = strtoul(curr_row[0], 0, 10);
+
+       if (temp_val == ULONG_MAX)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Response_Type::write_pull_response_to_database':"
+               << "`strtoul' failed, returning `ULONG_MAX':"
+               << endl 
+               << strerror(errno)
+               << endl
+               << "Will try to unlock tables."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          mysql_free_result(result); 
+          result = 0;
+
+          ret_val = 1;
+
+          goto UNLOCK_TABLES;
+
+
+       }
+
+@q ****** (6) @>
+@
+@<|Pull_Response_Type::write_pull_response_to_database| definition@>=
+
+       else if (temp_val > INT_MAX - 1)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Response_Type::write_pull_response_to_database':"
+               << "`strtoul' returned `temp_val' == " << temp_val << " (> `INT_MAX' - 1)"
+               << endl
+               << "Value out of range."
+               << endl 
+               << "Will try to unlock tables."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          mysql_free_result(result); 
+          result = 0;
+
+          ret_val = 1;
+
+          goto UNLOCK_TABLES;
+
+       }
+
+@q ****** (6) @>
+@
+@<|Pull_Response_Type::write_pull_response_to_database| definition@>=
+
+       else
+       {
+           pull_response_id = temp_val + 1;
+           temp_val = 0UL;           
+       }
+
+       mysql_free_result(result); 
+       result = 0;
+       sql_strm.str("");
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Pull_Response_Type::write_pull_response_to_database':"
+                << endl
+                << "`pull_response_id' == " << pull_response_id
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   }  /* |if (pull_response_id == 0)|  */
+
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::write_pull_response_to_database| definition@>=
+
+   sql_strm << "insert into gwirdcli.Pull_Responses "
+            << "(pull_response_id, user_id, server_hostname, server_ip_address, "
+            << "client_hostname, client_ip_address, pull_interval, latest_pull, "
+            << "created, last_modified) "
+            << "values (" << pull_response_id << ", " << user_id << ", "
+            << "'" << server_hostname << "', '" << server_ip_address << "', "
+            << "'" << client_hostname << "', '" << client_ip_address << "', "
+            << pull_interval << ", 0, now(), 0)"; 
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `Pull_Response_Type::write_pull_response_to_database':"
+            << endl
+            << "`sql_strm.str()' == " << sql_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::write_pull_response_to_database| definition@>=
+
+   status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, &affected_rows);
+
+   if (status != 0)
+   {
+      lock_cerr_mutex(); 
+      cerr << thread_str 
+           << "ERROR!  In `Pull_Response_Type::write_pull_response_to_database':"
+           << "`submit_mysql_query' failed, returning " << status << "."
+           << endl
+           << "Failed to insert row into `gwirdcli.Pull_Responses' database table."
+           << endl
+           << "Will try to unlock tables."
+           << endl;
+      unlock_cerr_mutex(); 
+
+      if (result)
+      {
+         mysql_free_result(result); 
+         result = 0;
+      }
+
+      ret_val = 1;
+
+      goto UNLOCK_TABLES;
+
+   }  /* |if (status != 0)|  */
+
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::write_pull_response_to_database| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+           << "In `Pull_Response_Type::write_pull_response_to_database':"
+           << "`submit_mysql_query' succeeded, returning 0."
+           << endl
+           << "`affected_rows'   == " << affected_rows
+           << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::write_pull_response_to_database| definition@>=
+
+UNLOCK_TABLES:
+
+   if (result)
+   {
+      mysql_free_result(result); 
+      result = 0;
+   }
+
+   if (lock == true)
+   {
+
+@q ****** (6) @>
+
+       sql_strm.str("");
+
+       sql_strm << "unlock tables";
+
+       status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, 0);
+
+       if (status != 0)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "ERROR!  In `Pull_Response_Type::write_pull_response_to_database':"
+               << "`submit_mysql_query' failed, returning " << status << "."
+               << endl
+               << "Failed to unlock `gwirdcli.Pull_Responses' database table."
+               << endl 
+               << "Exiting function unsuccessfully with return value 1."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          if (result)
+             mysql_free_result(result); 
+        
+          pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+          return 1;
+
+       }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Pull_Response_Type::write_pull_response_to_database':"
+                << "`submit_mysql_query' succeeded, returning 0:"
+                << endl
+                << "Unlocked `gwirdcli.Pull_Responses' database table successfully."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+       mysql_free_result(result); 
+       result = 0;
+
+   }  /* |if (lock == true)|  */
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::write_pull_response_to_database| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `Pull_Response_Type::write_pull_response_to_database':"
+            << endl
+            << "`lock' == `false'.  Not unlocking database tables."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::write_pull_response_to_database| definition@>=
+
+   if (ret_val != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `Pull_Response_Type::write_pull_response_to_database' "
+            << "unsuccessfully with return value " << ret_val << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return ret_val;
+
+   }  /* |if (ret_val != 0)|  */
+
+@q ***** (5) @>
+@
+@<|Pull_Response_Type::write_pull_response_to_database| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "Exiting `Pull_Response_Type::write_pull_response_to_database' "
+            << "successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+
+   return 0;
+
+}  /* End of |Pull_Response_Type::write_pull_response_to_database| definition  */
+
+@q *** (3) @>
+
+@q ** (2) Putting |class Pull_Response_Type| together.@>
+
+@ Putting |class Pull_Response_Type| together.
+\initials{LDF 2014.02.10.}
+
+@q *** (3) This is what's compiled.  @>
+
+This is what's compiled.  
+
+@c
+using namespace std;
+@<Include files@>@;@/
+using namespace gwrdifpk;
+class Scan_Parse_Parameter_Type;
+@<|class Pull_Response_Type| declaration@>@;@/ 
+@<Initialize static |Pull_Response_Type| data members@>@;@/
+@<|Pull_Response_Type| constructor definition@>@;@/ 
+@<|Pull_Response_Type::set| definition@>@;@/
+@<|Pull_Response_Type::operator=| definition@>@;@/
+@<|Pull_Response_Type::clear| definition@>@;@/
+@<|Pull_Response_Type::show| definition@>@;@/
+@<|Pull_Response_Type::get_pull_response_from_database| definition@>@;@/
+@<|Pull_Response_Type::update_database| definition@>@;@/
+@<|Pull_Response_Type::write_pull_response_to_database| definition@>@;@/
+
+@q *** (3) This is what's written to the header file `pullrstp.h++'.  @>
+
+@ This is what's written to the header file \filename{pullrstp.h++}.  
+\initials{LDF 2014.02.01.}
+
+@(pullrstp.h@>=
+#ifndef PULLRSTP_H
+#define PULLRSTP_H 1
+using namespace std;
+class Scan_Parse_Parameter_Type;
+@<|class Pull_Response_Type| declaration@>@;@/ 
+#endif 
+
+@q (progn (cweb-mode) (outline-minor-mode))                              @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

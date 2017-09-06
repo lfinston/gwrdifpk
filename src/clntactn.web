@@ -1,0 +1,2465 @@
+@q clntactn.web  @>
+@q Created by Laurence D. Finston (LDF) Thu May 30 11:20:32 CEST 2013  @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+
+
+@q ** (2) clntactn.web  @>
+
+@* {\bf Scan\_Parse\_Parameter\_Type} client action function definitions.
+\initials{LDF 2013.05.30.}
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+#include <stdlib.h>  /* Standard Library for C  */
+#include <stdio.h>
+#include <sys/mman.h>
+#include <errno.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <limits.h>
+#include <string.h>
+
+#include <algorithm> /* Standard Template Library (STL) for C++  */
+#include <bitset>
+#include <fstream> 
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <string>
+#include <time.h>
+#include <math.h>
+#include <sstream>  
+
+#include <set>
+#include <vector>
+#include <deque>
+#include <stack>
+
+#include <pthread.h>  /* POSIX threads  */
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+#include <mysql.h>
+
+#include <expat.h>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif 
+
+#undef NAME_LEN
+#undef LOCAL_HOST
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+
+#include "grouptp.h++"
+
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "helper.h++"
+#include "tanfncs.h++"
+#include "pidfncs.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+#include "usrinftp.h++"
+#include "prsrfncs.h++"
+
+@q *** (3) Client action functions.  @>
+@ Client action functions.
+\initials{LDF 2013.05.30.}
+
+\LOG
+\initials{LDF 2013.05.30.}
+Added this section.  The declarations are in \filename{scprpmtp.web}.
+\ENDLOG
+
+@q **** (4) |client_action_command_only|.  @>
+
+@ |client_action_command_only|.
+\initials{LDF 2013.05.30.}
+
+\LOG
+\initials{LDF 2013.05.30.}
+Added this function.
+\ENDLOG
+
+@<|Scan_Parse_Parameter_Type::client_action_command_only| definition@>=
+int
+Scan_Parse_Parameter_Type::client_action_command_only(Response_Type &response)
+{
+
+    bool DEBUG = false;  /* |true|  */
+    set_debug_level(DEBUG, 0, 0); 
+
+    int status = 0;
+
+    char buffer[BUFFER_SIZE];
+    memset(buffer, 0, BUFFER_SIZE);
+
+    strcpy(buffer, response.command.c_str());
+
+    int char_ctr = strlen(buffer);
+
+    if (char_ctr == 0)
+       char_ctr = 1;
+
+    if (remote_connection == true)
+    {
+        status = gnutls_record_send (session, buffer, char_ctr);
+    }
+    else
+    {
+        status = send(sock, buffer, char_ctr, 0);    
+    }
+
+    return 0;
+
+}  /* End of |Scan_Parse_Parameter_Type::client_action_command_only| definition   */
+
+
+@q **** (4) |client_action_send_file|.  @>
+
+@ |client_action_send_file|.
+\initials{LDF 2013.05.30.}
+
+\LOG
+\initials{LDF 2013.05.30.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Definition @>
+
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+int
+Scan_Parse_Parameter_Type::client_action_send_file(Response_Type &response)
+{
+@q ****** (6) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0);
+
+   int status = 0;
+
+   stringstream temp_strm;
+
+   char buffer[BUFFER_SIZE];
+   memset(buffer, 0, BUFFER_SIZE);
+
+   char temp_filename[] = "/tmp/gwirdcli.XXXXXX";
+
+   int fd = 0;
+
+   temp_strm << "[Thread " << thread_ctr << "] ";
+
+   string thread_str = temp_strm.str();
+
+   temp_strm.str("");   
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "Entering `Scan_Parse_Parameter_Type::client_action_send_file':"
+            << endl;
+
+       response.show("response:");
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+   
+   bool encrypt        = (response.options & 32U)   ? true : false;
+   bool sign           = (response.options & 64U)   ? true : false;
+   bool clearsign      = (response.options & 128U)  ? true : false;
+   bool detached       = (response.options & 256U)  ? true : false;
+   bool signature      = (response.options & 512U)  ? true : false;
+   bool verify         = (response.options & 2048U) ? true : false;
+   bool compress_gzip  = (response.options & 4096U) ? true : false;
+   bool compress_bzip2 = (response.options & 8192U) ? true : false;
+
+   bool is_directory   = (response.int_val > 0)     ? true: false;
+
+   string sign_str;
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "In `Scan_Parse_Parameter_Type::client_action_send_file':"
+            << endl
+            << "`encrypt'             == " << encrypt
+            << endl 
+            << "`sign'                == " << sign
+            << endl 
+            << "`clearsign'           == " << clearsign
+            << endl 
+            << "`detached'            == " << detached
+            << endl
+            << "`signature'           == " << signature
+            << endl
+            << "`verify'              == " << verify
+            << endl
+            << "`gpg_key_fingerprint' == " << gpg_key_fingerprint
+            << endl 
+            << "`is_directory'        == " << is_directory
+            << endl 
+            << "`compress_gzip'       == " << compress_gzip  
+            << endl 
+            << "`compress_bzip2'      == " << compress_bzip2
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2014.01.23.}
+Added this section.
+\ENDLOG
+
+@q ******* (7) @>
+@ This case is caught in |zzparse|, so this code should never be reached.
+\initials{LDF 2014.01.23.}
+
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+   if (is_directory && !(compress_gzip || compress_bzip2))
+   {
+        lock_cerr_mutex(); 
+        cerr << thread_str
+             << "ERROR!  In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+             << "`is_directory' == `true', but `compress_gzip' and `compress_bzip2' "
+             << "are both `false'."
+             << endl 
+             << "This isn't permitted.  not sending" 
+             << endl 
+             << "`" << response.local_filename << "' to server."
+             << endl 
+             << "Exiting function unsuccessfully with return value 2."
+             << endl;
+        unlock_cerr_mutex(); 
+ 
+        /* Send a single NULL byte to the server so it won't block.
+           \initials{LDF 2013.05.03.}  */
+
+        memset(buffer, 0, BUFFER_SIZE);
+   
+        if (remote_connection == true)
+        {
+            status = gnutls_record_send (session, buffer, 1);
+        }
+        else
+        {
+            status = send(sock, buffer, 1, 0);    
+        }
+
+        ++errors_occurred;
+
+        return 2;
+
+   }  /* |if (is_directory && !(compress_gzip || compress_bzip2))|  */
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+   else if (compress_gzip || compress_bzip2)
+   {
+@q ******** (8) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str
+                << "In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+                << "`is_directory'   == " << is_directory
+                << endl 
+                << "`compress_gzip'  == " << compress_gzip
+                << endl
+                << "`compress_bzip2' ==  " << compress_bzip2
+                << endl
+                << "Will compress ";
+
+           if (is_directory)
+               cerr << "directory ";
+           else
+               cerr << "file ";
+ 
+           cerr << "and send to server."
+                << endl
+                << "`response.local_filename' == " << "`" << response.local_filename << "'" 
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******** (8) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+       temp_strm.str("");
+
+       strcpy(temp_filename, "/tmp/gwirdcli.XXXXXX");
+             
+       errno = 0;
+       fd = mkstemp(temp_filename);
+
+       if (fd == -1)
+       {
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `Scan_Parse_Parameter_Type::client_action_send_file':"
+                << endl 
+                << "`mkstemp' failed, returning -1:"
+                << endl 
+                << strerror(errno)
+                << endl
+                << "Failed to create temporary file for compressed ";
+            
+           if (is_directory)
+                cerr << "tar file from the directory ";
+           else
+             cerr << "file ";
+
+           cerr << "`response.local_filename' == `" << response.local_filename << "'."
+                << endl 
+                << "Exiting function unsuccessfully with return value 2."
+                << endl;
+           unlock_cerr_mutex(); 
+ 
+        /* Send a single NULL byte to the server so it won't block.
+           \initials{LDF 2013.05.03.}  */
+
+           memset(buffer, 0, BUFFER_SIZE);
+   
+           if (remote_connection == true)
+           {
+               status = gnutls_record_send (session, buffer, 1);
+           }
+           else
+           {
+               status = send(sock, buffer, 1, 0);    
+           }
+
+           ++errors_occurred;
+
+           return 2;
+
+       }  /* |if (fd == -1)|  */
+
+@q ******** (8) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `Scan_Parse_Parameter_Type::client_action_send_file':"
+                << endl 
+                << "`mkstemp' succeeded."
+                << endl 
+                << "`temp_filename' == `" << temp_filename << "'."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******** (8) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+       close(fd);  /* We just need the name.  \initials{LDF 2014.01.23.}  */
+       fd = 0;
+
+       if (is_directory)
+       {
+          temp_strm << "tar -c -p -v -f - " << response.local_filename << " 2>/dev/null | ";
+
+          if (compress_gzip)
+              temp_strm << "gzip > " << temp_filename << ".tar.gz 2>/dev/null";
+          else
+              temp_strm << "bzip2 > " << temp_filename << ".tar.bz2 2>/dev/null";
+       }
+       else
+       {
+          if (compress_gzip)
+              temp_strm << "cat " << response.local_filename << " | gzip > " 
+                        << temp_filename << ".gz ";
+          else
+              temp_strm << "cat " << response.local_filename << " | bzip2 > " 
+                        << temp_filename << ".bz2 ";
+
+       }
+
+       response.string_val = response.local_filename;  /* Save the original directory name.
+                                                          \initials{LDF 2014.01.23.}  */
+
+       response.local_filename = temp_filename;
+
+       if (is_directory)
+          response.local_filename += ".tar";
+
+       if (compress_gzip)
+           response.local_filename += ".gz";
+       else
+           response.local_filename += ".bz2";
+      
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `Scan_Parse_Parameter_Type::client_action_send_file':"
+                << endl 
+                << "temp_strm.str() == " << temp_strm.str() 
+                << endl
+                << "response.local_filename == " << response.local_filename
+                << endl
+                << "response.string_val == " << response.string_val
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       status = system(temp_strm.str().c_str());
+
+@q ******** (8) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+       if (status == -1 || !WIFEXITED(status))
+       {
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+                << "`system' failed, returning " << status << "."
+                << endl;
+
+           if (WIFEXITED(status))
+              cerr << "WEXITSTATUS(status) == " << WEXITSTATUS(status) 
+                   << endl;
+           else
+              cerr << "Process failed to exit."
+                   << endl;
+ 
+           cerr << "Exiting `Scan_Parse_Parameter_Type::client_action_send_file' "
+                << "unsuccessfully with return value 2."
+                << endl;
+           unlock_cerr_mutex(); 
+
+        /* Send a single NULL byte to the server so it won't block.
+           \initials{LDF 2013.05.03.}  */
+
+           memset(buffer, 0, BUFFER_SIZE);
+   
+           if (remote_connection == true)
+           {
+               status = gnutls_record_send (session, buffer, 1);
+           }
+           else
+           {
+               status = send(sock, buffer, 1, 0);    
+           }
+
+           ++errors_occurred;
+
+           return 2;
+
+       }   /* |(status == -1 || !WIFEXITED(status))|  */
+
+@q ******** (8) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+       else if (WEXITSTATUS(status) != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << "ERROR!  In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+                << "`tar' and/or `gzip' or `bzip2' commands (called via `system') failed, "
+                << "returning " << WEXITSTATUS(status) << "."
+                << endl
+                << "Exiting `Scan_Parse_Parameter_Type::client_action_send_file' "
+                << "unsuccessfully with return value 2."
+                << endl;
+           unlock_cerr_mutex(); 
+
+        /* Send a single NULL byte to the server so it won't block.
+           \initials{LDF 2013.05.03.}  */
+
+           memset(buffer, 0, BUFFER_SIZE);
+   
+           if (remote_connection == true)
+           {
+               status = gnutls_record_send (session, buffer, 1);
+           }
+           else
+           {
+               status = send(sock, buffer, 1, 0);    
+           }
+
+           ++errors_occurred;
+
+           return 2;
+
+       }  /* |else if (WEXITSTATUS(status) != 0)|  */
+
+@q ******** (8) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "In `Scan_Parse_Parameter_Type::client_action_send_file':"
+                << endl 
+                << "`system' succeeded, returning 0."
+                << endl;
+           unlock_cerr_mutex();            
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******** (8) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+       strcpy(temp_filename, "/tmp/gwirdcli.XXXXXX");
+
+       temp_strm.str("");
+
+@q ******** (8) @>
+
+   }  /* |else if (is_directory)|  */
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+            << "`is_directory'   == `false'."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+@q ****** (6) Check whether file exists and is non-empty.  @>
+
+@ Check whether file exists and is non-empty.  
+\initials{LDF 2013.05.03.}
+
+\LOG
+\initials{LDF 2013.05.03.}
+@:BUG FIX@> BUG FIX:  Added this section.  Previously, the server blocked waiting 
+for data to read when the file was empty.  
+\ENDLOG
+
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+@q ******* (7) @>
+
+   struct stat stat_buffer;
+
+   bool strm_val = is_gwirdcli;
+
+   errno = 0;
+   status = stat(response.local_filename.c_str(), &stat_buffer);
+
+   if (status == -1)
+   {
+        lock_cerr_mutex(); 
+        cerr << thread_str
+             << "ERROR!  In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+             << "`stat' failed, returning -1:" << endl
+             << strerror(errno)
+             << endl 
+             << "Failed to retrieve information about file "
+             << "`" << response.local_filename << "'."
+             << endl 
+             << "Not sending file to server."
+             << endl 
+             << "Exiting function unsuccessfully with return value 2."
+             << endl;
+        unlock_cerr_mutex(); 
+ 
+
+        /* Send a single NULL byte to the server so it won't block.
+           \initials{LDF 2013.05.03.}  */
+
+        memset(buffer, 0, BUFFER_SIZE);
+   
+        if (remote_connection == true)
+        {
+            status = gnutls_record_send (session, buffer, 1);
+        }
+        else
+        {
+            status = send(sock, buffer, 1, 0);    
+        }
+
+        ++errors_occurred;
+
+        return 2;
+
+   }   /* |if (status == -1)|  */
+
+@q ******* (7) @>
+
+   else if (stat_buffer.st_size == 0)
+   {
+        temp_strm.str("");
+        temp_strm << thread_str
+             << "WARNING!  In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+             << "File `" << response.local_filename << "' is empty."
+             << endl 
+             << "Not sending file to server."
+             << endl 
+             << "Exiting function unsuccessfully with return value 2."
+             << endl;
+
+        lock_cerr_mutex();
+        cerr << temp_strm.str();
+        unlock_cerr_mutex(); 
+ 
+        temp_strm.str("");
+
+        /* Send a single NULL byte to the server so it won't block.
+           \initials{LDF 2013.05.03.}  */
+
+        memset(buffer, 0, BUFFER_SIZE);
+   
+        if (remote_connection == true)
+        {
+            status = gnutls_record_send (session, buffer, 1);
+        }
+        else
+        {
+            status = send(sock, buffer, 1, 0);    
+        }
+ 
+        ++errors_occurred;
+
+        return 2;
+
+   }   /* |else if (stat_buffer.st_size == 0)|  */
+
+
+@q ******* (7) @>
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "In `Scan_Parse_Parameter_Type::client_action_send_file':"
+            << endl;
+
+       response.show("response:");
+
+       cerr << "user_id             == " << user_id 
+            << endl
+            << "gpg_key_fingerprint == " << gpg_key_fingerprint 
+            << endl 
+            << "gpg_homedir         == " << gpg_homedir
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) If any encryption options have been used,       @>
+@q ****** (6) check that |gpg_key_fingerprint| is non-empty.  @>
+
+@ If any encryption options have been used, 
+check that |gpg_key_fingerprint| is non-empty.  
+\initials{LDF 2014.01.09.}
+
+\LOG
+\initials{LDF 2014.01.09.}
+Added this section.
+\ENDLOG
+
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+   if (   (encrypt || sign || clearsign  || detached) 
+       && gpg_key_fingerprint.empty())
+   {
+@q ******* (7) @>
+
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "ERROR!  In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+            << "Encryption option used, but `gpg_key_fingerprint' is empty:"
+            << endl 
+            << "`encrypt'   == " << encrypt  
+            << endl 
+            << "`sign'      == " << sign  
+            << endl 
+            << "`clearsign' == " << clearsign
+            << endl 
+            << "`detached'  == " << detached
+            << endl 
+            << "Not sending file to server."
+            << endl 
+            << "Exiting function unsuccessfully with return value 2."
+            << endl;
+       unlock_cerr_mutex(); 
+ 
+       /* Send a single NULL byte to the server so it won't block.
+          \initials{LDF 2013.05.03.}  */
+
+       memset(buffer, 0, BUFFER_SIZE);
+   
+       if (remote_connection == true)
+       {
+           status = gnutls_record_send (session, buffer, 1);
+       }
+       else
+       {
+           status = send(sock, buffer, 1, 0);    
+       }
+
+       ++errors_occurred;
+
+       return 2;
+
+@q ******* (7) @>
+
+   }  /* |if (   (encrypt || sign || clearsign  || detached) 
+              && gpg_key.empty())|  */
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+   strcpy(temp_filename, "/tmp/gwirdcli.XXXXXX");
+
+   fd = 0;
+
+   if (encrypt || detached || clearsign)
+   {
+       errno = 0;
+       fd = mkstemp(temp_filename);
+
+@q ******* (7) @>
+
+       if (fd == -1)
+       {
+            lock_cerr_mutex();
+            cerr << thread_str
+                 << "ERROR!  In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+                 << "`mkstemp' failed, returning -1:" << endl
+                 << strerror(errno)
+                 << endl 
+                 << "Failed to create temporary file for encrypting"
+                 << endl 
+                 << "or creating detached signature for `response.local_filename' == "
+                 << "`" << response.local_filename << "'."
+                 << endl 
+                 << "Not sending file to server."
+                 << endl 
+                 << "Exiting function unsuccessfully with return value 2."
+                 << endl;
+            unlock_cerr_mutex(); 
+ 
+
+            /* Send a single NULL byte to the server so it won't block.
+               \initials{LDF 2013.05.03.}  */
+
+            memset(buffer, 0, BUFFER_SIZE);
+   
+            if (remote_connection == true)
+            {
+                status = gnutls_record_send (session, buffer, 1);
+            }
+            else
+            {
+                status = send(sock, buffer, 1, 0);    
+            }
+
+            ++errors_occurred;
+
+            return 2;
+
+       }  /* |if (fd == -1)|  */
+
+@q ******* (7) @>
+
+       temp_file_vector.push_back(temp_filename);
+
+       close(fd);  /* We just need the name.  \initials{LDF 2014.01.08.}  */
+       fd = 0;
+
+   }  /* |if (encrypt || detached || clearsign)|  */
+
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+   if ((encrypt && sign) || clearsign)
+   {    
+@q ******* (7) @>
+
+        if (gpg_passphrase != 0 && strlen(gpg_passphrase) > 0)
+        {
+@q ******** (8) @>
+
+             pthread_mutex_lock(&gpg_passphrase_fifo_mutex);
+
+             status = write_to_fifo(gpg_passphrase, 
+                                    gpg_passphrase_length,
+                                    gpg_passphrase_fifo_fd);
+
+             if (status != 0)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << thread_str 
+                      << "ERROR!  "
+                      << "In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+                      << "`write_to_fifo' failed, returning " << status << "."
+                      << endl
+                      << "Failed to write `gpg_passphrase' to FIFO " 
+                      << "`" << gpg_passphrase_fifo_name << "'."
+                      << endl 
+                      << "Exiting function unsuccessfully with return value 1."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+                 pthread_mutex_unlock(&gpg_passphrase_fifo_mutex);
+
+                 ++errors_occurred;
+       
+                 return 1;
+                    
+             }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+             else if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << thread_str 
+                      << "In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+                      << "`write_to_fifo' succeeded, returning 0."
+                      << endl
+                      << "Wrote `gpg_passphrase' to FIFO " 
+                      << "`" << gpg_passphrase_fifo_name << "' successfully."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******** (8) @>
+
+             temp_strm << "--sign -u " << gpg_key_fingerprint << " --passphrase-file "
+                       << "'" << gpg_passphrase_fifo_name << "' ";
+
+             sign_str = temp_strm.str();
+
+             temp_strm.str("");
+
+      }  /* |if (gpg_passphrase != 0 && strlen(gpg_passphrase) > 0)|  */
+
+@q ******* (7) @>
+
+      else
+      {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "WARNING!  In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+               << "`sign' == `true', but `gpg_passphrase' is NULL or empty:"
+               << endl
+               << "Can't sign encrypted file.  Continuing."
+               << endl;
+          unlock_cerr_mutex(); 
+
+          ++warnings_occurred;
+
+      }  /* |else|  */
+
+@q ******* (7) @>
+
+   }  /* |if ((encrypt && sign) || clearsign)|  */
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+   if (encrypt)
+   {
+@q ******* (7) @>
+
+       temp_strm.str("");
+
+       temp_strm << "gpg --batch --yes --homedir=" << gpg_homedir << " "
+                 << "--encrypt -r " << gpg_key_fingerprint << " -a ";
+
+@q ******* (7) @>
+
+       
+@q ******* (7) @>
+
+       temp_strm << "-o " << temp_filename << " " << sign_str << response.local_filename;
+                 
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "temp_strm.str() == " << temp_strm.str() << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+       status = system(temp_strm.str().c_str());
+
+       pthread_mutex_unlock(&gpg_passphrase_fifo_mutex);
+
+       if (status == -1 || !WIFEXITED(status))
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+                << "`system' failed, returning " << status << "."
+                << endl;
+
+           if (WIFEXITED(status))
+              cerr << "WEXITSTATUS(status) == " << WEXITSTATUS(status) 
+                   << endl;
+           else
+              cerr << "Process failed to exit."
+                   << endl;
+ 
+           cerr << "Exiting function unsuccessfully with return value 2."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           /* Send a single NULL byte to the server so it won't block.
+              \initials{LDF 2013.05.03.}  */
+
+           memset(buffer, 0, BUFFER_SIZE);
+   
+           if (remote_connection == true)
+           {
+               status = gnutls_record_send (session, buffer, 1);
+           }
+           else
+           {
+               status = send(sock, buffer, 1, 0);    
+           }
+
+           ++errors_occurred;
+
+           return 2;
+
+       }   /* |(status == -1 || !WIFEXITED(status))|  */
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+       else if (WEXITSTATUS(status) != 0)
+       {
+              lock_cerr_mutex(); 
+              cerr << thread_str 
+                   << "ERROR!  In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+                   << "`gpg' command (called via `system') failed, "
+                   << "returning " << WEXITSTATUS(status) << "."
+                   << endl
+                   << "Failed to encrypt `" << response.local_filename << "'."
+                   << endl 
+                   << "Exiting function unsuccessfully with return value 1."
+                   << endl;
+              unlock_cerr_mutex(); 
+
+               /* Send a single NULL byte to the server so it won't block.
+                  \initials{LDF 2013.05.03.}  */
+
+               memset(buffer, 0, BUFFER_SIZE);
+   
+               if (remote_connection == true)
+               {
+                   status = gnutls_record_send (session, buffer, 1);
+               }
+               else
+               {
+                   status = send(sock, buffer, 1, 0);    
+               }
+
+               ++errors_occurred;
+
+               return 2;
+
+
+       } /* |else if (WEXITSTATUS(status) != 0)|  */
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Scan_Parse_Parameter_Type::client_action_send_file':"
+                << endl 
+                << "`system' succeeded, returning 0."
+                << endl
+                << "`gpg' command, executed via `system', succeeded, returning 0."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+   
+       response.local_filename = temp_filename;    
+
+       temp_strm.str("");
+
+@q ******* (7) @>
+
+   }  /* |if (encrypt)|  */
+ 
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+   else if (clearsign == true)
+   {
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Scan_Parse_Parameter_Type::client_action_send_file':"
+                << endl 
+                << "`clearsign' == `true'."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */         
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+       temp_strm.str("");
+
+       temp_strm << "gpg --batch --yes --clearsign "
+                 << "--passphrase-file "  << "'" << gpg_passphrase_fifo_name << "' "
+                 << "-u " << gpg_key_fingerprint << " -o " 
+                 << temp_filename << " " << response.local_filename;
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Scan_Parse_Parameter_Type::client_action_send_file':"
+                << endl 
+                << "`temp_strm.str()' == " << temp_strm.str()
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+       status = system(temp_strm.str().c_str());
+
+       if (status == -1 || !WIFEXITED(status))
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+                << "`system' failed, returning " << status << "."
+                << endl;
+
+           if (WIFEXITED(status))
+              cerr << "WEXITSTATUS(status) == " << WEXITSTATUS(status) 
+                   << endl;
+           else
+              cerr << "Process failed to exit."
+                   << endl;
+ 
+           cerr << "Exiting function unsuccessfully with return value 2."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           /* Send a single NULL byte to the server so it won't block.
+              \initials{LDF 2013.05.03.}  */
+
+           memset(buffer, 0, BUFFER_SIZE);
+   
+           if (remote_connection == true)
+           {
+               status = gnutls_record_send (session, buffer, 1);
+           }
+           else
+           {
+               status = send(sock, buffer, 1, 0);    
+           }
+
+           ++errors_occurred;
+
+           return 2;
+
+       }   /* |(status == -1 || !WIFEXITED(status))|  */
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+       else if (WEXITSTATUS(status) != 0)
+       {
+              lock_cerr_mutex(); 
+              cerr << thread_str 
+                   << "ERROR!  In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+                   << "`gpg' command (called via `system') failed, "
+                   << "returning " << WEXITSTATUS(status) << "."
+                   << endl
+                   << "Failed to clearsign `" << response.local_filename << "'."
+                   << endl 
+                   << "Exiting function unsuccessfully with return value 1."
+                   << endl;
+              unlock_cerr_mutex(); 
+
+               /* Send a single NULL byte to the server so it won't block.
+                  \initials{LDF 2013.05.03.}  */
+
+               memset(buffer, 0, BUFFER_SIZE);
+   
+               if (remote_connection == true)
+               {
+                   status = gnutls_record_send (session, buffer, 1);
+               }
+               else
+               {
+                   status = send(sock, buffer, 1, 0);    
+               }
+
+               ++errors_occurred;
+
+               return 2;
+
+
+       } /* |else if (WEXITSTATUS(status) != 0)|  */
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Scan_Parse_Parameter_Type::client_action_send_file':"
+                << endl 
+                << "`system' succeeded, returning 0."
+                << endl
+                << "`gpg' command, executed via `system', succeeded, returning 0."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+       
+       response.local_filename = temp_filename;
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Scan_Parse_Parameter_Type::client_action_send_file':"
+                << endl 
+                << "response.local_filename == " << response.local_filename 
+                << endl
+                << "response.remote_filename == " << response.remote_filename 
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+   }  /* |else if (clearsign == true)|  */
+
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+   if (encrypt && detached)
+   {
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Scan_Parse_Parameter_Type::client_action_send_file':"
+                << endl 
+                << "`encrypt' == `true'"
+                << endl
+                << "`detached' == `true'"
+                << endl 
+                << "Will create new temporary file."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+       strcpy(temp_filename, "/tmp/gwirdcli.XXXXXX");
+
+       errno = 0;
+       fd = mkstemp(temp_filename);
+
+@q ******* (7) @>
+
+       if (fd == -1)
+       {
+            lock_cerr_mutex();
+            cerr << thread_str
+                 << "ERROR!  In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+                 << "`mkstemp' failed, returning -1:" << endl
+                 << strerror(errno)
+                 << endl 
+                 << "Failed to create temporary file for detached signature."
+                 << endl 
+                 << "Not sending file to server."
+                 << endl 
+                 << "Exiting function unsuccessfully with return value 2."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            /* Send a single NULL byte to the server so it won't block.
+               \initials{LDF 2013.05.03.}  */
+
+            memset(buffer, 0, BUFFER_SIZE);
+   
+            if (remote_connection == true)
+            {
+                status = gnutls_record_send (session, buffer, 1);
+            }
+            else
+            {
+                status = send(sock, buffer, 1, 0);    
+            }
+
+            ++errors_occurred;
+
+            return 2;
+
+       }  /* |if (fd == -1)|  */
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str
+                << "In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+                << "`mkstemp' succeeded, returning 0:" << endl
+                << endl 
+                << "Created temporary file for detached signature successfully:"
+                << endl 
+                << "`temp_filename' == " << temp_filename
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+       temp_file_vector.push_back(temp_filename);
+
+       close(fd);  /* We just need the name.  \initials{LDF 2014.01.08.}  */
+       fd = 0;
+
+@q ******* (7) @>
+
+   }  /* |if (encrypt && detached)|  */
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+   if (detached)
+   {
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Scan_Parse_Parameter_Type::client_action_send_file':"
+                << endl 
+                << "`detached' == `true'"
+                << endl 
+                << "`encrypt' == " << encrypt
+                << endl
+                << "`response.local_filename' == " << response.local_filename
+                << endl 
+                << "`response.remote_filename' == " << response.remote_filename
+                << endl 
+                << "Will create detached signature."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+        if (gpg_passphrase != 0 && strlen(gpg_passphrase) > 0)
+        {
+@q ******** (8) @>
+
+             pthread_mutex_lock(&gpg_passphrase_fifo_mutex);
+
+             status = write_to_fifo(gpg_passphrase, 
+                                    gpg_passphrase_length,
+                                    gpg_passphrase_fifo_fd);
+
+             if (status != 0)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << thread_str 
+                      << "ERROR!  "
+                      << "In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+                      << "`write_to_fifo' failed, returning " << status << "."
+                      << endl
+                      << "Failed to write `gpg_passphrase' to FIFO " 
+                      << "`" << gpg_passphrase_fifo_name << "'."
+                      << endl 
+                      << "Exiting function unsuccessfully with return value 1."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+                 pthread_mutex_unlock(&gpg_passphrase_fifo_mutex);
+
+                 ++errors_occurred;
+       
+                 return 1;
+                    
+             }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+             else if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << thread_str 
+                      << "In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+                      << "`write_to_fifo' succeeded, returning 0."
+                      << endl
+                      << "Wrote `gpg_passphrase' to FIFO " 
+                      << "`" << gpg_passphrase_fifo_name << "' successfully."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        }  /* |if (gpg_passphrase != 0 && strlen(gpg_passphrase) > 0)|  */
+
+@q ******** (8) @>
+
+       temp_strm.str("");
+
+       temp_strm << "gpg --batch --yes --detach-sign -a "
+                 << "--passphrase-file "  << "'" << gpg_passphrase_fifo_name << "' "
+                 << "-u " << gpg_key_fingerprint << " "
+                 << "-o " <<  temp_filename << " " << response.local_filename;
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Scan_Parse_Parameter_Type::client_action_send_file':"
+                << endl 
+                << "`temp_strm.str()' == " << temp_strm.str()
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+       status = system(temp_strm.str().c_str());
+
+       pthread_mutex_unlock(&gpg_passphrase_fifo_mutex);
+
+
+       if (status == -1 || !WIFEXITED(status))
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "ERROR!  In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+                << "`system' failed, returning " << status << "."
+                << endl;
+
+           if (WIFEXITED(status))
+              cerr << "WEXITSTATUS(status) == " << WEXITSTATUS(status) 
+                   << endl;
+           else
+              cerr << "Process failed to exit."
+                   << endl;
+ 
+           cerr << "Exiting function unsuccessfully with return value 2."
+                << endl;
+           unlock_cerr_mutex(); 
+
+           /* Send a single NULL byte to the server so it won't block.
+              \initials{LDF 2013.05.03.}  */
+
+           memset(buffer, 0, BUFFER_SIZE);
+   
+           if (remote_connection == true)
+           {
+               status = gnutls_record_send (session, buffer, 1);
+           }
+           else
+           {
+               status = send(sock, buffer, 1, 0);    
+           }
+
+           ++errors_occurred;
+
+           return 2;
+
+       }   /* |(status == -1 || !WIFEXITED(status))|  */
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+       else if (WEXITSTATUS(status) != 0)
+       {
+              lock_cerr_mutex(); 
+              cerr << thread_str 
+                   << "ERROR!  In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+                   << "`gpg' command (called via `system') failed, "
+                   << "returning " << WEXITSTATUS(status) << "."
+                   << endl
+                   << "Failed to create detached signature for "
+                   << "`" << response.local_filename << "'."
+                   << endl 
+                   << "Exiting function unsuccessfully with return value 1."
+                   << endl;
+              unlock_cerr_mutex(); 
+
+               /* Send a single NULL byte to the server so it won't block.
+                  \initials{LDF 2013.05.03.}  */
+
+               memset(buffer, 0, BUFFER_SIZE);
+   
+               if (remote_connection == true)
+               {
+                   status = gnutls_record_send (session, buffer, 1);
+               }
+               else
+               {
+                   status = send(sock, buffer, 1, 0);    
+               }
+
+               ++errors_occurred;
+
+               return 2;
+
+
+       } /* |else if (WEXITSTATUS(status) != 0)|  */
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Scan_Parse_Parameter_Type::client_action_send_file':"
+                << endl 
+                << "`system' succeeded, returning 0."
+                << endl
+                << "`gpg' command, executed via `system', succeeded, returning 0."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+@:NOTE@> !! PLEASE NOTE:  \.{gwirdcli.GPG\_Key\_Pairs.gpg\_key\_pair\_id} 
+is {\it not\/} sent to the server!  The corresponding entry in the server-side
+\.{gwirdsif.GPG\_Key\_Pairs} database table, i.e., the one with this fingerprint,
+will probably have a different value for \.{gpg\_key\_pair\_id}.
+There is no connection between the client-side and server-side values for
+\.{GPG\_Key\_Pairs.gpg\_key\_pair\_id}.  They are assigned consecutively.
+\initials{LDF 2014.01.15.}
+
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+       Response_Type new_response;
+
+       new_response.type = Response_Type::COMMAND_ONLY_TYPE;
+
+       temp_strm.str("");
+
+       temp_strm << "PUT -f +pid +gen ";
+
+       if (verify)
+           temp_strm << "VERIFY ";
+
+       temp_strm << "SIGNATURE "
+                 << "\"" << response.remote_filename << "\" "
+                 << "GPG_KEY_FINGERPRINT \"" << gpg_key_fingerprint << "\" "
+                 << "\"" << temp_filename << "\" "
+                 << "remote_filename \"" << response.remote_filename << ".sig\"";
+
+
+       new_response.command = temp_strm.str();
+
+       response_deque.push_back(new_response);
+
+@q ******* (7) @>
+
+   }  /* |if (detached)|  */
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>=
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex();
+       cerr << thread_str 
+            << "In `Scan_Parse_Parameter_Type::client_action_send_file':"
+            << endl 
+            << "`response.type' == `Response_Type::SEND_FILE_TYPE'."
+            << endl
+            << "Calling `Scan_Parse_Parameter_Type::send_to_peer'."
+            << endl; 
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   status = send_to_peer(response);
+
+@q ****** (6) @>
+
+   if (status != 0)
+   {
+
+       temp_strm.str("");
+       temp_strm << thread_str 
+                 << "ERROR!  In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+                 << "`Scan_Parse_Parameter_Type::send_to_peer' failed, "
+                 << "returning " << status << "."
+                 << endl 
+                 << "Failed to send file `" << response.local_filename << "' "
+                 << "to server."
+                 << endl
+                 << "Exiting function unsuccessfully with return value 2."
+                 << endl;
+
+       lock_cerr_mutex(); 
+       cerr << temp_strm.str();
+       unlock_cerr_mutex(); 
+
+       ++errors_occurred;
+
+       return 2;
+
+   }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+
+       temp_strm.str("");
+       temp_strm << thread_str 
+                 << "In `Scan_Parse_Parameter_Type::client_action_send_file':  "
+                 << "`Scan_Parse_Parameter_Type::send_to_peer' succeeded, "
+                 << "returning 0."
+                 << endl 
+                 << "Sent file `" << response.local_filename << "' "
+                 << "to server successfully."
+                 << endl;
+
+       lock_cerr_mutex(); 
+       cerr << temp_strm.str();
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |Scan_Parse_Parameter_Type::client_action_send_file| definition   */
+
+
+@q **** (4) |client_action_send_public_key|.  @>
+
+@ |client_action_send_public_key|.
+\initials{LDF 2014.01.22.}
+
+\LOG
+\initials{LDF 2014.01.22.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Definition @>
+
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+int
+Scan_Parse_Parameter_Type::client_action_send_public_key(Response_Type &response)
+{
+@q ****** (6) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0);
+
+   int status  = 0;
+
+   int ret_val = 0;
+
+   stringstream temp_strm;
+
+   char buffer[BUFFER_SIZE];
+   memset(buffer, 0, BUFFER_SIZE);
+
+   char *buffer_ptr = buffer;
+
+   temp_strm << "[Thread " << thread_ctr << "] ";
+
+   string thread_str = temp_strm.str();
+
+   temp_strm.str("");   
+
+   Response_Type new_response;
+
+   MYSQL_RES* result = 0;
+   MYSQL_ROW curr_row;
+
+   unsigned int row_ctr = 0;
+   unsigned int field_ctr = 0;
+
+   stringstream sql_strm;
+
+   unsigned long int temp_val = 0UL;
+   bool revoked = false;
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "Entering `Scan_Parse_Parameter_Type::client_action_send_public_key':"
+            << endl;
+
+       response.show("response:");
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+   if (!(response.options & 1U) && gpg_key_pair_id == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "WARNING!  "
+            << "In `Scan_Parse_Parameter_Type::client_action_send_public_key':"
+            << endl 
+            << "Public key not specified and `gpg_key_pair_id' == 0."
+            << endl
+            << "Can't send public key.  Will exit function unsuccessfully with return value 2."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++warnings_occurred; 
+
+       ret_val = 2;  
+
+   }  /* |if|  */
+
+@q ****** (6) Key pair not specified, but |gpg_key_pair_id > 0|.  @>
+
+@ Key pair not specified, but |gpg_key_pair_id > 0|.  
+\initials{LDF 2014.01.22.}
+
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+   else if (!(response.options & 1U)) 
+   {
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+          lock_cerr_mutex(); 
+          cerr << thread_str 
+               << "In `Scan_Parse_Parameter_Type::client_action_send_public_key':"
+               << endl 
+               << "`gpg_key_pair_id' == " << gpg_key_pair_id
+               << endl;
+          unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+       sql_strm << "select uid, fingerprint, public_key, revoked from gwirdcli.GPG_Key_Pairs "
+                << "where gpg_key_pair_id = " << gpg_key_pair_id;
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str 
+                << "In `Scan_Parse_Parameter_Type::client_action_send_public_key':"
+                << endl 
+                << "`sql_strm.str()' == " << sql_strm.str()
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   }  /* |else if (!(response.options & 1U)) |  */
+
+@q ****** (6) Public key specified.  @>
+
+@ Public key specified.  This case hasn't been programmed yet.
+\initials{LDF 2014.01.22.}
+
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+   else
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "WARNING!  "
+            << "In `Scan_Parse_Parameter_Type::client_action_send_public_key':"
+            << endl 
+            << "Public key specified.  This case hasn't been programmed yet."
+            << endl
+            << "Can't send public key.  Will exit function unsuccessfully with return value 2."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++warnings_occurred; 
+
+       ret_val = 2;  
+
+       goto END_SEND_PUBLIC_KEY;
+
+   }  /* |else|  */
+
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+   status = submit_mysql_query(sql_strm.str(), result, &row_ctr, &field_ctr);
+
+   if (status != 0)
+   {
+       cerr << thread_str << "ERROR!  "
+            << "In `Scan_Parse_Parameter_Type::client_action_send_public_key':"
+            << endl 
+            << "`Scan_Parse_Parameter_Type::submit_mysql_query' failed, returning " 
+            << status << "."
+            << endl
+            << "Failed to retrieve entry from `gwirdsif.GPG_Key_Pairs' database table."
+            << endl 
+            << "Will exit function unsuccessfully with return value 2."
+            << endl;
+
+       if (result)
+          mysql_free_result(result);
+
+       ret_val = 2;
+
+       ++errors_occurred; 
+
+       goto END_SEND_PUBLIC_KEY;
+
+   }  /* |if (status != 0)|  */
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `Scan_Parse_Parameter_Type::client_action_send_public_key':"
+            << endl 
+            << "`Scan_Parse_Parameter_Type::submit_mysql_query' succeeded returning 0." 
+            << endl
+            << "`row_ctr' == " << row_ctr
+            << endl
+            << "`field_ctr' == " << field_ctr
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+   curr_row = mysql_fetch_row(result);
+
+   if (curr_row == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Scan_Parse_Parameter_Type::client_action_send_public_key':"
+            << endl 
+            << "`mysql_fetch_row' failed, returning NULL:" 
+            << endl
+            << mysql_error(mysql_ptr)
+            << endl 
+            << "Failed to retrieve entry from `gwirdsif.GPG_Key_Pairs' database table."
+            << endl 
+            << "Will exit function unsuccessfully with return value 2."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result);
+
+       ret_val = 2;
+
+       ++errors_occurred; 
+
+       goto END_SEND_PUBLIC_KEY;
+
+   }  /* |if (curr_row == 0)|  */
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `Scan_Parse_Parameter_Type::client_action_send_public_key':"
+            << endl 
+            << "`mysql_fetch_row' succeeded."
+            << endl;
+
+       for (int i = 0; i < field_ctr; ++i)
+           cerr << "`curr_row[" << i << "]' == " << curr_row[i] << endl;
+
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+   if (   curr_row[0] == 0 || curr_row[1] == 0 || curr_row[2] == 0 || curr_row[3] == 0
+       || strlen(curr_row[0]) == 0 
+       || strlen(curr_row[1]) == 0 
+       || strlen(curr_row[2]) == 0
+       || strlen(curr_row[3]) == 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Scan_Parse_Parameter_Type::client_action_send_public_key':"
+            << endl 
+            << "`curr_row[0]', `curr_row[1]', `curr_row[2]' and/or `curr_row[3]' "
+            << "is NULL or empty:"
+            << endl
+            << "Failed to retrieve entry from `gwirdsif.GPG_Key_Pairs' database table."
+            << endl 
+            << "Will exit function unsuccessfully with return value 2."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result);
+
+       ret_val = 2;
+
+       ++errors_occurred; 
+
+       goto END_SEND_PUBLIC_KEY;
+
+   }  /* |if|  */
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+   errno = 0;
+   temp_val = strtol(curr_row[3], 0, 10);
+
+   if (temp_val == ULONG_MAX)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Scan_Parse_Parameter_Type::client_action_send_public_key':"
+            << endl 
+            << "`strtoul' failed, returning `ULONG_MAX':"
+            << endl
+            << "Failed to retrieve `revoked' field value from `gwirdsif.GPG_Key_Pairs' "
+            << "database table entry."
+            << endl 
+            << "Will exit function unsuccessfully with return value 2."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result);
+
+       ret_val = 2;
+
+       ++errors_occurred; 
+
+       goto END_SEND_PUBLIC_KEY;
+
+   }  /* |if (temp_val == ULONG_MAX)|  */
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+   else if (temp_val > 1)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  "
+            << "In `Scan_Parse_Parameter_Type::client_action_send_public_key':"
+            << endl 
+            << "`strtoul' returned `temp_val' == " << temp_val << " (> 1):"
+            << endl
+            << "Value for `revoked' field value from `gwirdsif.GPG_Key_Pairs' "
+            << "database table entry out of range (0..1)."
+            << endl 
+            << "Will exit function unsuccessfully with return value 2."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       mysql_free_result(result);
+
+       ret_val = 2;
+
+       ++errors_occurred; 
+
+       goto END_SEND_PUBLIC_KEY;
+
+   }  /* |if (temp_val == ULONG_MAX)|  */
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+   revoked = static_cast<bool>(temp_val); 
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `Scan_Parse_Parameter_Type::client_action_send_public_key':"
+            << endl 
+            << "`temp_val' == " << temp_val
+            << endl 
+            << "`revoked'  == " << revoked
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+   if (revoked)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "WARNING!  "
+            << "In `Scan_Parse_Parameter_Type::client_action_send_public_key':"
+            << endl 
+            << "`revoked' == `true':"
+            << endl
+            << "GPG public key " << gpg_key_pair_id << ", fingerprint " 
+            << curr_row[1] << ", has been revoked."
+            << endl 
+            << "Will send to server anyway.  Continuing."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++warnings_occurred; 
+
+   }  /* |if (revoked)|  */
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+   temp_strm.str("");
+
+   temp_strm << "CLIENT SENDING PUBLIC_KEY \"" << curr_row[0] << "\" "
+             << "\"" << curr_row[1] << "\" \"" << curr_row[2] << "\"" 
+             << revoked << "U";
+
+   mysql_free_result(result);
+   result = 0;
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `Scan_Parse_Parameter_Type::client_action_send_public_key':"
+            << endl 
+            << "`temp_strm.str()' == " << temp_strm.str()
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+   if (temp_strm.str().length() < BUFFER_SIZE)
+   {
+       strncpy(buffer, temp_strm.str().c_str(), temp_strm.str().length());
+   }
+   else
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "WARNING!  "
+            << "In `Scan_Parse_Parameter_Type::client_action_send_public_key':"
+            << endl 
+            << "`temp_strm.str().length()' >= `BUFFER_SIZE':"
+            << endl
+            << "This case hasn't been accounted for yet."
+            << endl 
+            << "Will exit function unsuccessfully with return value 2."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ret_val = 2;
+
+       ++warnings_occurred; 
+
+       goto END_SEND_PUBLIC_KEY;
+
+   }
+
+
+@q ******* (7) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `Scan_Parse_Parameter_Type::client_action_send_public_key':"
+            << endl 
+            << "`buffer_ptr' ==" 
+            << endl
+            << buffer_ptr
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+END_SEND_PUBLIC_KEY:
+
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex();
+       cerr << thread_str 
+            << "In `Scan_Parse_Parameter_Type::client_action_send_public_key':"
+            << endl 
+            << "`response.type' == `Response_Type::SEND_PUBLIC_KEY_TYPE'."
+            << endl
+            << "Calling `Scan_Parse_Parameter_Type::send_to_peer'."
+            << endl; 
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   if (strlen(buffer) > 0)
+      status = send_to_peer(&buffer_ptr, 0);
+   else
+      status = send_to_peer(0, 1);  /* Send single NULL byte to server to 
+                                       prevent it from blocking.
+                                       \initials{LDF 2014.01.22.}  */
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+   if (status != 0)
+   {
+
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "ERROR!  In `Scan_Parse_Parameter_Type::client_action_send_public_key':  "
+            << "`Scan_Parse_Parameter_Type::send_to_peer' failed, "
+            << "returning " << status << "."
+            << endl
+            << "Exiting function unsuccessfully with return value 2."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       ++errors_occurred;
+
+       return 2;
+
+   }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str 
+            << "In `Scan_Parse_Parameter_Type::client_action_send_public_key':  "
+            << "`Scan_Parse_Parameter_Type::send_to_peer' succeeded, "
+            << "returning 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+   if (ret_val != 0)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "Exiting `Scan_Parse_Parameter_Type::client_action_send_public_key' "
+            << "unsuccessfully with return value " << ret_val << "."
+            << endl;
+       unlock_cerr_mutex(); 
+
+       return ret_val;
+
+   }  /* |if (ret_val != 0)|  */
+
+@q ****** (6) @>
+@
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>=
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str
+            << "Exiting `Scan_Parse_Parameter_Type::client_action_send_public_key' "
+            << "successfully with return value 0."
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   return 0;
+
+}  /* End of |Scan_Parse_Parameter_Type::client_action_send_public_key| definition   */
+
+
+@q **** (4) |client_action_unknown|.  @>
+
+@ |client_action_unknown|.
+\initials{LDF 2013.05.30.}
+
+\LOG
+\initials{LDF 2013.05.30.}
+Added this function.
+\ENDLOG
+
+@q ***** (5) Definition  @>
+
+@<|Scan_Parse_Parameter_Type::client_action_unknown| definition@>=
+int
+Scan_Parse_Parameter_Type::client_action_unknown(Response_Type &response)
+{
+@q ****** (6) @>
+
+   bool DEBUG = false;  /* |true|  */
+   set_debug_level(DEBUG, 0, 0); 
+
+   stringstream temp_strm;
+
+   temp_strm << "[Thread " << thread_ctr << "] ";
+
+   string thread_str = temp_strm.str();
+
+   temp_strm.str("");   
+
+   bool strm_val = is_gwirdcli;
+
+   int status = 0;
+
+   temp_strm << thread_str 
+             << "WARNING!  In `Scan_Parse_Parameter_Type::client_action_unknown':"
+             << endl
+             << "Response type `" << Response_Type::typename_map[response.type] << "' "
+             << "not accounted for."
+             << endl
+             << "Will send single NULL byte to server so it won't block and "
+             << "try to continue."
+             << endl;
+
+   ++warnings_occurred;
+
+   lock_cerr_mutex(); 
+   cerr << temp_strm.str();
+   unlock_cerr_mutex(); 
+
+@q ****** (6) @>
+
+   temp_strm.str("");
+
+   status = send_to_peer(0, 1);  /* Sending single NULL byte so server won't block.
+                                    \initials{LDF 2013.05.30.}  */  
+
+   if (status != 0)
+   {
+       temp_strm << thread_str 
+                 << "ERROR!  In `Scan_Parse_Parameter_Type::client_action_unknown':"
+                 << endl
+                 << "`Scan_Parse_Parameter_Type::send_to_peer' failed, returning " << status << "."
+                 << endl
+                 << "Exiting function unsuccessfully with return value 1."
+                 << endl;
+
+       lock_cerr_mutex(); 
+       cerr << temp_strm.str();
+       unlock_cerr_mutex(); 
+
+       ++errors_occurred; 
+
+       return 1;      
+
+   }  /* |if (status != 0)|  */
+
+   else 
+   {
+       temp_strm << thread_str 
+                 << "In `Scan_Parse_Parameter_Type::client_action_unknown':"
+                 << endl
+                 << "`Scan_Parse_Parameter_Type::send_to_peer' succeeded, returning 0."
+                 << endl
+                 << "Exiting function successfully with return value 2."
+                 << endl;
+
+       lock_cerr_mutex(); 
+       cerr << temp_strm.str();
+       unlock_cerr_mutex(); 
+
+       return 2;
+
+   }  /* |else|  */
+
+
+@q ****** (6) @>
+
+}  /* End of |Scan_Parse_Parameter_Type::client_action_unknown| definition  */
+
+@q **** (4) @>
+
+@
+@c
+@<Include files@>@;@/
+using namespace std;
+using namespace gwrdifpk;
+int output_func(string, bool b = false);
+@<|Scan_Parse_Parameter_Type::client_action_command_only| definition@>@;@/
+@<|Scan_Parse_Parameter_Type::client_action_send_file| definition@>@;@/
+@<|Scan_Parse_Parameter_Type::client_action_send_public_key| definition@>@;@/
+@<|Scan_Parse_Parameter_Type::client_action_unknown| definition@>@;@/
+
+@q *** (3) This is what's written to the header file `clntactn.h'.  @>
+
+@ This is what's written to the header file \filename{clntactn.h}.
+\initials{LDF 2013.05.29.}
+
+@(clntactn.h@>=
+#ifndef CLNTACTN_H
+#define CLNTACTN_H 1
+/* Empty  */
+#endif 
+
+@q ** (2) @>
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))                          @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>

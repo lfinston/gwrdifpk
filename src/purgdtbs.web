@@ -1,0 +1,3709 @@
+@q purgdtbs.web  @>
+@q [...]/gwrdifpk/src/purgdtbs.web  @>
+
+@q Created by Laurence D. Finston (LDF) Sun Jul 14 18:03:20 CEST 2013  @>
+
+@q * (1) Top @>
+
+@q * (1) Copyright and License.@>
+
+@q This file is part of gwrdifpk, a package for long-term archiving.  @>
+@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+
+@q gwrdifpk is free software; you can redistribute it and/or modify @>
+@q it under the terms of the GNU General Public License as published by @>
+@q the Free Software Foundation; either version 3 of the License, or @>
+@q (at your option) any later version.  @>
+
+@q gwrdifpk is distributed in the hope that it will be useful, @>
+@q but WITHOUT ANY WARRANTY; without even the implied warranty of @>
+@q MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the @>
+@q GNU General Public License for more details.  @>
+
+@q You should have received a copy of the GNU General Public License          @>
+@q along with gwrdifpk; if not, write to the Free Software                    @>
+@q Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA @>
+
+@q gwrdifpk is available for downloading via Git from @>
+@q https://github.com/gwdg/gwrdifpk.git    @>
+
+@q ("@@" stands for a single at-sign in the following paragraph.) @>
+
+@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+
+@q Laurence D. Finston                                                   @>
+@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
+@q Am Fassberg 11         					         @>
+@q 37077 Goettingen              					 @>
+@q Germany                           					 @>                                
+
+@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+
+@* Functions for culling and purging databases.
+\initials{LDF 2013.07.14.}
+
+@q ** (2) Include files  @>
+
+@ Include files.
+
+@<Include files@>=
+
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE         
+#endif 
+
+#include <stdlib.h>  /* Standard Library for C  */
+#include <stdio.h>
+#include <errno.h>
+#include <limits.h>
+
+#include <unistd.h>
+
+#if 0 
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <limits.h>
+#endif 
+
+#include <string.h>
+
+#include <algorithm> /* Standard Template Library (STL) for C++  */
+#include <fstream> 
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <string>
+#include <time.h>
+#include <math.h>
+#include <sstream>  
+#include <deque>
+#include <stack>
+#include <vector>
+#include <set>
+
+#include <pthread.h>  /* POSIX threads  */
+
+#include <gcrypt.h> /* for |gcry_control| */
+#include <gnutls/gnutls.h>
+#include<gnutls/x509.h>
+
+#include <expat.h>
+
+#include <mysql.h>
+
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif 
+
+#include "glblcnst.h++"
+#include "glblvrbl.h++"
+#include "excptntp.h++"
+#include "utilfncs.h++"
+#include "grouptp.h++"
+#include "hndlvltp.h++"
+#include "irdsavtp.h++"
+#include "rspnstp.h++"
+#include "irdsobtp.h++"
+#include "hndltype.h++"
+#include "dcmdsbtp.h++"
+#include "dcmtdttp.h++"
+#include "x509cert.h++"
+#include "dstngnmt.h++"
+#include "usrinftp.h++"
+#include "parser.h++"
+#include "scanner.h++"
+#include "pullrqtp.h++"
+#include "scprpmtp.h++"
+
+@q ** (2) Purge database function for server.@>
+
+@ Purge database function for server.
+\initials{LDF 2013.07.14.}
+
+\LOG
+\initials{LDF 2013.09.12.}
+Added code for deleting individual handle values that have been marked for deletion and expired.
+These are handle values that have been marked for deletion using the \.{delete handle\_value} 
+command, which I have now added.
+\par
+Previously, this function only accounted for the case that handle values had been marked for 
+deletion by means of the \.{delete handle} command, in which case all of the handle values 
+belonging to the handle in question are marked.  This was the only possibility until now.
+\ENDLOG 
+
+@q *** (3) Declaration  @>
+
+@<|purge_server_database| declaration@>=
+
+void* 
+purge_server_database(void *v);
+
+@q *** (3) Definition  @>
+@
+@<|purge_server_database| definition@>=
+
+void* 
+purge_server_database(void *v)
+{
+@q **** (4) @>
+
+   bool DEBUG = false;  /* |true|  */ 
+
+   set_debug_level(DEBUG, 0, 0);
+
+   bool NO_EXECUTE = false;  /* |true|.  Set to |true| for testing (suppress execution).  */
+
+   int status;
+
+   string thread_str;
+
+   stringstream temp_strm;
+
+   temp_strm << "[Thread " << purge_database_thread_ctr << "] ";
+
+   thread_str = temp_strm.str();
+
+   temp_strm.str(""); 
+
+   struct timespec timeout;
+
+   time_t went_to_sleep;
+   time_t curr_time;
+ 
+   bool irods_objects_handles_present = false;
+
+#if DEBUG_COMPILE
+   if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Entering `purge_server_database'." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+@q **** (4) @>
+@
+@<|purge_server_database| definition@>=
+
+   MYSQL *mysql_ptr;
+
+   MYSQL_RES* result = 0;
+   MYSQL_ROW curr_row;
+
+   long int affected_rows;
+   unsigned int row_ctr;
+   unsigned int field_ctr;
+
+   stringstream sql_strm;
+
+   MYSQL_RES* result_1 = 0;
+   MYSQL_ROW curr_row_1;
+
+   long int affected_rows_1;
+   unsigned int row_ctr_1;
+   unsigned int field_ctr_1;
+
+   stringstream sql_strm_1;
+
+   stringstream irods_objects_handles_sql_strm;
+
+   mysql_ptr = mysql_init(0);
+
+@q **** (4) @>
+
+   if (mysql_ptr)
+   {
+#if DEBUG_COMPILE 
+      if (DEBUG)
+      {
+         lock_cerr_mutex(); 
+         cerr << thread_str << "In purge_server_database:  " 
+              << "`mysql_init' succeeded."
+              << endl;
+         unlock_cerr_mutex();
+
+      }  /* |if (DEBUG)|  */ 
+#endif  /* |DEBUG_COMPILE|  */ 
+
+   }  /* |if (mysql_ptr)| */
+
+@q **** (4) @>
+
+   else
+   {
+      lock_cerr_mutex(); 
+      cerr << thread_str << "ERROR!  In purge_server_database:" 
+           << endl
+           << "`mysql_init' failed.  Exiting thread unsuccessfully with "
+           << "return value 0."
+           << endl;
+      unlock_cerr_mutex();
+ 
+      pthread_exit(0);
+
+   }   
+
+@q **** (4) Set |mysql_socket_filename|.  @>
+@ Set |mysql_socket_filename|.  
+\initials{LDF 2013.07.14.}
+
+@<|purge_server_database| definition@>=
+
+   string mysql_socket_filename;
+
+   errno = 0;
+
+   status = access("/var/run/mysqld/mysqld.sock", F_OK);
+
+@q ***** (5) @>
+
+   if (status == -1)
+   {  
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In purge_server_database:" 
+                 << endl
+                 << "MySQL server socket file `/var/run/mysqld/mysqld.sock' doesn't exist:"
+                 << endl 
+                 << "`access' error: " << strerror(errno)
+                 << endl 
+                 << "Trying `/var/run/mysql/mysql.sock'."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+        errno = 0;
+
+        status = access("/var/run/mysql/mysql.sock", F_OK);
+
+        if (status == -1)
+        {
+             lock_cerr_mutex(); 
+             cerr << thread_str << "ERROR!  In purge_server_database:" 
+                  << endl
+                  << "MySQL server socket file `/var/run/mysql/mysql.sock' doesn't exist:"
+                  << endl 
+                  << "`access' error: " << strerror(errno)
+                  << endl
+                  << "Tested for `/var/run/mysqld/mysqld.sock' previously."
+                  << endl
+                  << "Exiting thread unsuccessfully with "
+                  << "return value 0."
+                  << endl;
+             unlock_cerr_mutex();
+
+             mysql_close(mysql_ptr); 
+             mysql_ptr = 0;
+ 
+             pthread_exit(0);
+
+        }  /* |if (status == -1)|  */
+
+@q ****** (6) @>
+ 
+        else
+        {
+#if DEBUG_COMPILE
+             if (DEBUG)
+             {
+                 lock_cerr_mutex(); 
+                 cerr << thread_str << "In purge_server_database:" 
+                      << endl
+                      << "MySQL server socket file `/var/run/mysql/mysql.sock' exists."
+                      << endl;
+                 unlock_cerr_mutex(); 
+
+             }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             mysql_socket_filename = "/var/run/mysql/mysql.sock";
+
+        }  /* |else|  */
+
+@q ****** (6) @>
+
+   }  /* |if (status == -1)|  */
+     
+@q ***** (5) @>
+
+   else
+   {
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In purge_server_database:" 
+                 << endl
+                 << "MySQL server socket file `/var/run/mysqld/mysqld.sock' exists."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        mysql_socket_filename = "/var/run/mysqld/mysqld.sock";         
+
+   }  /* |else|  */
+
+@q ***** (5) @>
+
+@q **** (4) @>
+@
+@<|purge_server_database| definition@>=
+
+
+   my_bool reconnect    = 1;
+   unsigned int mysql_timeout = 120;
+
+   mysql_options(mysql_ptr, MYSQL_OPT_RECONNECT, &reconnect); 
+   mysql_options(mysql_ptr, MYSQL_OPT_CONNECT_TIMEOUT, &mysql_timeout); 
+
+   if (!mysql_real_connect(mysql_ptr, 
+                           0, 
+                           "root",
+                           0, 
+                           0,
+                           0, 
+                           mysql_socket_filename.c_str(), 0))
+   {
+      lock_cerr_mutex(); 
+      cerr << thread_str << "ERROR!  In `purge_server_database':" 
+           << endl
+           << "`mysql_real_connect' failed.  "
+           << "Error:  " << mysql_error(mysql_ptr)
+           << endl 
+           << "Error number:  " << mysql_errno(mysql_ptr)
+           << endl 
+           << "Exiting thread unsuccessfully with "
+           << "return value 0."
+           << endl;
+       unlock_cerr_mutex();
+
+       mysql_close(mysql_ptr); 
+       mysql_ptr = 0;
+
+       pthread_exit(0);
+   }
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+      lock_cerr_mutex(); 
+      cerr << thread_str << "In `purge_server_database':"
+           << endl
+           << "`mysql_real_connect' succeeded."
+           << endl; 
+      unlock_cerr_mutex();
+   } 
+
+#endif /* |DEBUG_COMPILE|  */
+
+   string handles_database = (standalone_handle) ? "handlesystem_standalone" : "handlesystem";
+
+
+@q **** (4) @>
+@
+@<|purge_server_database| definition@>=
+
+   bool failed = false;
+
+   map<unsigned long int, string> handle_map;
+
+   vector<unsigned long int> handle_id_vector;
+
+   map<unsigned long int, string> irods_object_map;
+   vector<Irods_AVU_Type> irods_avu_vector;
+
+   const unsigned int MAX_TEMP_VAL = 4;
+
+   unsigned long int temp_val[MAX_TEMP_VAL];
+
+   time_t temp_time_val;
+
+   Irods_AVU_Type curr_irods_avu;
+
+   string comma_str = "";
+
+@q **** (4) @>
+
+   for (;;)  /* main |for| loop  */
+   {
+@q ***** (5) @>
+
+@q ****** (6) @>
+
+        irods_objects_handles_present = false;
+
+        for (int i = 0; i < MAX_TEMP_VAL; ++i)
+           temp_val[i] = 0UL;
+
+        handle_map.clear();
+        irods_object_map.clear();
+        irods_avu_vector.clear();
+
+        curr_irods_avu.clear();
+
+        timeout.tv_sec = time(0) + purge_database_interval;
+        timeout.tv_nsec = 0;
+ 
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "In `purge_server_database':  At start of main loop."
+                 << endl
+                 << "`purge_database_interval' == " << purge_database_interval
+                 << endl 
+                 << "`purge_database_limit' == " << purge_database_limit
+                << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        pthread_mutex_lock(&sql_lock_tables_mutex);
+
+        sql_strm.str("");
+
+        sql_strm << "lock tables " << handles_database << ".handles write, "
+                 << "gwirdsif.Irods_Objects write, gwirdsif.Irods_AVUs write, "
+                 << "gwirdsif.Irods_Objects_Handles write, gwirdsif.Dublin_Core_Metadata write, "
+                 << "gwirdsif.Dublin_Core_Metadata_Sub write, "
+                 << "gwirdsif.Irods_Objects as IO write, gwirdsif.Irods_AVUs as IA write";
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        status = submit_mysql_query(sql_strm.str(), result, mysql_ptr);
+
+        if (status != 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' failed, returning " << status << ":"
+                 << endl 
+                 << "Error:  " << mysql_error(mysql_ptr)
+                 << endl 
+                 << "Error number:  " << mysql_errno(mysql_ptr)
+                 << endl 
+                 << "Failed to lock tables."
+                 << endl 
+                 << "Exiting thread unsuccessfully with "
+                 << "return value 0."
+                 << endl;
+             unlock_cerr_mutex();
+
+             if (result)
+                mysql_free_result(result);
+
+             mysql_close(mysql_ptr); 
+             mysql_ptr = 0;
+
+
+             pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+             pthread_exit(0);
+
+
+        }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex();
+            cerr << thread_str << "In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' succeeded, returning 0."
+                 << endl
+                 << "Locked tables successfully."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) @>
+@
+@<|purge_server_database| definition@>=
+
+        mysql_free_result(result);
+        result = 0;
+        sql_strm.str("");
+
+        sql_strm << "select distinct handle_id, handle, marked_for_deletion, "
+                 << "delete_from_database_timestamp, "
+                 << "unix_timestamp(delete_from_database_timestamp) "
+                 << "from " << handles_database << ".handles "
+                 << "where marked_for_deletion = 1 and delete_from_database_timestamp <> 0 and "
+                 << "unix_timestamp(delete_from_database_timestamp) < " 
+                 << (time(0) - purge_database_limit) << " " 
+                 << "order by handle_id";
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+        status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, &row_ctr, &field_ctr);
+
+        if (status != 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' failed, returning " << status << ":"
+                 << endl 
+                 << "Error:  " << mysql_error(mysql_ptr)
+                 << endl 
+                 << "Error number:  " << mysql_errno(mysql_ptr)
+                 << endl 
+                 << "Failed to select handles to delete from " 
+                 << handles_database << ".handles table."
+                 << endl 
+                 << "Will try to unlock tables before exiting thread function."
+                 << endl;
+             unlock_cerr_mutex(); 
+
+             if (result)
+             {
+                mysql_free_result(result);
+                result = 0;
+             }
+
+             failed = true;
+
+             goto UNLOCK_TABLES;
+
+
+        }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' succeeded, returning 0."
+                 << endl
+                 << "`row_ctr' == " << row_ctr
+                 << endl
+                 << "`field_ctr' == " << field_ctr
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ****** (6) |row_ctr == 0|.  No rows to delete.  @>
+
+@ |row_ctr == 0|.  No rows to delete.
+\initials{LDF 2013.07.15.}
+
+@<|purge_server_database| definition@>=
+
+        if (row_ctr == 0)
+        {
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `purge_server_database':" 
+                     << endl
+                     << "`row_ctr' == 0.  No rows to delete."
+                     << endl
+                     << "Skipping to code for deleting database entries for iRODS objects."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             mysql_free_result(result);
+             result = 0;
+
+             goto IRODS_OBJECTS;
+      
+        }  /* |if (row_ctr == 0)|  */
+
+@q ***** (5) |row_ctr > 0|.  Will delete rows.  @>
+
+@ |row_ctr > 0|.  Will delete rows.  
+\initials{LDF 2013.07.15.}
+
+@<|purge_server_database| definition@>=
+
+        for (int i = 0; i < row_ctr; ++i)
+        {
+@q ******* (7) @>
+
+            if ((curr_row = mysql_fetch_row(result)) == 0)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `purge_server_database':"
+                     << endl 
+                     << "`mysql_fetch_row' failed:"
+                     << endl
+                     << "Error:  " << mysql_error(mysql_ptr)
+                     << endl 
+                     << "Error number:  " << mysql_errno(mysql_ptr)
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                mysql_free_result(result);
+                result = 0;
+
+                failed = true;
+
+                goto UNLOCK_TABLES;
+
+            }  /* |if (curr_row = mysql_fetch_row(result) == 0)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `purge_server_database':"
+                     << endl 
+                     << "`mysql_fetch_row' succeeded."
+                     << endl
+                     << "`curr_row[0]' == " << curr_row[0]
+                     << endl 
+                     << "`curr_row[1]' == " << curr_row[1]
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+            errno = 0;
+            temp_val[0] = strtoul(curr_row[0], 0, 10);
+
+            if (temp_val[0] == ULONG_MAX)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `purge_server_database':"
+                     << endl 
+                     << "`strtoul' failed, returning `ULONG_MAX':"
+                     << endl
+                     << strerror(errno)
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                mysql_free_result(result);
+                result = 0;
+
+                failed = true;
+
+                goto UNLOCK_TABLES;
+
+            }  /* |if (temp_val[0] == ULONG_MAX)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `purge_server_database':"
+                     << endl 
+                     << "`strtoul' succeeded.  `temp_val[0]' == " << temp_val[0] << "."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+@<|purge_server_database| definition@>=
+
+            sql_strm_1.str("");
+            
+            sql_strm_1 << "select handle_value_id from " << handles_database << ".handles "
+                       << "where handle_id = " << temp_val[0] << " "
+                       << "and (marked_for_deletion = 0 "
+                       << "or unix_timestamp(delete_from_database_timestamp) >= " 
+                       << (time(0) - purge_database_limit) << ")";
+
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "sql_strm_1.str() == " << sql_strm_1.str() << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */  
+            
+
+           status = submit_mysql_query(sql_strm_1.str(), 
+                                       result_1, 
+                                       mysql_ptr, 
+                                       &row_ctr_1, 
+                                       &field_ctr_1);
+
+           if (status != 0)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "ERROR!  In `purge_server_database':" 
+                    << endl
+                    << "`submit_mysql_query' failed, returning " << status << ":"
+                    << endl 
+                    << "Error:  " << mysql_error(mysql_ptr)
+                    << endl 
+                    << "Error number:  " << mysql_errno(mysql_ptr)
+                    << endl 
+                    << "Failed to select handle value IDs from " 
+                    << handles_database << ".handles table."
+                    << endl 
+                    << "Will try to unlock tables before exiting thread function."
+                    << endl;
+                unlock_cerr_mutex(); 
+
+                if (result_1)
+                {
+                   mysql_free_result(result_1);
+                   result_1 = 0;
+                }
+
+                if (result)
+                {
+                   mysql_free_result(result);
+                   result = 0;
+                }
+
+                failed = true;
+
+                goto UNLOCK_TABLES;
+
+           }  /* |if (status != 0)|  */
+
+@q ******* (7) @>
+@
+@<|purge_server_database| definition@>=
+
+#if DEBUG_COMPILE
+           else if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "In `purge_server_database':" 
+                    << endl
+                    << "`submit_mysql_query' succeeded, returning 0."
+                    << endl
+                    << "`row_ctr_1' == " << row_ctr_1
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+@
+\LOG
+\initials{LDF 2013.09.12.}
+Now putting |temp_val[0]| and |curr_row[1]| onto |handle_map| only if all of the handle values
+for the handle are due to be deleted.  Otherwise, putting |temp_val[0]| onto |handle_id_vector|.
+Then the individual handle values will be deleted below.
+\ENDLOG 
+
+@<|purge_server_database| definition@>=
+
+            if (row_ctr_1 == 0)
+               handle_map[temp_val[0]] = curr_row[1];
+            else
+               handle_id_vector.push_back(temp_val[0]);
+
+@q ******* (7) @>
+
+        }  /* |for|  */
+
+@q ****** (6) @>
+
+        mysql_free_result(result);
+        result = 0;
+        sql_strm.str("");
+
+        mysql_free_result(result_1);
+        result_1 = 0;
+        sql_strm_1.str("");
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "`handle_map.size()' == " << handle_map.size()
+                 << endl;
+ 
+            if (handle_map.size() > 0)
+            {
+                cerr << "`handle_map':"
+                     << endl;
+
+                for (map<unsigned long int, string>::const_iterator iter = handle_map.begin();
+                     iter != handle_map.end();
+                     ++iter)
+                {
+                    cerr << iter->first << ", " << iter->second << endl;
+                }
+
+                cerr << endl;
+
+            }  /* |if|  */
+
+
+            cerr << "`handle_id_vector.size()' == " << handle_id_vector.size()
+                 << endl;
+ 
+            if (handle_id_vector.size() > 0)
+            {
+                cerr << "`handle_id_vector':"
+                     << endl;
+
+                for (vector<unsigned long int>::const_iterator iter = handle_id_vector.begin();
+                     iter != handle_id_vector.end();
+                     ++iter)
+                {
+                    cerr << *iter << endl;
+                }
+
+                cerr << endl;
+
+            } /* |if|  */
+
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2013.09.12.}
+Added this section.
+\ENDLOG
+
+@<|purge_server_database| definition@>=
+
+       if (handle_map.size() == 0)
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "In `purge_server_database':" 
+                    << endl
+                    << "`handle_map' is empty.  Skipping to `IRODS_OBJECTS'."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+           goto IRODS_OBJECTS;
+
+       }  /* |if (handle_map.size() == 0)|  */
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+       
+
+        sql_strm.str("");
+        irods_objects_handles_sql_strm.str("");
+
+        sql_strm << "delete from " << handles_database << ".handles "
+                 << "where handle_id in (";
+
+
+        irods_objects_handles_sql_strm << "delete from gwirdsif.Irods_Objects_Handles "
+                                       << "where handle_id in (";
+
+        comma_str = "";
+
+        for (map<unsigned long int, string>::const_iterator iter = handle_map.begin();
+             iter != handle_map.end();
+             ++iter)
+        {
+            sql_strm                       << comma_str << iter->first;
+            irods_objects_handles_sql_strm << comma_str << iter->first;
+            comma_str = ", ";
+        }
+
+        sql_strm                       << ")";
+        irods_objects_handles_sql_strm << ")";
+        comma_str = "";
+        
+        if (handle_map.size() > 0)
+        {
+            irods_objects_handles_present = true;
+        }
+        else
+        {
+            irods_objects_handles_present = false;
+            irods_objects_handles_sql_strm.str("");
+        }
+
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+        if (NO_EXECUTE)
+            status = affected_rows = 0;
+        else 
+           status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, &affected_rows);
+
+        if (status != 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' failed, returning " << status << ":"
+                 << endl 
+                 << "Error:  " << mysql_error(mysql_ptr)
+                 << endl 
+                 << "Error number:  " << mysql_errno(mysql_ptr)
+                 << endl 
+                 << "Failed to delete handles from " << handles_database << ".handles table."
+                 << endl 
+                 << "Will try to unlock tables before exiting thread function."
+                 << endl;
+             unlock_cerr_mutex(); 
+
+             if (result)
+             {
+                mysql_free_result(result);
+                result = 0;
+             }
+
+             failed = true;
+
+             goto UNLOCK_TABLES;
+
+
+        }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' succeeded, returning 0."
+                 << endl
+                 << "`affected_rows' == " << affected_rows
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        if (affected_rows > 0)
+        {
+            lock_cerr_mutex(); 
+            lock_cout_mutex();
+            cout << thread_str << "In `purge_server_database':" 
+                 << endl
+                 << "Deleted " << affected_rows << " row(s) from the "
+                 << "`" << handles_database << ".handles' database table."
+                 << endl << endl;
+            unlock_cout_mutex();
+            unlock_cerr_mutex(); 
+
+        }
+
+        sql_strm.str("");
+        mysql_free_result(result);
+        result = 0;
+
+
+
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2013.07.21.}
+Added this section.
+\ENDLOG
+@<|purge_server_database| definition@>=
+
+UPDATE_HANDLES:
+
+        if (result)
+        {
+            mysql_free_result(result);
+            result = 0;
+
+        }
+
+        sql_strm.str("");
+
+        sql_strm << "update " << handles_database << ".handles "
+                 << "set type = 'IRODS_OBJECT_PID_DELETED' "
+                 << "where type = 'IRODS_OBJECT_PID' and data in (";
+
+        comma_str = "";
+
+        for (map<unsigned long int, string>::const_iterator iter = handle_map.begin();
+             iter != handle_map.end();
+             ++iter)
+        {
+            sql_strm << comma_str << "'" << iter->second << "'";
+            comma_str = ", ";
+        }
+
+        comma_str = "";
+
+        sql_strm << ")";
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+        status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, &affected_rows);
+
+        if (status != 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' failed, returning " << status << ":"
+                 << endl 
+                 << "Error:  " << mysql_error(mysql_ptr)
+                 << endl 
+                 << "Error number:  " << mysql_errno(mysql_ptr)
+                 << endl 
+                 << "Failed to update `" << handles_database << ".handles' database table."
+                 << endl 
+                 << "Will try to unlock tables before exiting thread function."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            if (result)
+            {
+               mysql_free_result(result);
+               result = 0;
+            }
+
+            failed = true;
+
+            goto UNLOCK_TABLES;
+
+
+        }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_server_database':" 
+                    << endl
+                    << "`submit_mysql_query' succeeded, returning 0."
+                    << endl
+                    << "`affected_rows' == " << affected_rows
+                    << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        mysql_free_result(result);
+        result = 0;
+
+@q ****** (6) @>
+@
+\LOG
+\initials{LDF 2013.07.21.}
+Added this section.
+\ENDLOG
+@<|purge_server_database| definition@>=
+
+        sql_strm.str("");
+
+        sql_strm << "update " << handles_database << ".handles "
+                 << "set type = 'DC_METADATA_IRODS_OBJECT_PID_DELETED' "
+                 << "where type = 'DC_METADATA_IRODS_OBJECT_PID' and data in (";
+
+        comma_str = "";
+
+        for (map<unsigned long int, string>::const_iterator iter = handle_map.begin();
+             iter != handle_map.end();
+             ++iter)
+        {
+            sql_strm << comma_str << "'" << iter->second << "'";
+            comma_str = ", ";
+        }
+
+        comma_str = "";
+
+        sql_strm << ")";
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+        status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, &affected_rows);
+
+        if (status != 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' failed, returning " << status << ":"
+                 << endl 
+                 << "Error:  " << mysql_error(mysql_ptr)
+                 << endl 
+                 << "Error number:  " << mysql_errno(mysql_ptr)
+                 << endl 
+                 << "Failed to update `" << handles_database << ".handles' database table."
+                 << endl 
+                 << "Will try to unlock tables before exiting thread function."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            if (result)
+            {
+               mysql_free_result(result);
+               result = 0;
+            }
+
+            failed = true;
+
+            goto UNLOCK_TABLES;
+
+
+        }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_server_database':" 
+                    << endl
+                    << "`submit_mysql_query' succeeded, returning 0."
+                    << endl
+                    << "`affected_rows' == " << affected_rows
+                    << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        mysql_free_result(result);
+        result = 0;
+
+@q ***** (5) @>
+@
+@<|purge_server_database| definition@>=
+
+        sql_strm.str("");
+
+        sql_strm << "select gwirdsif.Irods_Objects.irods_object_id, "
+                 << "gwirdsif.Irods_Objects.irods_object_path "
+                 << "from gwirdsif.Irods_Objects_Handles, gwirdsif.Irods_Objects "
+                 << "where gwirdsif.Irods_Objects_Handles.handle_id in (";
+
+        comma_str = "";
+
+        for (map<unsigned long int, string>::const_iterator iter = handle_map.begin();
+             iter != handle_map.end();
+             ++iter)
+        {
+            sql_strm << comma_str << iter->first;
+            comma_str = ", ";
+        }
+
+        comma_str = "";
+
+        sql_strm << ") " 
+                 << "and gwirdsif.Irods_Objects_Handles.irods_object_id "
+                 << " = gwirdsif.Irods_Objects.irods_object_id "
+                 << "order by irods_object_id";
+ 
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+        status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, &row_ctr, &field_ctr);
+
+        if (status != 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' failed, returning " << status << ":"
+                 << endl 
+                 << "Error:  " << mysql_error(mysql_ptr)
+                 << endl 
+                 << "Error number:  " << mysql_errno(mysql_ptr)
+                 << endl 
+                 << "Failed to retrieve `irods_object_id' entries from "
+                 << "`gwirdsif.Irods_Objects_Handles' database table."
+                 << endl 
+                 << "Will try to unlock tables before exiting thread function."
+                 << endl;
+             unlock_cerr_mutex(); 
+
+             if (result)
+             {
+                mysql_free_result(result);
+                result = 0;
+             }
+
+             failed = true;
+
+             goto UNLOCK_TABLES;
+
+
+        }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' succeeded, returning 0."
+                 << endl
+                 << "`row_ctr' == " << row_ctr
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+        if (row_ctr == 0)
+        {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "No rows to delete.  Skipping to `DC_METADATA'." 
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */            
+
+           mysql_free_result(result);
+           result = 0;
+
+           goto DC_METADATA;
+
+        }  /* |if (row_ctr == 0)|  */
+
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+
+        for (int i = 0; i < row_ctr; ++i)
+        {
+@q ******* (7) @>
+
+            if ((curr_row = mysql_fetch_row(result)) == 0)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `purge_server_database':"
+                     << endl 
+                     << "`mysql_fetch_row' failed:"
+                     << endl
+                     << "Error:  " << mysql_error(mysql_ptr)
+                     << endl 
+                     << "Error number:  " << mysql_errno(mysql_ptr)
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                mysql_free_result(result);
+                result = 0;
+
+                failed = true;
+
+                goto UNLOCK_TABLES;
+
+            }  /* |if (curr_row = mysql_fetch_row(result) == 0)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `purge_server_database':"
+                     << endl 
+                     << "`mysql_fetch_row' succeeded."
+                     << endl
+                     << "`curr_row[0]' == " << curr_row[0]
+                     << endl 
+                     << "`curr_row[1]' == " << curr_row[1]
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+            errno = 0;
+            temp_val[0] = strtoul(curr_row[0], 0, 10);
+
+            if (temp_val[0] == ULONG_MAX)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `purge_server_database':"
+                     << endl 
+                     << "`strtoul' failed, returning `ULONG_MAX':"
+                     << endl
+                     << strerror(errno)
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                mysql_free_result(result);
+                result = 0;
+
+                failed = true;
+
+                goto UNLOCK_TABLES;
+
+            }  /* |if (temp_val[0] == ULONG_MAX)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `purge_server_database':"
+                     << endl 
+                     << "`strtoul' succeeded.  `temp_val[0]' == " << temp_val[0] << "."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+            irods_object_map[temp_val[0]] = curr_row[1];
+
+@q ******* (7) @>
+
+        }  /* |for|  */
+
+@q ****** (6) @>
+
+        mysql_free_result(result);
+        result = 0;
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "`irods_object_map.size()' == " << irods_object_map.size()
+                << endl;
+ 
+           if (irods_object_map.size() > 0)
+           {
+               cerr << "`irods_object_map':"
+                    << endl;
+
+               for (map<unsigned long int, string>::const_iterator iter 
+                       = irods_object_map.begin();
+                    iter != irods_object_map.end();
+                    ++iter)
+               {
+                   cerr << iter->first << ", " << iter->second << endl;
+               }
+
+               cerr << endl;
+
+           }  /* |if|  */
+
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+        sql_strm.str("");
+
+        sql_strm << "select Irods_AVUs.irods_avu_id, Irods_AVUs.irods_object_id, "
+                 << "Irods_AVUs.attribute, Irods_AVUs.value, Irods_AVUs.units, "
+                 << "Irods_AVUs.time_set, Irods_Objects.irods_object_path, "
+                 << "Irods_Objects.user_id, Irods_Objects.deleted_from_archive "
+                 << "from gwirdsif.Irods_AVUs, gwirdsif.Irods_Objects "
+                 << " where gwirdsif.Irods_AVUs.irods_object_id in "
+                 << "(";
+
+       comma_str = "";
+
+       for (map<unsigned long int, string>::const_iterator iter 
+             = irods_object_map.begin();
+            iter != irods_object_map.end();
+            ++iter)
+       {
+           sql_strm << comma_str << iter->first;
+
+           comma_str = ", ";
+       }
+
+       sql_strm << ") and "
+                << "gwirdsif.Irods_AVUs.attribute = 'PID' and "
+                << "gwirdsif.Irods_AVUs.value in (";
+
+       comma_str = "";
+
+       for (map<unsigned long int, string>::const_iterator iter 
+             = handle_map.begin();
+            iter != handle_map.end();
+            ++iter)
+       {
+           sql_strm << comma_str << "'" << iter->second << "'";
+
+           comma_str = ", ";
+       }
+
+       sql_strm << ") "
+                << "and gwirdsif.Irods_AVUs.irods_object_id = "
+                << "gwirdsif.Irods_Objects.irods_object_id "
+                << "order by irods_avu_id";
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+       status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, &row_ctr, &field_ctr);
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `purge_server_database':" 
+                << endl
+                << "`submit_mysql_query' failed, returning " << status << ":"
+                << endl 
+                << "Error:  " << mysql_error(mysql_ptr)
+                << endl 
+                << "Error number:  " << mysql_errno(mysql_ptr)
+                << endl 
+                << "Failed to retrieve rows from "
+                << "`gwirdsif.Irods_AVUs' database table."
+                << endl 
+                << "Will try to unlock tables before exiting thread function."
+                << endl;
+            unlock_cerr_mutex(); 
+
+            if (result)
+            {
+               mysql_free_result(result);
+               result = 0;
+            }
+
+            failed = true;
+
+            goto UNLOCK_TABLES;
+
+
+       }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `purge_server_database':" 
+                << endl
+                << "`submit_mysql_query' succeeded, returning 0."
+                << endl
+                << "`row_ctr' == " << row_ctr
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+        if (row_ctr == 0)
+        {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "No rows to delete.  Skipping to `DC_METADATA'." 
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */            
+
+           mysql_free_result(result);
+           result = 0;
+
+           goto DC_METADATA;
+
+        }  /* |if (row_ctr == 0)|  */
+
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+       for (int i = 0; i < row_ctr; ++i)
+       {
+@q ******* (7) @>
+
+           if ((curr_row = mysql_fetch_row(result)) == 0)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "ERROR!  In `purge_server_database':"
+                    << endl 
+                    << "`mysql_fetch_row' failed:"
+                    << endl
+                    << "Error:  " << mysql_error(mysql_ptr)
+                    << endl 
+                    << "Error number:  " << mysql_errno(mysql_ptr)
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               mysql_free_result(result);
+               result = 0;
+
+               failed = true;
+
+               goto UNLOCK_TABLES;
+
+           }  /* |if (curr_row = mysql_fetch_row(result) == 0)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+           else if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "In `purge_server_database':"
+                    << endl 
+                    << "`mysql_fetch_row' succeeded."
+                    << endl
+                    << "`curr_row[0]' == " << curr_row[0]
+                    << endl 
+                    << "`curr_row[1]' == " << curr_row[1]
+                    << endl 
+                    << "`curr_row[2]' == " << curr_row[2]
+                    << endl 
+                    << "`curr_row[3]' == " << curr_row[3]
+                    << endl 
+                    << "`curr_row[4]' == " << curr_row[4]
+                    << endl 
+                    << "`curr_row[5]' == " << curr_row[5]
+                    << endl 
+                    << "`curr_row[6]' == " << curr_row[6]
+                    << endl 
+                    << "`curr_row[7]' == " << curr_row[7]
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+           errno = 0;
+
+           for (int i = 0; i < MAX_TEMP_VAL; ++i)
+              temp_val[i] = 0UL;
+
+           status = 0;
+
+           temp_val[0]   = strtoul(curr_row[0], 0, 10);
+
+           if (temp_val[0] != ULONG_MAX)
+              temp_val[1] = strtoul(curr_row[1], 0, 10);
+
+           if (temp_val[1] != ULONG_MAX)
+              temp_val[2] = strtoul(curr_row[7], 0, 10);
+
+           if (temp_val[2] != ULONG_MAX)
+              temp_val[3] = strtoul(curr_row[8], 0, 10);
+
+           if (temp_val[3] != ULONG_MAX)
+              status = get_seconds_since_epoch(curr_row[5], temp_time_val); 
+
+           if (   temp_val[0] == ULONG_MAX 
+               || temp_val[1] == ULONG_MAX 
+               || temp_val[2] == ULONG_MAX
+               || temp_val[3] == ULONG_MAX)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "ERROR!  In `purge_server_database':"
+                    << endl
+                    << "`strtoul' failed, returning `ULONG_MAX':"
+                    << endl
+                    << strerror(errno)
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               mysql_free_result(result);
+               result = 0;
+
+               failed = true;
+
+               goto UNLOCK_TABLES;
+
+           }  /* |if|  */
+
+           else if (status != 0)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "ERROR!  In `purge_server_database':"
+                    << endl
+                    << "`get_seconds_since_epoch' failed, returning " << status << "."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               mysql_free_result(result);
+               result = 0;
+
+               failed = true;
+
+               goto UNLOCK_TABLES;
+
+           }  /* |else if|  */
+
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+           else if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "In `purge_server_database':"
+                    << endl 
+                    << "`strtoul' and `get_seconds_since_epoch' succeeded."
+                    << endl
+                    << "`temp_val[0]' == " << temp_val[0]
+                    << endl 
+                    << "`temp_val[1]' == " << temp_val[1] 
+                    << endl 
+                    << "`temp_val[2]' == " << temp_val[2] 
+                    << endl 
+                    << "`temp_val[3]' == " << temp_val[3] 
+                    << endl 
+                    << "`temp_time_val' == " << temp_time_val 
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+           curr_irods_avu.clear();
+           curr_irods_avu.set(curr_row[2],    /* attribute              */       
+                              curr_row[3],    /* value                  */
+                              curr_row[4],    /* units                  */
+                              temp_time_val,  /* time set               */
+                              temp_val[1],    /* |irods_object_id|      */
+                              temp_val[0],    /* |irods_avu_id|         */
+                              curr_row[6],    /* |irods_object_path|    */
+                              temp_val[2],    /* |user_id|              */
+                              temp_val[3]     /* |deleted_from_archive| */
+                            );
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "temp_val[3] == " << temp_val[3] << endl;
+                curr_irods_avu.show("curr_irods_avu:");
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            irods_avu_vector.push_back(curr_irods_avu);
+
+@q ******* (7) @>
+
+       }  /* |for|  */
+
+@q ****** (6) @>
+
+       mysql_free_result(result);
+       result = 0;
+       sql_strm.str("");
+
+@q ***** (5) Handle AVUs for Dublin Core metadata.  @>
+
+@ Handle AVUs for Dublin Core metadata.  
+\initials{LDF 2013.07.18.}
+
+@<|purge_server_database| definition@>=
+
+DC_METADATA:
+  
+       if (result)
+       {
+          mysql_free_result(result);
+          result = 0;
+       }
+
+
+       sql_strm.str("");
+
+        sql_strm << "select Irods_AVUs.irods_avu_id, Irods_AVUs.irods_object_id, "
+                 << "Irods_AVUs.attribute, Irods_AVUs.value, Irods_AVUs.units, "
+                 << "Irods_AVUs.time_set, Irods_Objects.irods_object_path, "
+                 << "Irods_Objects.user_id, Irods_Objects.deleted_from_archive "
+                 << "from gwirdsif.Irods_AVUs, gwirdsif.Irods_Objects "
+                 << "where "
+                 << "(Irods_AVUs.attribute = 'DC_METADATA_PID' or "
+                 << "Irods_AVUs.attribute = 'IRODS_OBJECT_PID') "
+                 << "and Irods_AVUs.value in (";
+
+       comma_str = "";
+
+       for (map<unsigned long int, string>::const_iterator iter = handle_map.begin();
+            iter != handle_map.end();
+            ++iter)
+       {
+           sql_strm << comma_str << "'" << iter->second << "'";
+           comma_str = ", ";
+       }
+
+       sql_strm << ") and Irods_AVUs.irods_object_id = Irods_Objects.irods_object_id "
+                << "order by Irods_AVUs.irods_avu_id";
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+       status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, &row_ctr, &field_ctr);
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `purge_server_database':" 
+                << endl
+                << "`submit_mysql_query' failed, returning " << status << ":"
+                << endl 
+                << "Error:  " << mysql_error(mysql_ptr)
+                << endl 
+                << "Error number:  " << mysql_errno(mysql_ptr)
+                << endl 
+                << "Failed to retrieve rows from "
+                << "`gwirdsif.Irods_AVUs' database table."
+                << endl 
+                << "Will try to unlock tables before exiting thread function."
+                << endl;
+            unlock_cerr_mutex(); 
+
+            if (result)
+            {
+               mysql_free_result(result);
+               result = 0;
+            }
+
+            failed = true;
+
+            goto UNLOCK_TABLES;
+
+
+       }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `purge_server_database':" 
+                << endl
+                << "`submit_mysql_query' succeeded, returning 0."
+                << endl
+                << "`row_ctr' == " << row_ctr
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+        if (row_ctr == 0)
+        {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "No rows to delete.  Skipping to `IRODS_OBJECTS_HANDLES'." 
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */            
+
+           mysql_free_result(result);
+           result = 0;
+
+           goto IRODS_OBJECTS_HANDLES;
+
+        }  /* |if (row_ctr == 0)|  */
+
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+       for (int i = 0; i < row_ctr; ++i)
+       {
+@q ******* (7) @>
+
+           if ((curr_row = mysql_fetch_row(result)) == 0)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "ERROR!  In `purge_server_database':"
+                    << endl 
+                    << "`mysql_fetch_row' failed:"
+                    << endl
+                    << "Error:  " << mysql_error(mysql_ptr)
+                    << endl 
+                    << "Error number:  " << mysql_errno(mysql_ptr)
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               mysql_free_result(result);
+               result = 0;
+
+               failed = true;
+
+               goto UNLOCK_TABLES;
+
+           }  /* |if (curr_row = mysql_fetch_row(result) == 0)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+           else if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "In `purge_server_database':"
+                    << endl 
+                    << "`mysql_fetch_row' succeeded."
+                    << endl
+                    << "`curr_row[0]' == " << curr_row[0]
+                    << endl 
+                    << "`curr_row[1]' == " << curr_row[1]
+                    << endl 
+                    << "`curr_row[2]' == " << curr_row[2]
+                    << endl 
+                    << "`curr_row[3]' == " << curr_row[3]
+                    << endl 
+                    << "`curr_row[4]' == " << curr_row[4]
+                    << endl 
+                    << "`curr_row[5]' == " << curr_row[5]
+                    << endl 
+                    << "`curr_row[6]' == " << curr_row[6]
+                    << endl 
+                    << "`curr_row[7]' == " << curr_row[7]
+                    << endl 
+                    << "`curr_row[8]' == " << curr_row[8]
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+           errno = 0;
+
+           for (int i = 0; i < MAX_TEMP_VAL; ++i)
+              temp_val[i] = 0UL;
+
+           status = 0;
+
+           temp_val[0]   = strtoul(curr_row[0], 0, 10);
+
+           if (temp_val[0] != ULONG_MAX)
+              temp_val[1] = strtoul(curr_row[1], 0, 10);
+
+           if (temp_val[1] != ULONG_MAX)
+              temp_val[2] = strtoul(curr_row[7], 0, 10);
+
+           if (temp_val[2] != ULONG_MAX)
+              temp_val[3] = strtoul(curr_row[8], 0, 10);
+
+           if (temp_val[3] != ULONG_MAX)
+              status = get_seconds_since_epoch(curr_row[5], temp_time_val); 
+
+           if (   temp_val[0] == ULONG_MAX 
+               || temp_val[1] == ULONG_MAX 
+               || temp_val[2] == ULONG_MAX
+               || temp_val[3] == ULONG_MAX)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "ERROR!  In `purge_server_database':"
+                    << endl
+                    << "`strtoul' failed, returning `ULONG_MAX':"
+                    << endl
+                    << strerror(errno)
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               mysql_free_result(result);
+               result = 0;
+
+               failed = true;
+
+               goto UNLOCK_TABLES;
+
+           }  /* |if|  */
+
+           else if (status != 0)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "ERROR!  In `purge_server_database':"
+                    << endl
+                    << "`get_seconds_since_epoch' failed, returning " << status << "."
+                    << endl;
+               unlock_cerr_mutex(); 
+
+               mysql_free_result(result);
+               result = 0;
+
+               failed = true;
+
+               goto UNLOCK_TABLES;
+
+           }  /* |else if|  */
+
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+           else if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << thread_str << "In `purge_server_database':"
+                    << endl 
+                    << "`strtoul' and `get_seconds_since_epoch' succeeded."
+                    << endl
+                    << "`temp_val[0]' == " << temp_val[0]
+                    << endl 
+                    << "`temp_val[1]' == " << temp_val[1] 
+                    << endl 
+                    << "`temp_val[2]' == " << temp_val[2] 
+                    << endl 
+                    << "`temp_val[3]' == " << temp_val[3] 
+                    << endl 
+                    << "`temp_time_val' == " << temp_time_val 
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+           curr_irods_avu.clear();
+           curr_irods_avu.set(curr_row[2],    /* attribute              */       
+                              curr_row[3],    /* value                  */
+                              curr_row[4],    /* units                  */
+                              temp_time_val,  /* time set               */
+                              temp_val[1],    /* |irods_object_id|      */
+                              temp_val[0],    /* |irods_avu_id|         */
+                              curr_row[6],    /* |irods_object_path|    */
+                              temp_val[2],    /* |user_id|              */
+                              temp_val[3]     /* |deleted_from_archive| */
+                            );
+
+            irods_avu_vector.push_back(curr_irods_avu);
+
+@q ******* (7) @>
+
+       }  /* |for|  */
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "`irods_avu_vector.size()' == " << irods_avu_vector.size()
+                << endl;
+ 
+           if (irods_avu_vector.size() > 0)
+           {
+               cerr << "`irods_avu_vector':"
+                    << endl;
+
+               for (vector<Irods_AVU_Type>::const_iterator iter 
+                     = irods_avu_vector.begin();
+                    iter != irods_avu_vector.end();
+                    ++iter)
+               {
+                   iter->show();
+               }
+
+               cerr << endl;
+
+           }  /* |if|  */
+
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+       if (irods_avu_vector.size() == 0)
+       {
+#if DEBUG_COMPILE
+           if (DEBUG)
+           {
+               lock_cerr_mutex(); 
+               cerr << "`irods_avu_vector' is empty.  Skipping to `IRODS_OBJECTS_HANDLES'." 
+                    << endl;
+               unlock_cerr_mutex(); 
+
+           }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */            
+
+           goto IRODS_OBJECTS_HANDLES;
+
+       }  /* |if (irods_avu_vector.size() == 0)|  */
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+       sql_strm.str("");
+       sql_strm << "delete from gwirdsif.Irods_AVUs where irods_avu_id in (";
+
+       comma_str = "";
+
+       for (vector<Irods_AVU_Type>::const_iterator iter 
+             = irods_avu_vector.begin();
+            iter != irods_avu_vector.end();
+            ++iter)
+       {
+           sql_strm << comma_str << iter->get_id();
+
+           comma_str = ", ";
+       } 
+
+       sql_strm << ")";
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+        if (NO_EXECUTE)
+            status = affected_rows = 0;
+        else 
+           status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, &affected_rows);
+
+        if (status != 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' failed, returning " << status << ":"
+                 << endl 
+                 << "Error:  " << mysql_error(mysql_ptr)
+                 << endl 
+                 << "Error number:  " << mysql_errno(mysql_ptr)
+                 << endl 
+                 << "Failed to delete iRODS AVU entries from the `gwirdsif.Irods_AVUs' "
+                 << "database table."
+                 << endl 
+                 << "Will try to unlock tables before exiting thread function."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+            if (result)
+            {
+               mysql_free_result(result);
+               result = 0;
+            }
+
+            failed = true;
+
+            goto UNLOCK_TABLES;
+
+
+        }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_server_database':" 
+                    << endl
+                    << "`submit_mysql_query' succeeded, returning 0."
+                    << endl
+                    << "`affected_rows' == " << affected_rows
+                    << endl;
+
+            if (affected_rows > 0)
+                 cerr << "Deleted iRODS AVU entry/entries from the `gwirdsif.Irods_AVUs' "
+                      << "database table successfully."
+                      << endl;
+             else
+                cerr << "No rows deleted." << endl;
+
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' succeeded, returning 0."
+                 << endl
+                 << "`affected_rows' == " << affected_rows
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        mysql_free_result(result);
+        result = 0;    
+        sql_strm.str("");
+     
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+        sql_strm.str("");
+
+        sql_strm << "delete from handlesystem_standalone.handles where "
+                 << "type = 'DC_METADATA_PID' and data in (";
+
+       comma_str = "";
+
+       for (map<unsigned long int, string>::const_iterator iter = handle_map.begin();
+            iter != handle_map.end();
+            ++iter)
+       {
+           sql_strm << comma_str << "'" << iter->second << "'";
+           comma_str = ", ";
+       }
+
+       sql_strm << ")";
+
+
+#if DEBUG_COMPILE
+       if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+       if (NO_EXECUTE)
+           status = affected_rows = 0;
+       else 
+          status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, &affected_rows);
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `purge_server_database':" 
+                << endl
+                << "`submit_mysql_query' failed, returning " << status << ":"
+                << endl 
+                << "Error:  " << mysql_error(mysql_ptr)
+                << endl 
+                << "Error number:  " << mysql_errno(mysql_ptr)
+                << endl 
+                << "Failed to delete handle entries from the `handlesystem_standalone.handles' "
+                << "database table."
+                << endl 
+                << "Will try to unlock tables before exiting thread function."
+                << endl;
+            unlock_cerr_mutex(); 
+
+            if (result)
+            {
+               mysql_free_result(result);
+               result = 0;
+            }
+
+            failed = true;
+
+            goto UNLOCK_TABLES;
+
+
+       }  /* |if (status != 0)|  */
+
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_server_database':" 
+                    << endl
+                    << "`submit_mysql_query' succeeded, returning 0."
+                    << endl 
+                    << "`affected_rows' == " << affected_rows
+                    << endl;
+
+             if (affected_rows > 0)
+                 cerr << "Deleted handle entry/entries from the `handlesystem_standalone.handles' "
+                      << "database table successfully."
+                      << endl;
+
+             else
+                cerr << "No rows deleted." << endl;
+
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        mysql_free_result(result);
+        result = 0;
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+        sql_strm.str("");
+
+        sql_strm << "update gwirdsif.Dublin_Core_Metadata set handle_id = 0 "
+                 << "where handle_id in (";
+
+        comma_str = "";
+
+        for (map<unsigned long int, string>::const_iterator iter = handle_map.begin();
+             iter != handle_map.end();
+             ++iter)
+        {
+            sql_strm << comma_str << iter->first;
+            comma_str = ", ";
+        }
+
+        sql_strm << ")";
+
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+       if (NO_EXECUTE)
+           status = affected_rows = 0;
+       else 
+           status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, &affected_rows);
+
+       if (status != 0)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "ERROR!  In `purge_server_database':" 
+                << endl
+                << "`submit_mysql_query' failed, returning " << status << ":"
+                << endl 
+                << "Error:  " << mysql_error(mysql_ptr)
+                << endl 
+                << "Error number:  " << mysql_errno(mysql_ptr)
+                << endl 
+                << "Failed to update Dublin Core metadata entries from the "
+                << "`gwirdsif.Dublin_Core_Metadata' database table."
+                << endl 
+                << "Will try to unlock tables before exiting thread function."
+                << endl;
+            unlock_cerr_mutex(); 
+
+            if (result)
+            {
+               mysql_free_result(result);
+               result = 0;
+            }
+
+            failed = true;
+
+            goto UNLOCK_TABLES;
+
+
+       }  /* |if (status != 0)|  */
+
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_server_database':" 
+                    << endl
+                    << "`submit_mysql_query' succeeded, returning 0."
+                    << endl 
+                    << "`affected_rows' == " << affected_rows
+                    << endl;
+
+             if (affected_rows > 0)
+                 cerr << "Update Dublin Core metadata entries from the "
+                      << "`gwirdsif.Dublin_Core_Metadata' database table successfully."
+                      << endl;
+
+             else
+                cerr << "No rows updated in the `gwirdsif.Dublin_Core_Metadata' database table." 
+                     << endl;
+
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        mysql_free_result(result);
+        result = 0;
+
+
+@q ***** (5) Delete database entries for iRODS objects from Irods_Objects table.  @>
+
+@ Delete database entries for iRODS objects from \.{Irods\_Objects table}.
+\initials{LDF 2013.07.28.}
+
+\LOG
+\initials{LDF 2013.07.28.}
+Added this section.
+\ENDLOG
+
+@<|purge_server_database| definition@>=
+
+@q ****** (6) @>
+
+IRODS_OBJECTS:
+
+        if (result)
+        {
+            mysql_free_result(result);
+            result = 0;
+        }
+
+        sql_strm.str("");
+
+        for (int i = 0; i < MAX_TEMP_VAL; ++i)
+           temp_val[i] = 0UL;
+
+        irods_object_map.clear();
+
+        sql_strm << "select distinct irods_object_id, irods_object_path "
+                 << "from gwirdsif.Irods_Objects "
+                 << "where marked_for_deletion_from_gwirdsif_db = 1 "
+                 << "and unix_timestamp(last_modified) < " 
+                 << (time(0) - purge_database_limit) << " "
+                 << "order by irods_object_id";
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+        status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, &row_ctr, &field_ctr);
+
+        if (status != 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' failed, returning " << status << ":"
+                 << endl 
+                 << "Error:  " << mysql_error(mysql_ptr)
+                 << endl 
+                 << "Error number:  " << mysql_errno(mysql_ptr)
+                 << endl 
+                 << "Failed to select iRODS objects to delete from the " 
+                 << "`gwirdsif.Irods_Objects' database table."
+                 << endl 
+                 << "Will try to unlock tables before exiting thread function."
+                 << endl;
+             unlock_cerr_mutex(); 
+
+             if (result)
+             {
+                mysql_free_result(result);
+                result = 0;
+             }
+
+             failed = true;
+
+             goto UNLOCK_TABLES;
+
+
+        }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' succeeded, returning 0."
+                 << endl
+                 << "`row_ctr' == " << row_ctr
+                 << endl
+                 << "`field_ctr' == " << field_ctr
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+
+@q ****** (6) |row_ctr == 0|.  No rows to delete.  @>
+
+@ |row_ctr == 0|.  No rows to delete.
+\initials{LDF 2013.07.15.}
+
+@<|purge_server_database| definition@>=
+
+        if (row_ctr == 0)
+        {
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `purge_server_database':" 
+                     << endl
+                     << "`row_ctr' == 0.  No rows to delete."
+                     << endl
+                     << "Skipping to `IRODS_OBJECTS_HANDLES'."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+             mysql_free_result(result);
+             result = 0;
+
+             goto IRODS_OBJECTS_HANDLES;
+      
+        }  /* |if (row_ctr == 0)|  */
+
+@q ****** (6) |row_ctr > 0|.  Will delete rows.  @>
+
+@ |row_ctr > 0|.  Will delete rows.  
+\initials{LDF 2013.07.15.}
+
+@<|purge_server_database| definition@>=
+
+        for (int i = 0; i < row_ctr; ++i)
+        {
+@q ******* (7) @>
+
+            if ((curr_row = mysql_fetch_row(result)) == 0)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `purge_server_database':"
+                     << endl 
+                     << "`mysql_fetch_row' failed:"
+                     << endl
+                     << "Error:  " << mysql_error(mysql_ptr)
+                     << endl 
+                     << "Error number:  " << mysql_errno(mysql_ptr)
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                mysql_free_result(result);
+                result = 0;
+
+                failed = true;
+
+                goto UNLOCK_TABLES;
+
+            }  /* |if (curr_row = mysql_fetch_row(result) == 0)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `purge_server_database':"
+                     << endl 
+                     << "`mysql_fetch_row' succeeded."
+                     << endl
+                     << "`curr_row[0]' == " << curr_row[0]
+                     << endl 
+                     << "`curr_row[1]' == " << curr_row[1]
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+            errno = 0;
+            temp_val[0] = strtoul(curr_row[0], 0, 10);
+
+            if (temp_val[0] == ULONG_MAX)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "ERROR!  In `purge_server_database':"
+                     << endl 
+                     << "`strtoul' failed, returning `ULONG_MAX':"
+                     << endl
+                     << strerror(errno)
+                     << endl;
+                unlock_cerr_mutex(); 
+
+                mysql_free_result(result);
+                result = 0;
+
+                failed = true;
+
+                goto UNLOCK_TABLES;
+
+            }  /* |if (temp_val[0] == ULONG_MAX)|  */
+
+@q ******* (7) @>
+
+#if DEBUG_COMPILE
+            else if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `purge_server_database':"
+                     << endl 
+                     << "`strtoul' succeeded.  `temp_val[0]' == " << temp_val[0] << "."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ******* (7) @>
+
+            irods_object_map[temp_val[0]] = curr_row[1];
+
+@q ******* (7) @>
+
+        }  /* |for|  */
+
+@q ****** (6) @>
+
+        mysql_free_result(result);
+        result = 0;
+                  
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "`irods_object_map.size()' == " << irods_object_map.size()
+                 << endl;
+
+            if (irods_object_map.size() > 0)
+            {
+               cerr << "irods_object_map:" << endl;
+
+               for (map<unsigned long int, string>::const_iterator iter 
+                       = irods_object_map.begin();
+                    iter != irods_object_map.end();
+                    ++iter)
+               {
+                   cerr << iter->first << ", " << iter->second << endl;
+               }
+
+            }  /* |if|  */
+
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */         
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+        mysql_free_result(result);
+        result = 0;
+
+        sql_strm.str("");
+
+        sql_strm << "delete from gwirdsif.Irods_Objects where irods_object_id in (";
+ 
+        comma_str = "";
+
+        for (map<unsigned long int, string>::const_iterator iter 
+                = irods_object_map.begin();
+             iter != irods_object_map.end();
+             ++iter)
+        {
+            sql_strm << comma_str << iter->first;
+
+            comma_str = ", ";
+        }
+
+        sql_strm << ")";
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+        status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, &affected_rows);
+
+        if (status != 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' failed, returning " << status << ":"
+                 << endl 
+                 << "Error:  " << mysql_error(mysql_ptr)
+                 << endl 
+                 << "Error number:  " << mysql_errno(mysql_ptr)
+                 << endl 
+                 << "Failed to delete rows from the `gwirdsif.Irods_Objects' database table."
+                 << endl 
+                 << "Will try to unlock tables before exiting thread function."
+                 << endl;
+             unlock_cerr_mutex(); 
+
+             if (result)
+             {
+                mysql_free_result(result);
+                result = 0;
+             }
+
+             failed = true;
+
+             goto UNLOCK_TABLES;
+
+
+        }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' succeeded, returning 0."
+                 << endl
+                 << "`affected_rows' == " << affected_rows
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        mysql_free_result(result);
+        result = 0;
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+        mysql_free_result(result);
+        result = 0;
+
+        sql_strm.str("");
+
+        sql_strm << "delete from gwirdsif.Irods_AVUs where irods_object_id in (";
+ 
+        comma_str = "";
+
+        for (map<unsigned long int, string>::const_iterator iter 
+                = irods_object_map.begin();
+             iter != irods_object_map.end();
+             ++iter)
+        {
+            sql_strm << comma_str << iter->first;
+
+            comma_str = ", ";
+        }
+
+        sql_strm << ")";
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */        
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+        status = submit_mysql_query(sql_strm.str(), result, mysql_ptr, 0, 0, &affected_rows);
+
+        if (status != 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' failed, returning " << status << ":"
+                 << endl 
+                 << "Error:  " << mysql_error(mysql_ptr)
+                 << endl 
+                 << "Error number:  " << mysql_errno(mysql_ptr)
+                 << endl 
+                 << "Failed to delete rows from the `gwirdsif.Irods_AVUs' database table."
+                 << endl 
+                 << "Will try to unlock tables before exiting thread function."
+                 << endl;
+             unlock_cerr_mutex(); 
+
+             if (result)
+             {
+                mysql_free_result(result);
+                result = 0;
+             }
+
+             failed = true;
+
+             goto UNLOCK_TABLES;
+
+
+        }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' succeeded, returning 0."
+                 << endl
+                 << "`affected_rows' == " << affected_rows
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        mysql_free_result(result);
+        result = 0;
+
+
+@q ***** (5) Delete rows from `gwirdsif.Irods_Objects_Handles'.  @>
+
+@ Delete rows from \.{gwirdsif.Irods\_Objects\_Handles}.  
+\initials{LDF 2013.08.28.}
+
+\LOG
+\initials{LDF 2013.08.28.}
+Added this section.
+\ENDLOG
+
+@<|purge_server_database| definition@>=
+
+IRODS_OBJECTS_HANDLES:
+
+@q ****** (6) @>
+
+        if (result)
+        {
+            mysql_free_result(result); 
+            result = 0;
+        }
+
+        sql_strm.str("");
+
+        if (irods_objects_handles_present == false)
+        {
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << thread_str << "In `purge_server_database':" 
+                     << endl
+                     << "`irods_objects_handles_present' == `false'."
+                     << endl 
+                     << "No rows to delete from `gwirdsif.Irods_Objects_Handles'."
+                     << endl 
+                     << "Skipping to `HANDLE_VALUES'."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+            goto HANDLE_VALUES;
+
+        }  /* |if (irods_objects_handles_present == false)|  */
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "irods_objects_handles_sql_strm.str() == " 
+                 << irods_objects_handles_sql_strm.str() << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        if (NO_EXECUTE)
+            status = affected_rows = 0;
+        else 
+           status = submit_mysql_query(irods_objects_handles_sql_strm.str(), 
+                                       result, 
+                                       mysql_ptr, 
+                                       0, 
+                                       0, 
+                                       &affected_rows);
+
+        if (status != 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' failed, returning " << status << ":"
+                 << endl 
+                 << "Error:  " << mysql_error(mysql_ptr)
+                 << endl 
+                 << "Error number:  " << mysql_errno(mysql_ptr)
+                 << endl 
+                 << "Failed to delete rows from `gwirdsif.Irods_Objects_Handles' table."
+                 << endl 
+                 << "Will try to unlock tables before exiting thread function."
+                 << endl;
+             unlock_cerr_mutex(); 
+
+             if (result)
+             {
+                mysql_free_result(result);
+                result = 0;
+             }
+
+             failed = true;
+
+             goto UNLOCK_TABLES;
+
+
+        }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' succeeded, returning 0."
+                 << endl
+                 << "`affected_rows' == " << affected_rows
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        if (affected_rows > 0)
+        {
+            lock_cerr_mutex(); 
+            lock_cout_mutex();
+            cout << thread_str << "In `purge_server_database':" 
+                 << endl
+                 << "Deleted " << affected_rows << " row(s) from the "
+                 << "`gwirdsif.Irods_Objects_Handles' table."
+                 << endl << endl;
+            unlock_cout_mutex();
+            unlock_cerr_mutex(); 
+
+        }
+
+        irods_objects_handles_sql_strm.str("");
+        mysql_free_result(result);
+        result = 0;
+
+@q ****** (6) @>
+
+@q ***** (5) @>
+
+HANDLE_VALUES:
+
+       if (handle_id_vector.size() > 0)
+       {
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+          if (DEBUG)
+          {
+              lock_cerr_mutex(); 
+              cerr << thread_str << "In `purge_server_database':" 
+                   << endl
+                   << "`handle_id_vector.size()' == " << handle_id_vector.size()
+                   << endl;
+              unlock_cerr_mutex(); 
+
+          }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+          sql_strm.str("");
+
+          comma_str = "";
+
+          sql_strm << "delete from " << handles_database << ".handles "
+                   << "where handle_id in (";
+
+          for (vector<unsigned long int>::iterator iter = handle_id_vector.begin();
+               iter != handle_id_vector.end();
+               ++iter)
+          {
+               sql_strm << comma_str << *iter;
+
+               comma_str = ", ";
+
+          }  /* |for|  */
+
+          sql_strm << ") and marked_for_deletion = 1 and "
+                   << "unix_timestamp(delete_from_database_timestamp) < " 
+                   << (time(0) - purge_database_limit);
+
+@q ****** (6) @>
+
+#if DEBUG_COMPILE
+          if (DEBUG)
+          {
+              lock_cerr_mutex(); 
+              cerr << thread_str << "In `purge_server_database':" 
+                   << endl
+                   << "`sql_strm.str()' == " << sql_strm.str()
+                   << endl;
+              unlock_cerr_mutex(); 
+
+          }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+          if (NO_EXECUTE)
+            status = affected_rows = 0;
+          else 
+            status = submit_mysql_query(sql_strm.str(), 
+                                        result, 
+                                        mysql_ptr, 
+                                        0, 
+                                        0, 
+                                        &affected_rows);
+
+          if (status != 0)
+          {
+              lock_cerr_mutex(); 
+              cerr << thread_str << "ERROR!  In `purge_server_database':" 
+                   << endl
+                   << "`submit_mysql_query' failed, returning " << status << ":"
+                   << endl 
+                   << "Error:  " << mysql_error(mysql_ptr)
+                   << endl 
+                   << "Error number:  " << mysql_errno(mysql_ptr)
+                   << endl 
+                   << "Failed to delete rows from `" << handles_database << ".handles' table."
+                   << endl 
+                   << "Will try to unlock tables before exiting thread function."
+                   << endl;
+               unlock_cerr_mutex(); 
+
+               if (result)
+               {
+                  mysql_free_result(result);
+                  result = 0;
+               }
+
+               failed = true;
+
+               goto UNLOCK_TABLES;
+
+          }  /* |if (status != 0)|  */
+
+@q ****** (6) @>
+@
+@<|purge_server_database| definition@>=
+
+#if DEBUG_COMPILE
+          else if (DEBUG)
+          {
+              lock_cerr_mutex(); 
+              cerr << thread_str << "In `purge_server_database':" 
+                   << endl
+                   << "`submit_mysql_query' succeeded, returning 0."
+                   << endl
+                   << "`affected_rows' == " << affected_rows
+                   << endl;
+              unlock_cerr_mutex(); 
+
+          }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+          if (affected_rows > 0)
+          {
+              lock_cerr_mutex(); 
+              lock_cout_mutex();
+              cout << thread_str << "In `purge_server_database':" 
+                   << endl
+                   << "Deleted " << affected_rows << " row(s) from the "
+                   << "`" << handles_database << ".handles' table."
+                   << endl << endl;
+              unlock_cout_mutex();
+              unlock_cerr_mutex(); 
+
+          }
+
+          sql_strm.str("");
+          mysql_free_result(result);
+          result = 0;
+
+@q ****** (6) @>
+
+       }  /* |if (handle_id_vector.size() > 0)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+       else if (DEBUG)
+       {
+           lock_cerr_mutex(); 
+           cerr << thread_str << "In `purge_server_database':" 
+                << endl
+                << "`handle_id_vector.size()' == 0."
+                << endl 
+                << "No individual handle values scheduled for deletion from the"
+                << endl 
+                << "`" << handles_database << ".handles' table."
+                << endl;
+           unlock_cerr_mutex(); 
+
+       }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ***** (5) Unlock database tables.  @>
+
+@ Unlock database tables.  
+\initials{LDF 2013.07.14.}
+
+@<|purge_server_database| definition@>=
+
+UNLOCK_TABLES:    
+
+       sql_strm.str("");
+
+       sql_strm << "unlock tables";
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "sql_strm.str() == " << sql_strm.str() << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        status = submit_mysql_query(sql_strm.str(), result, mysql_ptr);
+
+        if (status != 0)
+        {
+            lock_cerr_mutex(); 
+            cerr << thread_str << "ERROR!  In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' failed, returning " << status << ":"
+                 << endl 
+                 << "Error:  " << mysql_error(mysql_ptr)
+                 << endl 
+                 << "Error number:  " << mysql_errno(mysql_ptr)
+                 << endl 
+                 << "Failed to unlock tables."
+                 << endl 
+                 << "Exiting thread unsuccessfully with "
+                 << "return value 0."
+                 << endl;
+             unlock_cerr_mutex();
+
+             if (result)
+                mysql_free_result(result);
+
+             mysql_close(mysql_ptr); 
+             mysql_ptr = 0;
+
+             pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+             pthread_exit(0);
+
+        }  /* |if (status != 0)|  */
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex();
+            cerr << thread_str << "In `purge_server_database':" 
+                 << endl
+                 << "`submit_mysql_query' succeeded, returning 0."
+                 << endl
+                 << "Unlocked tables successfully."
+                 << endl; 
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+       pthread_mutex_unlock(&sql_lock_tables_mutex);
+
+       if (failed)
+        {
+            break;
+        }
+
+@q ***** (5) Delete iRODS AVUs (imeta).  @>
+
+@ Delete iRODS AVUs (\.{imeta}).
+\initials{LDF 2013.07.17.}
+
+@<|purge_server_database| definition@>=
+
+#if DEBUG_COMPILE
+        if (DEBUG)
+        {
+@q ****** (6) @>
+
+            lock_cerr_mutex(); 
+
+            cerr << "irods_avu_vector.size() == " << irods_avu_vector.size() 
+                 << endl
+                 << "global_user_info_map.size() == " << global_user_info_map.size() 
+                 << endl;
+
+@q ****** (6) @>
+
+            if (irods_avu_vector.size() > 0)
+            {
+                cerr << "irods_avu_vector:" << endl;
+
+                for (vector<Irods_AVU_Type>::const_iterator iter 
+                      = irods_avu_vector.begin();
+                     iter != irods_avu_vector.end();
+                     ++iter)
+                {
+                    iter->show();
+
+                } 
+
+                cerr << endl;
+
+            }  /* |if|  */
+
+@q ****** (6) @>
+
+#if 0 
+            if (global_user_info_map.size() > 0)
+            {
+
+                cerr << "global_user_info_map:" << endl;
+
+                for (map<int, User_Info_Type>::const_iterator iter 
+                      = global_user_info_map.begin();
+                     iter != global_user_info_map.end();
+                     ++iter)
+                {
+                    iter->second.show();
+
+                } 
+
+                cerr << endl;
+
+            }  /* |if|  */
+
+#endif 
+
+@q ****** (6) @>
+
+            unlock_cerr_mutex(); 
+
+@q ****** (6) @>
+
+
+        }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+       
+@q ***** (5) @>
+@
+\LOG
+\initials{LDF 2013.08.02.}
+Now calling |Irods_AVU_Type::delete_irods_avu| with the arguments for having it
+delete a row from the \.{gwirdsif.Irods\_AVUs} database table.
+\ENDLOG 
+@<|purge_server_database| definition@>=
+
+        if (NO_EXECUTE)
+        {
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "`NO_EXECUTE' is `true'.  Not calling `Irods_AVU_Type::delete_irods_avu' "
+                     << "on the elements of `irods_avu_vector'."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        }
+
+@q ***** (5) @>
+
+        else if (irods_avu_vector.size() > 0)
+        {
+@q ****** (6) @>
+            for (vector<Irods_AVU_Type>::iterator iter 
+                  = irods_avu_vector.begin();
+                 iter != irods_avu_vector.end();
+                 ++iter)
+            {
+@q ******* (7) @>
+
+                if (iter->get_deleted_from_archive() == true)
+                {
+#if DEBUG_COMPILE
+                     if (DEBUG)
+                     {
+                         lock_cerr_mutex(); 
+                         cerr << "`iter->get_deleted_from_archive' returned `true'."
+                              << endl
+                              << "AVU already deleted from archive.  Not calling "
+                              << "`Irods_AVU_Type::delete_irods_avu'."
+                              << endl;
+                         unlock_cerr_mutex(); 
+
+                     }  /* |if (DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+                }
+                else
+                {
+#if DEBUG_COMPILE
+                     if (DEBUG)
+                     {
+                         lock_cerr_mutex(); 
+                         cerr << "`iter->get_deleted_from_archive' returned `false'."
+                              << endl
+                              << "AVU not already deleted from archive.  Calling "
+                              << "`Irods_AVU_Type::delete_irods_avu'."
+                              << endl;
+                         unlock_cerr_mutex(); 
+
+                     }  /* |if (DEBUG)|  */  
+#endif  /* |DEBUG_COMPILE|  */ 
+
+                    Irods_AVU_Type::delete_irods_avu(*iter, true, mysql_ptr);
+                }
+
+@q ******* (7) @>
+
+            } 
+
+@q ****** (6) @>
+
+            irods_avu_vector.clear();
+
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "Checked iRODS AVUs, deleted any that needed to be deleted, "
+                     << "and cleared `irods_avu_vector'."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+@q ****** (6) @>
+
+        }  /* |else if (irods_avu_vector.size() > 0)|  */
+
+@q ***** (5) @>
+
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << "`irods_avu_vector' is empty.  Nothing to delete."
+            << endl;
+
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+       
+
+@q ***** (5) Go to sleep for |purge_database_interval| seconds.  @>
+
+@ Go to sleep for |purge_database_interval| seconds, unless another thread 
+wakes this one up in order to perform immediate deletion.  This is done
+in |Handle_Type::delete_from_database|.
+\initials{LDF 2013.07.14.}
+\initials{LDF 2013.07.18.}
+
+\LOG
+\initials{LDF 2013.07.18.}
+Replaced the call to |sleep| with the call to |pthread_cond_timedwait|, with 
+accompanying code.
+\ENDLOG
+
+@<|purge_server_database| definition@>=
+
+
+        went_to_sleep = time(0);
+
+        pthread_mutex_lock(&purge_server_database_mutex);
+
+        status = pthread_cond_timedwait(&purge_server_database_cond, 
+                                        &purge_server_database_mutex, 
+                                        &timeout);
+
+        curr_time = time(0);
+
+
+        if (status == ETIMEDOUT)
+        {
+#if DEBUG_COMPILE
+            if (DEBUG)
+            {
+                lock_cerr_mutex(); 
+                cerr << "Timed-out after " << (curr_time - went_to_sleep) << " seconds."
+                     << endl;
+                unlock_cerr_mutex(); 
+
+            }  /* |if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */ 
+
+        }
+
+@q ***** (5) @>
+@
+\LOG
+@:BUG FIX@> BUG FIX: BUG FIX:  Now unlocking |purge_server_database_mutex| before breaking.
+\ENDLOG 
+
+@<|purge_server_database| definition@>=
+
+        else if (status != 0)
+        {
+             lock_cerr_mutex(); 
+             cerr << "ERROR!  `pthread_cond_timedwait' failed, returning " << status << "." 
+                  << endl
+                  << "Error:  " << strerror(status) << endl
+                  << endl
+                  << "Breaking."
+                  << endl;
+             unlock_cerr_mutex(); 
+
+             failed = true;
+
+             pthread_mutex_unlock(&purge_server_database_mutex);
+
+             break;
+        }
+
+@q ***** (5) @>
+@
+@<|purge_server_database| definition@>=
+
+#if DEBUG_COMPILE
+        else if (DEBUG)
+        {
+            lock_cerr_mutex(); 
+            cerr << "`pthread_cond_timedwait' succeeded, returning 0."
+                 << endl 
+                 << "Woke up after " << (curr_time - went_to_sleep) << " seconds."
+                 << endl;
+            unlock_cerr_mutex(); 
+
+        }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */         
+
+        pthread_mutex_unlock(&purge_server_database_mutex);
+
+@q ***** (5) @>
+        
+
+   }  /* End of main |for| loop */
+
+
+@q **** (4) Exit.  This code will normally never be reached.  @>
+
+@ Exit.  This code will normally never be reached.
+\initials{LDF 2013.04.09.}
+
+@<|purge_server_database| definition@>=
+
+
+   if (failed)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "ERROR!  In `purge_server_database':"
+            << endl
+            << "`failed' == `true'.  Exiting thread function unsuccessfully "
+            << "with exit status 0." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }
+#if DEBUG_COMPILE
+   else if (DEBUG)
+   {
+       lock_cerr_mutex(); 
+       cerr << thread_str << "Exiting thread function `purge_server_database' "
+            << "with exit status 0." 
+            << endl;
+       unlock_cerr_mutex(); 
+
+   }  /* |else if (DEBUG)|  */
+#endif  /* |DEBUG_COMPILE|  */    
+
+   mysql_close(mysql_ptr);
+   mysql_ptr = 0;
+
+   pthread_exit(0);
+
+}  /* End of |purge_server_database| definition  */
+
+@q *** (3) @>
+
+@q ** (2) Putting purgdtbs together.  @>
+@ Putting purgdtbs together.  
+
+This is what's compiled.
+\initials{LDF 2013.04.09.}
+@c 
+using namespace std;
+typedef void* yyscan_t;
+@<Include files@>@;@/
+using namespace gwrdifpk;
+@<|purge_server_database| definition@>@;@/
+
+@ This is what's written to the header file \filename{purgdtbs.h}.
+\initials{LDF 2013.04.09.}
+
+@(purgdtbs.h@>=
+#ifndef PURGDTBS_H
+#define PURGDTBS_H 1
+using namespace std;
+typedef void* yyscan_t;
+@<|purge_server_database| declaration@>@;@/
+#endif 
+
+@q * (1) Emacs-Lisp code for use in indirect buffers  @>
+
+@q (progn (cweb-mode) (outline-minor-mode))                          @>
+
+@q * (1) Local variables for Emacs @>
+
+@q * Local variables for Emacs.@>
+@q Local Variables: @>
+@q mode:CWEB @>
+@q eval:(display-time) @>
+@q abbrev-mode:t @>
+@q eval:(read-abbrev-file) @>
+@q indent-tabs-mode:nil @>
+@q eval:(outline-minor-mode) @>
+@q fill-column:80 @>
+@q End: @>
+
