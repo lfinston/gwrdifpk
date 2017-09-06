@@ -1,0 +1,963 @@
+@c scprpmtp.texi
+@c [...]/gwrdifpk/doc/scprpmtp.texi
+
+@c Created by Laurence D. Finston (LDF) Wed Mar 13 14:30:50 CET 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) class Scan_Parse_Parameter_Type 
+
+@node class Scan_Parse_Parameter_Type, class Response_Type, Global constants and variables, Top
+@chapter class Scan_Parse_Parameter_Type
+
+@tindex class Scan_Parse_Parameter_Type
+@tindex Scan_Parse_Parameter_Type, class 
+@cindex session
+@cindex session, state of
+@cindex state, of session
+@cindex program state
+@cindex state, of program
+@c
+@code{class Scan_Parse_Parameter_Type} is a very important data type within @command{gwrdifpk}:
+It represents the ``state'' of a session.  That is, on the client-side, it represents the state 
+of a run of the program @command{gwirdcli}, whereas on the server-side, it represents the 
+state of a thread in which the server program @command{gwirdsif} is communicating with an instance 
+of the client.
+
+The reason this class is named ``@code{Scan_Parse_Parameter_Type}'' is because
+an object of this type is passed as a parameter to the scanner and parser functions @code{yylex} 
+and @code{yyparse} on the server-side and @code{zzlex} and @code{zzparse} on the client-side.
+@xref{Scanning and parsing}. 
+
+@tindex class Scan_Parse_Parameter_Type
+@tindex Scan_Parse_Parameter_Type, class 
+@cindex session
+@cindex session, state of
+@cindex state, of session
+@cindex program state
+@cindex state, of program
+@c
+@code{class Scan_Parse_Parameter_Type} contains many variables to represent the state of the session 
+and many of the functions called in the course of a session are member functions of this class.  
+The connections to the various MySQL databases are also managed by means of data members and member 
+functions belonging to this class.
+
+The following functions are @code{friends} of @code{class Scan_Parse_Parameter_Type}:
+
+@findex Irods_Object_Type::get_avus_from_irods_system
+@findex client_func
+@findex client_sending_file_rule_func
+@findex connect_func
+@findex create_databases
+@findex distinguished_name_rule_func
+@findex exchange_data_with_client
+@findex exchange_data_with_server 
+@findex get_avus_from_irods_system
+@findex get_user_info_func
+@findex listen_local
+@findex listen_remote_X_509
+@findex listen_remote_anon
+@findex main
+@findex parse_post_data
+@findex pull_response
+@findex pull_client_func 
+@findex yylex
+@findex yyparse
+@c
+@table @code
+@item client_func
+@xref{Main (and similar) functions}.
+
+@item client_sending_file_rule_func
+@xref{Parser rule functions}.
+ 
+@item connect_func
+@xref{Listen and connect functions}.
+
+@item create_databases
+Defined in @file{stpcrdbs.web} and called in the @code{main} function of @command{setupdbs}
+(@file{setupdbs.web}).
+@xref{Database setup}, and @ref{Set up databases (setupdbs)}.
+
+@item distinguished_name_rule_func
+
+@item exchange_data_with_client
+
+@item exchange_data_with_server 
+
+@item get_avus_from_irods_system
+
+@item get_user_info_func
+
+@item listen_local
+@xref{Listen and connect functions}.
+
+@item listen_remote_X_509
+@xref{Listen and connect functions}.
+
+@item listen_remote_anon
+@xref{Listen and connect functions}.
+
+@item main
+@xref{Main (and similar) functions}.
+
+@item parse_post_data
+
+@item pull_response
+
+@item pull_client_func
+
+@item yylex
+
+@item yyparse
+
+@item Irods_Object_Type::get_avus_from_irods_system
+@end table
+
+@menu
+* Scan_Parse_Parameter_Type Data Members::
+* Scan_Parse_Parameter_Type Member Functions::
+@end menu
+
+@c ** (2)
+
+@node Scan_Parse_Parameter_Type Data Members, Scan_Parse_Parameter_Type Member Functions, , class Scan_Parse_Parameter_Type
+@section Data Members
+
+@menu
+* Static constants (Scan_Parse_Parameter_Type)::
+* Static variables (Scan_Parse_Parameter_Type)::
+* Variables (Scan_Parse_Parameter_Type)::
+@end menu
+
+@c *** (3)
+
+@node Static constants (Scan_Parse_Parameter_Type), Static variables (Scan_Parse_Parameter_Type), , Scan_Parse_Parameter_Type Data Members
+
+@subsection Static constants
+
+Static @code{unsigned int} constants in @code{Scan_Parse_Parameter_Type}:
+
+@vindex Scan_Parse_Parameter_Type::NULL_AUTH_TYPE
+@vindex Scan_Parse_Parameter_Type::LOCAL_NULL_AUTH_TYPE
+@vindex Scan_Parse_Parameter_Type::X_509_AUTH_TYPE
+@vindex Scan_Parse_Parameter_Type::ANON_AUTH_TYPE
+@c
+@vindex NULL_AUTH_TYPE (Scan_Parse_Parameter_Type)
+@vindex LOCAL_NULL_AUTH_TYPE (Scan_Parse_Parameter_Type)
+@vindex X_509_AUTH_TYPE (Scan_Parse_Parameter_Type)
+@vindex ANON_AUTH_TYPE (Scan_Parse_Parameter_Type)
+@c
+@multitable {@code{DELETE_LAST_HS_ADMIN_HANDLE_VALUE_PRIVILEGE}} {0}
+@headitem Name @tab Value
+@item @code{NULL_AUTH_TYPE} @tab 0
+@c
+@item @code{LOCAL_NULL_AUTH_TYPE} @tab 1
+@c
+@item @code{X_509_AUTH_TYPE} @tab 2
+@c
+@item @code{ANON_AUTH_TYPE} @tab 3      
+@end multitable
+
+@cindex bit field
+@cindex field, bit
+@c
+Privileges are represented as bit positions in @code{unsigned int} values used as bit fields.
+These constants are numbered in powers of 2 from @math{1^0 = 1} to @math{2^{12} = 2048}.
+On the author's PC, 32 privileges are allowed, since @code{unsigned int} values are of 
+length 4 bytes @math{=} 32 bits.
+
+If more privileges are needed at a later date, @code{unsigned long int} values 
+will have to be used instead.
+
+@vindex SUPERUSER_PRIVILEGE (Scan_Parse_Parameter_Type)
+@vindex DELEGATE_PRIVILEGE (Scan_Parse_Parameter_Type)
+@vindex DELETE_HANDLES_PRIVILEGE (Scan_Parse_Parameter_Type)
+@vindex DELETE_HANDLE_VALUES_PRIVILEGE (Scan_Parse_Parameter_Type)
+@vindex DELETE_HS_ADMIN_HANDLE_VALUES_PRIVILEGE (Scan_Parse_Parameter_Type)
+@vindex DELETE_LAST_HS_ADMIN_HANDLE_VALUE_PRIVILEGE (Scan_Parse_Parameter_Type)
+@vindex UNDELETE_HANDLE_VALUES_PRIVILEGE (Scan_Parse_Parameter_Type)
+@vindex SHOW_USER_INFO_PRIVILEGE (Scan_Parse_Parameter_Type)
+@vindex SHOW_GROUPS_PRIVILEGE (Scan_Parse_Parameter_Type)
+@vindex SHOW_CERTIFICATES_PRIVILEGE (Scan_Parse_Parameter_Type)
+@vindex SHOW_DISTINGUISHED_NAMES_PRIVILEGE (Scan_Parse_Parameter_Type)
+@vindex SHOW_PRIVILEGES_PRIVILEGE (Scan_Parse_Parameter_Type)
+@c
+@vindex Scan_Parse_Parameter_Type::SUPERUSER_PRIVILEGE
+@vindex Scan_Parse_Parameter_Type::DELEGATE_PRIVILEGE
+@vindex Scan_Parse_Parameter_Type::DELETE_HANDLES_PRIVILEGE
+@vindex Scan_Parse_Parameter_Type::DELETE_HANDLE_VALUES_PRIVILEGE
+@vindex Scan_Parse_Parameter_Type::DELETE_HS_ADMIN_HANDLE_VALUES_PRIVILEGE
+@vindex Scan_Parse_Parameter_Type::DELETE_LAST_HS_ADMIN_HANDLE_VALUE_PRIVILEGE
+@vindex Scan_Parse_Parameter_Type::UNDELETE_HANDLE_VALUES_PRIVILEGE
+@vindex Scan_Parse_Parameter_Type::SHOW_USER_INFO_PRIVILEGE
+@vindex Scan_Parse_Parameter_Type::SHOW_GROUPS_PRIVILEGE
+@vindex Scan_Parse_Parameter_Type::SHOW_CERTIFICATES_PRIVILEGE
+@vindex Scan_Parse_Parameter_Type::SHOW_DISTINGUISHED_NAMES_PRIVILEGE
+@vindex Scan_Parse_Parameter_Type::SHOW_PRIVILEGES_PRIVILEGE
+@c
+@multitable {@code{DELETE_LAST_HS_ADMIN_HANDLE_VALUE_PRIVILEGE}} {0000}
+@headitem Name @tab Value
+@item @code{SUPERUSER_PRIVILEGE} @tab 1
+@c
+@item @code{DELEGATE_PRIVILEGE} @tab 2
+@c
+@item @code{DELETE_HANDLES_PRIVILEGE} @tab 4
+@c
+@item @code{DELETE_HANDLE_VALUES_PRIVILEGE} @tab 8
+@c
+@item @code{DELETE_HS_ADMIN_HANDLE_VALUES_PRIVILEGE} @tab 16
+@c
+@item @code{DELETE_LAST_HS_ADMIN_HANDLE_VALUE_PRIVILEGE} @tab 32 
+@c
+@item @code{UNDELETE_HANDLE_VALUES_PRIVILEGE} @tab 64
+@c
+@item @code{SHOW_USER_INFO_PRIVILEGE} @tab 128
+@c
+@item @code{SHOW_GROUPS_PRIVILEGE} @tab 256
+@c
+@item @code{SHOW_CERTIFICATES_PRIVILEGE} @tab 512
+@c
+@item @code{SHOW_DISTINGUISHED_NAMES_PRIVILEGE} @tab 1024
+@c
+@item @code{SHOW_PRIVILEGES_PRIVILEGE} @tab 2048
+@end multitable
+
+
+
+
+@c *** (3)
+
+@node Static variables (Scan_Parse_Parameter_Type), Variables (Scan_Parse_Parameter_Type), Static constants (Scan_Parse_Parameter_Type), Scan_Parse_Parameter_Type Data Members
+
+@subsection Static variables
+
+The following variables use the data type @code{Scan_Parse_Parameter_Type::func_ptr} 
+which is defined as:
+
+@example
+@code{typedef int (Scan_Parse_Parameter_Type::*func_ptr)(Response_Type &)}
+@end example
+
+@noindent
+That is, @code{Scan_Parse_Parameter_Type::func_ptr} is a pointer to a function 
+taking a reference to @code{Response_Type} as its argument and returning @code{int}.
+@xref{Server action functions}, and @ref{Client action functions}.
+
+@deftypevr {Static variables} {map<unsigned int, func_ptr>} server_action_map
+@deftypevrx {}                {map<unsigned int, func_ptr>} client_action_map
+@end deftypevr
+
+@deftypevr {Static variables} {map<unsigned int, string>} server_action_name_map
+@deftypevrx {}                {map<unsigned int, string>} client_action_name_map
+@end deftypevr
+
+@c *** (3) Variables (Scan_Parse_Parameter_Type)
+
+@node Variables (Scan_Parse_Parameter_Type), , Static variables (Scan_Parse_Parameter_Type), Scan_Parse_Parameter_Type Data Members
+
+@subsection Variables
+
+@deftypevar int sock
+@end deftypevar
+
+@deftypevar gnutls_session_t session
+@end deftypevar
+
+@deftypevar bool remote_connection
+@end deftypevar
+
+@deftypevar bool anonymous
+@end deftypevar
+
+@deftypevar {unsigned int} connection_type
+@end deftypevar
+
+@deftypevar bool PARSER_DEBUG
+@end deftypevar
+
+@deftypevar {MYSQL*} mysql_ptr
+@end deftypevar
+
+@deftypevar Distinguished_Name_Type distinguished_name
+@end deftypevar
+
+@deftypevar int user_id
+@end deftypevar
+
+@deftypevar string username
+@end deftypevar
+
+@deftypevar {vector<Group_Type>} group_vector
+@end deftypevar
+
+@deftypevar {unsigned int} privileges  
+On the author's PC, this allows the definition of 32 privileges.
+@xref{Static constants (Scan_Parse_Parameter_Type), , Static constants}, above. 
+@end deftypevar
+
+@deftypevar string irods_auth_filename 
+@end deftypevar
+
+@deftypevar string irods_env_filename
+@end deftypevar
+
+@deftypevar string irods_password_encrypted
+@end deftypevar
+
+@deftypevar string irods_password_encrypted_timestamp
+@end deftypevar
+
+@deftypevar string irods_homedir
+@end deftypevar
+
+@deftypevar string irods_current_dir
+@end deftypevar
+
+@deftypevar string irods_zone
+@end deftypevar
+
+@deftypevar string irods_default_resource
+@end deftypevar
+
+@deftypevar int thread_ctr
+@end deftypevar
+
+@deftypevar time_t expires
+@end deftypevar
+
+@deftypevar string data_filename
+@end deftypevar
+
+@vindex data_buffer
+@c
+@deftypevar char data_buffer[BUFFER_SIZE]
+@end deftypevar
+
+@deftypevar string input_commands
+@end deftypevar
+
+@deftypevar {deque<Response_Type>} response_deque
+@end deftypevar
+
+@deftypevar {deque<Response_Type>} delayed_response_deque
+@end deftypevar
+
+@deftypevar bool pending_operations_flag
+@end deftypevar
+
+@deftypevar deque<Response_Type>::iterator pending_operations_iter
+@end deftypevar
+
+@deftypevar {map<unsigned int, Response_Type>} response_map
+@end deftypevar
+
+@deftypevar pthread_mutex_t response_map_mutex
+@end deftypevar
+
+@deftypevar bool client_finished
+@end deftypevar
+
+@deftypevar bool server_finished 
+@end deftypevar
+
+@deftypevar {vector<string>} filename_vector
+@end deftypevar
+
+@deftypevar {unsigned int} default_handle_prefix_id  
+@end deftypevar
+
+@deftypevar string default_handle_prefix
+@end deftypevar
+
+@deftypevar {unsigned int} default_institute_id  
+@end deftypevar
+
+@deftypevar string       default_institute_name
+@end deftypevar
+
+@deftypevar string pid_str             
+@end deftypevar
+
+@deftypevar string pid_prefix_str
+@end deftypevar
+
+@deftypevar string pid_suffix_str
+@end deftypevar
+
+@deftypevar string pid_institute_str
+@end deftypevar
+
+@deftypevar unsigned long delay_value
+@end deftypevar
+
+@deftypevar Handle_Value_Triple hvt
+@end deftypevar
+
+@deftypevar map<string, int> user_id_map
+@end deftypevar
+
+@deftypevar {map<int, User_Info_Type>} user_info_map
+@end deftypevar
+
+
+@deftypevar Handle_Value_Type handle_value
+@end deftypevar
+
+@deftypevar {User_Info_Type*} user_info_ptr  
+@end deftypevar
+
+
+@deftypevar {Irods_Object_Type*} irods_object  
+@end deftypevar
+
+@deftypevar {vector<Irods_Object_Type>} irods_object_vector  
+@end deftypevar
+
+@deftypevar {vector<string>} temp_file_vector
+@end deftypevar
+
+@deftypevar {vector<string>} string_vector
+@end deftypevar
+
+@deftypevar {vector<int>} int_vector
+@end deftypevar
+
+@deftypevar {unsigned int} errors_occurred
+@end deftypevar
+
+@deftypevar {unsigned int} warnings_occurred
+@end deftypevar
+
+@deftypevar int thread_cancel_state
+@end deftypevar
+
+@deftypevar X509_Cert_Type user_cert     
+@xref{X.509 Certificate Types}.
+@end deftypevar
+
+@deftypevar X509_Cert_Type server_cert   
+@end deftypevar
+
+@deftypevar X509_Cert_Type ca_cert       
+@end deftypevar
+
+@deftypevar {X509_Cert_Type*} cert_ptr     
+@end deftypevar
+
+@deftypevar string public_key_id
+@end deftypevar
+
+@deftypevar string temp_gpg_key_fingerprint
+@end deftypevar
+
+@deftypevar {unsigned int} gpg_key_pair_id
+@end deftypevar
+
+@deftypevar string gpg_key_fingerprint
+@end deftypevar
+
+@c ** (2)
+
+@node Scan_Parse_Parameter_Type Member Functions, , Scan_Parse_Parameter_Type Data Members, class Scan_Parse_Parameter_Type
+@section Member Functions
+
+@code{Scan_Parse_Parameter_Type} has so many member functions that the definitions are spread over several files:
+@file{scprpmtp.web}, @file{spptfnc1.web} and @file{spptfnc2.web} contain ``normal'' member functions, while 
+the files @file{srvractn.web} and @file{clntactn.web} contain the definitions for ``server action'' 
+and ``client action'' functions, respectively.  @xref{Server action functions}, and 
+@ref{Client action functions}, below.
+
+@menu
+* Constructor and initialization functions (Scan_Parse_Parameter_Type)::
+* Functions for user and group administration (Scan_Parse_Parameter_Type)::
+* Functions for X.509 certificates (Scan_Parse_Parameter_Type)::
+* Communication functions (Scan_Parse_Parameter_Type)::
+* Functions for iRODS (Scan_Parse_Parameter_Type)::
+* Functions for handles (Scan_Parse_Parameter_Type)::
+* Functions for Dublin Core metadata (Scan_Parse_Parameter_Type)::
+* Database functions (Scan_Parse_Parameter_Type)::
+* Cryptographic operations (Scan_Parse_Parameter_Type)::
+* Functions for TANs (Scan_Parse_Parameter_Type)::
+* Other functions (Scan_Parse_Parameter_Type)::
+* Server action functions::
+* Client action functions::
+@end menu
+
+
+
+@c *** (3) Constructor and initialization functions (Scan_Parse_Parameter_Type)
+
+@node Constructor and initialization functions (Scan_Parse_Parameter_Type), Functions for user and group administration (Scan_Parse_Parameter_Type), , Scan_Parse_Parameter_Type Member Functions
+
+@subsection Constructor and initialization functions 
+
+@findex Scan_Parse_Parameter_Type::Scan_Parse_Parameter_Type (constructor)
+@c
+@deftypefn {Default constructor} {void} Scan_Parse_Parameter_Type (@code{void})
+@code{Scan_Parse_Parameter_Type} only has this one constructor.
+@end deftypefn
+
+@findex Scan_Parse_Parameter_Type::initialize_maps
+@c
+@deftypefn {Static function} int initialize_maps (@code{void})
+@end deftypefn
+
+@c *** (3) Functions for user and group administration (Scan_Parse_Parameter_Type)
+
+@node Functions for user and group administration (Scan_Parse_Parameter_Type), Functions for X.509 certificates (Scan_Parse_Parameter_Type), Constructor and initialization functions (Scan_Parse_Parameter_Type), Scan_Parse_Parameter_Type Member Functions
+
+@subsection User and group administration
+
+
+@findex Scan_Parse_Parameter_Type::get_user
+@findex get_user (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int get_user (@code{int} {@var{curr_user_id} @code{= 0}}, @*@
+                          @code{const char *}{@var{dn} @code{= 0}}, @*@
+                          @code{string} {@var{curr_username} @code{= ""}}, @*@
+                          @code{User_Info_Type *}{@var{user_info} @code{= 0}}, @*@
+                          @code{bool} {@var{set_user} @code{= false}})
+@end deftypefun
+
+@findex Scan_Parse_Parameter_Type::set_user_info
+@findex set_user_info (@code{Scan_Parse_Parameter_Type})
+@c
+@deftypefn {const function} int set_user_info (@code{User_Info_Type &}@var{user_info}) 
+@end deftypefn
+
+@findex Scan_Parse_Parameter_Type::get_database_username
+@findex get_database_username (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int get_database_username (@code{void})
+@end deftypefun
+
+@findex Scan_Parse_Parameter_Type::get_privileges
+@findex get_privileges (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int get_privileges (@code{int} {@var{curr_user_id} @code{= 0}}, @*@
+                                @code{unsigned int *}{@var{privs} @code{= 0}})
+@end deftypefun
+
+
+@findex Scan_Parse_Parameter_Type::show_privileges
+@findex show_privileges (Scan_Parse_Parameter_Type)
+@c
+@deftypefn {Static function} int show_privileges (@code{unsigned int} @var{privileges}, @*@
+                                                  @code{ostream *}{@var{strm} @code{= 0}}, @*@
+                                                  @code{bool} {@var{verbose} @code{= false}})
+@end deftypefn
+
+@c *** (3) Functions for X.509 certificates (Scan_Parse_Parameter_Type)
+
+@node Functions for X.509 certificates (Scan_Parse_Parameter_Type), Communication functions (Scan_Parse_Parameter_Type), Functions for user and group administration (Scan_Parse_Parameter_Type), Scan_Parse_Parameter_Type Member Functions
+
+@subsection X.509 certificates
+
+@findex Scan_Parse_Parameter_Type::show_certificates
+@findex show_certificates (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int show_certificates (@code{Response_Type &}@var{response}, @*@
+                                   @code{char *}@var{buffer}, @*@
+                                   @code{size_t} @var{buffer_size}, @*@
+                                   @code{string &}@var{filename})
+@end deftypefun
+
+
+@c *** (3) Communication functions (Scan_Parse_Parameter_Type)
+
+@node Communication functions (Scan_Parse_Parameter_Type), Functions for iRODS (Scan_Parse_Parameter_Type), Functions for X.509 certificates (Scan_Parse_Parameter_Type), Scan_Parse_Parameter_Type Member Functions
+@subsection Communication
+
+@findex Scan_Parse_Parameter_Type::get_input
+@findex get_input (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int get_input (@code{void})
+@end deftypefun
+
+@findex Scan_Parse_Parameter_Type::send_to_peer
+@findex send_to_peer (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int send_to_peer (@code{char **}@var{buffer_ptr}, @*@
+                              @code{unsigned int} {@var{char_ctr} @code{= 0}}, @*@
+                              @code{string} {@var{filename} @code{= ""}})
+@end deftypefun
+
+@findex Scan_Parse_Parameter_Type::send_to_peer
+@findex send_to_peer (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int send_to_peer (@code{const Response_Type &}@var{response})
+@end deftypefun
+
+@findex Scan_Parse_Parameter_Type::receive_file
+@findex receive_file (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int receive_file (@code{string} {@var{remote_filename} @code{= ""}}, @*@
+                              @code{string} {@var{local_filename} @code{= ""}}, @*@
+                              @code{bool} {@var{overwrite} @code{= false}}, @*@
+                              @code{string *}@var{new_local_filename_ptr} @code{= 0}, @*@
+                              @code{string *}{@var{temp_filename_ptr} @code{= 0}})
+@end deftypefun
+
+
+@c *** (3) Functions for iRODS (Scan_Parse_Parameter_Type)
+
+@node Functions for iRODS (Scan_Parse_Parameter_Type), Functions for handles (Scan_Parse_Parameter_Type), Communication functions (Scan_Parse_Parameter_Type), Scan_Parse_Parameter_Type Member Functions
+@subsection iRODS
+
+@findex Scan_Parse_Parameter_Type::cd
+@findex cd (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int cd (@code{string} @var{dir}, @*@
+                    @code{char *}@var{buffer_ptr}, @*@
+                    @code{unsigned int} @var{buff_size})
+@end deftypefun
+
+@findex Scan_Parse_Parameter_Type::mkdir
+@findex mkdir (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int mkdir (@code{Response_Type &}@var{response}, @*@
+                       @code{char *}@var{buffer_ptr}, @*@
+                       @code{size_t} @var{buffer_size})
+@end deftypefun
+
+@findex Scan_Parse_Parameter_Type::ls
+@findex ls (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int ls (@code{char *}@var{buffer_ptr}, @*@
+                    @code{unsigned int} @var{buff_size}, @*@
+                    @code{string *}@var{filename}, @*@
+                    @code{Response_Type *}@var{response}, @*@
+                    @code{string} {@var{filename_1} @code{= ""}}, @*@
+                    @code{bool} {@var{do_response} @code{= true}})
+@end deftypefun
+
+@findex Scan_Parse_Parameter_Type::mv
+@findex mv (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int mv (@code{Response_Type &}@var{response}, @*@
+                    @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+
+@findex Scan_Parse_Parameter_Type::pwd
+@findex pwd (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int pwd (@code{char *}@var{buffer_ptr}, @*@
+                     @code{unsigned int} @var{buff_size}, @*@
+                     @code{string} {@var{args} @code{= ""}})
+@end deftypefun
+
+@findex Scan_Parse_Parameter_Type::put
+@findex put (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int put (@code{Response_Type &}@var{response})
+@end deftypefun
+
+@findex Scan_Parse_Parameter_Type::get
+@findex get (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int get (@code{Response_Type &}@var{response}, @*@
+                     @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+@findex Scan_Parse_Parameter_Type::mark_irods_objects_for_deletion
+@findex mark_irods_objects_for_deletion (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int mark_irods_objects_for_deletion (@code{Response_Type &}@var{response}, @*@
+                                                 @code{char *}@var{buffer_ptr}, @*@
+                                                 @code{size_t} @var{buffer_size})
+@end deftypefun
+
+@findex Scan_Parse_Parameter_Type::undelete_files
+@findex undelete_files (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int undelete_files (@code{Response_Type &}@var{response}, @*@
+                                @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+@c *** (3) Functions for handles (Scan_Parse_Parameter_Type)
+
+@node Functions for handles (Scan_Parse_Parameter_Type), Functions for Dublin Core metadata (Scan_Parse_Parameter_Type), Functions for iRODS (Scan_Parse_Parameter_Type), Scan_Parse_Parameter_Type Member Functions
+
+@subsection Handles 
+
+@findex Scan_Parse_Parameter_Type::fetch_handle_from_database
+@findex fetch_handle_from_database (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int fetch_handle_from_database (@code{unsigned long int} @var{handle_id}, @*@
+                                            @code{Handle_Type &}@var{handle}, @*@
+                                            @code{string} {@var{type} @code{= ""}})
+@end deftypefun
+
+
+@findex Scan_Parse_Parameter_Type::fetch_handle_from_database
+@findex fetch_handle_from_database (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int fetch_handle_from_database (@code{string} @var{handle_str}, @*@
+                                            @code{Handle_Type &}@var{handle}, @*@
+                                            @code{string} {@var{type} @code{= ""}})
+@end deftypefun
+
+
+@findex Scan_Parse_Parameter_Type::fetch_handles_from_database
+@findex fetch_handles_from_database (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int fetch_handles_from_database (@code{vector<unsigned long int> &}@var{handle_id_vector}, @*@
+                                             @code{vector<Handle_Type> &}@var{handle_vector}, @*@
+                                             @code{string} {@var{type} @code{= ""}})
+@end deftypefun
+
+
+@findex Scan_Parse_Parameter_Type::get_handle
+@findex get_handle (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int get_handle (@code{string} @var{s},@*@
+                            @code{unsigned int} @var{flags},@*@
+                            @code{unsigned int} {@var{options} @code{= 0U}},@*@
+                            @code{string} {@var{filename_1} @code{= ""}})
+@end deftypefun
+
+@c *** (3) Functions for Dublin Core metadata (Scan_Parse_Parameter_Type)
+
+@node Functions for Dublin Core metadata (Scan_Parse_Parameter_Type), Database functions (Scan_Parse_Parameter_Type), Functions for handles (Scan_Parse_Parameter_Type), Scan_Parse_Parameter_Type Member Functions
+
+@subsection Dublin Core metadata 
+
+@findex Scan_Parse_Parameter_Type::add_metadata
+@findex add_metadata (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int add_metadata (@code{Response_Type &}@var{response})
+@end deftypefun
+
+@findex Scan_Parse_Parameter_Type::store_dc_metadata
+@findex store_dc_metadata (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int store_dc_metadata (@code{const Response_Type &}@var{response}, @*@
+                                   @code{Handle_Type &}@var{irods_object_handle}, @*@
+                                   @code{Handle_Type &}@var{dc_metadata_handle}, @*@
+                                   @code{bool} @var{force}, @*@
+                                   @code{string &}@var{irod_object_path}, @*@
+                                   @code{unsigned long int} @var{dc_metadata_id}, @*@
+                                   @code{unsigned long int} {@var{irods_object_ref_id} @code{= 0UL}}, @*@
+                                   @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+@findex Scan_Parse_Parameter_Type::parse_metadata
+@findex parse_metadata (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int parse_metadata (@code{vector<Dublin_Core_Metadata_Type> &}@var{dc_metadata_vector}, @*@
+                                @code{Response_Type &}@var{response})
+@end deftypefun
+
+@findex Scan_Parse_Parameter_Type::get_metadata
+@findex get_metadata (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int get_metadata (@code{string} @var{filename},  @*@
+                              @code{unsigned int} @var{flags},  @*@
+                              @code{int *}{@var{ctr} @code{= 0}},  @*@
+                              @code{unsigned int} {@var{options} @code{= 0}}, @*@
+                              @code{char *}{@var{buffer_ptr} @code{= 0}}, @*@
+                              @code{size_t} {@var{buffer_size} @code{= 0}}, @*@
+                              @code{bool} {@var{do_output} @code{= true}}, @*@
+                              @code{bool} {@var{do_irods_user_metadata} @code{= true}}, @*@
+                              @code{map<unsigned long int, Dublin_Core_Metadata_Type> *} @*@
+                                 {@var{dc_metadata_type_map_ptr} @code{= 0}})
+@end deftypefun
+
+
+
+
+@c *** (3) Database functions (Scan_Parse_Parameter_Type)
+
+@node Database functions (Scan_Parse_Parameter_Type), Cryptographic operations (Scan_Parse_Parameter_Type), Functions for Dublin Core metadata (Scan_Parse_Parameter_Type), Scan_Parse_Parameter_Type Member Functions
+@subsection Database 
+
+@findex Scan_Parse_Parameter_Type::submit_mysql_query
+@findex submit_mysql_query (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int submit_mysql_query (@code{string} @var{query}, @code{MYSQL_RES *&}@var{result}, @*@
+                                    @code{unsigned int *}@var{row_ctr}, @*@
+                                    @code{unsigned int *}@var{field_ctr}, @*@
+                                    @code{long *}{@var{affected_rows} @code{= 0}})
+@end deftypefun
+
+
+@findex Scan_Parse_Parameter_Type::submit_mysql_queries
+@findex submit_mysql_queries (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int submit_mysql_queries (@code{vector<string> &}@var{query_vector}, @*@
+                                      @code{MYSQL_RES **}@var{result_array}, @*@
+                                      @code{vector<unsigned int *> &}@var{row_ctr_vector}, @*@
+                                      @code{vector<unsigned int *> &}@var{field_ctr_vector}, @*@
+                                      @code{vector<long int *> &}@var{affected_rows_vector}, @*@
+                                      @code{bool} {@var{continue_on_error} @code{= false}})
+@end deftypefun
+
+
+@findex Scan_Parse_Parameter_Type::get_highest_value
+@findex get_highest_value (Scan_Parse_Parameter_Type)
+@c
+@deftypefn {Static function} int get_highest_value (@code{MYSQL *}@var{mysql_ptr}, @*@
+                                                    @code{string} @var{table}, @*@
+                                                    @code{string} @var{column}, @*@
+                                                    @code{unsigned long int& }@var{val}, @*@
+                                                    @code{bool} {@var{incr} @code{= false}})
+@end deftypefn
+
+
+@c *** (3) Cryptographic operations (Scan_Parse_Parameter_Type)
+@node Cryptographic operations (Scan_Parse_Parameter_Type), Functions for TANs (Scan_Parse_Parameter_Type), Database functions (Scan_Parse_Parameter_Type), Scan_Parse_Parameter_Type Member Functions
+
+@subsection Cryptographic operations
+
+
+@findex Scan_Parse_Parameter_Type::generate_checksum
+@findex generate_checksum (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int generate_checksum (@code{Response_Type &}@var{response},@*@
+                                   @code{bool} {@var{verify_only} @code{= false}},@*@
+                                   @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+@findex Scan_Parse_Parameter_Type::store_public_key
+@findex store_public_key (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int store_public_key (@code{string} @var{uid},@*@
+                                  @code{string} @var{fingerprint},@*@
+                                  @code{string} @var{public_key},@*@
+                                  @code{unsigned int} @var{options},@*@
+                                  @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+
+@c *** (3) Functions for TANs (Scan_Parse_Parameter_Type)
+
+@node Functions for TANs (Scan_Parse_Parameter_Type), Other functions (Scan_Parse_Parameter_Type), Cryptographic operations (Scan_Parse_Parameter_Type), Scan_Parse_Parameter_Type Member Functions
+@subsection TANs 
+
+@findex Scan_Parse_Parameter_Type::send_tan_list
+@findex send_tan_list (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int send_tan_list (@code{void})
+@end deftypefun
+
+
+@c *** (3) Other functions (Scan_Parse_Parameter_Type)
+
+@node Other functions (Scan_Parse_Parameter_Type), , Functions for TANs (Scan_Parse_Parameter_Type), Scan_Parse_Parameter_Type Member Functions
+@subsection Other functions
+
+@findex Scan_Parse_Parameter_Type::show
+@findex show (Scan_Parse_Parameter_Type)
+@c
+@deftypefun void show (@code{string} {@var{s} @code{= "Scan_Parse_Parameter_Type:"}}, @*@
+                       @code{stringstream *}{@var{strm} @code{= 0}})
+@end deftypefun
+
+@findex Scan_Parse_Parameter_Type::set_expires
+@findex set_expires (Scan_Parse_Parameter_Type)
+@findex Scan_Parse_Parameter_Type::get_expires
+@findex get_expires (Scan_Parse_Parameter_Type)
+@c
+@deftypefun int set_expires (@code{time_t} @var{seconds}, @*@
+                             @code{stringstream *}{@var{out_strm} @code{= 0}})
+@deftypefunx time_t get_expires (@code{char *}{@var{str} @code{= 0}}, @*@
+                                @code{size_t} {@var{str_size} @code{= 0}}, @*@
+                                @code{stringstream *}{@var{out_strm} @code{= 0}})
+
+These functions are only called in the web application @command{gwrdwbap}.
+@xref{Web application gwrdwbap}. 
+@end deftypefun
+
+@c ***  (3) Server action functions
+
+@node Server action functions, Client action functions, , Scan_Parse_Parameter_Type Member Functions
+
+@subsection Server action functions
+
+
+@findex server_action_* (Scan_Parse_Parameter_Type)
+@findex Scan_Parse_Parameter_Type::server_action_* 
+@c
+@deftypefn  {Functions}  int server_action_delete_handle_value (@*@
+                            @code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_add_handle_value (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_cd (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_command_only (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_create_handle (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_delete_handle (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_end_server (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_get (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_get_handle (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_get_metadata (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_get_user_info (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_ls (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_mv (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_mark_irods_objects_for_deletion @*@
+                               (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_mkdir (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_process_pending (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_pwd (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_receive_metadata_file (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_receive_put_file (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_send_file (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_send_handle (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_send_metadata (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_send_tan_list (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_show_certificate (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_sleep (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_undelete_file (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_undelete_handle (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_undelete_handle_value (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_delete_metadata (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_undelete_metadata (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_show_metadata (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_generate_checksum (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_verify_checksum (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_store_public_key (@code{Response_Type &}@var{response})
+@deftypefnx {}           int server_action_unknown (@code{Response_Type &}@var{response})
+@end deftypefn
+
+
+@c ***  (3) Client action functions
+
+@node Client action functions, , Server action functions, Scan_Parse_Parameter_Type Member Functions
+
+@subsection Client action functions
+
+@findex client_action_* (Scan_Parse_Parameter_Type)
+@findex Scan_Parse_Parameter_Type::client_action_* 
+@c
+@deftypefn {Functions} int client_action_command_only (@code{Response_Type &}@var{response})
+@deftypefnx {}         int client_action_send_file (@code{Response_Type &}@var{response})
+@deftypefnx {}         int client_action_unknown (@code{Response_Type &}@var{response})
+@deftypefnx {}         int client_action_send_public_key (@code{Response_Type &}@var{response})
+@end deftypefn
+
+
+
+@c ** (2)
+
+@c * (1) Emacs-Lisp code for use in indirect buffers
+
+@c (progn (texinfo-mode) (setq abbrev-mode t) (outline-minor-mode t) (setq fill-column 80) (ignore (quote 
+@c )) (setq outline-regexp "@c *\\*+") (set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi"))
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

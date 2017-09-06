@@ -1,0 +1,11 @@
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@node Function Index, Concept Index, Data Type Index, Top
+@comment  node-name,  next,  previous,  up
+
+@unnumbered Function Index
+@printindex fn
+

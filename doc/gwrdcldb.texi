@@ -1,0 +1,267 @@
+@c gwrdcldb.texi
+@c [...]/gwrdifpk/doc/gwrdcldb.texi
+
+@c Created by Laurence D. Finston (LDF) Mon Sep  9 16:50:42 CEST 2013
+
+@c This file is part of the GWDG Archive Interface User and Reference Manual (gwrdifpk).
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) gwirdcli Database 
+
+@node gwirdcli Database, Profiling and testing, gwirdsif Database, Top
+@chapter gwirdcli Database
+
+The client-side database @code{gwirdcli} contains tables for storing data sent by the server program 
+@command{gwirdsif} to the client program @command{gwirdcli}.
+The tables are based on ones defined in the @code{gwirdsif} and @code{handlesystem} or (@code{handlesystem_standalone}) 
+databases.
+@xref{gwirdsif Database}, and @ref{handlesystem and handlesystem_standalone Databases}.
+
+@menu
+* Users database table (gwirdcli)::
+* handles database table (gwirdcli)::
+* nas database table (gwirdcli)::
+* Privileges_Gwirdcli database table (gwirdcli)::
+* Dublin Core database tables (gwirdcli)::
+* GPG_Key_Pair database tables (gwirdcli)::
+* Pull Response database tables (gwirdcli)::
+@end menu
+
+@c ** (2) Users database table (gwirdcli)
+
+@node Users database table (gwirdcli), handles database table (gwirdcli), , gwirdcli Database
+@section Users
+
+@xref{Users database table, Users database table, Users database table (gwirdsif)}.
+
+@c ** (2) handles database table (gwirdcli)
+
+@node handles database table (gwirdcli), nas database table (gwirdcli), Users database table (gwirdcli), gwirdcli Database
+@section handles
+
+@xref{handles database table}.
+
+@c ** (2) nas database table (gwirdcli)
+
+@node nas database table (gwirdcli), Privileges_Gwirdcli database table (gwirdcli), handles database table (gwirdcli), gwirdcli Database
+
+@section nas
+
+@xref{nas database table}.
+
+@c ** (2) Privileges_Gwirdcli database table (gwirdcli)
+
+@node Privileges_Gwirdcli database table (gwirdcli), Dublin Core database tables (gwirdcli), nas database table (gwirdcli), gwirdcli Database
+ 
+@section Privileges_Gwirdcli
+
+@table @code 
+@item user_id 
+@code{int primary key unique not null references Users(user_id})
+
+@item superuser 
+@code{boolean not null default 0}
+
+@item delegate 
+@code{boolean not null default 0}
+
+@item add_groups 
+@code{boolean not null default 0}
+
+@item delete_groups 
+@code{boolean not null default 0}
+
+@item show_user_info 
+@code{boolean not null default 0}
+
+@item show_groups 
+@code{boolean not null default 0}
+
+@item show_certificates 
+@code{boolean not null default 0}
+
+@item show_distinguished_names 
+@code{boolean not null default 0}
+
+@item show_privileges 
+@code{boolean not null default 0}
+
+@item pull_response_self 
+@code{boolean not null default 0}
+
+@item pull_response_group 
+@code{boolean not null default 0}
+
+@item pull_response_all 
+@code{boolean not null default 0}
+@end table 
+
+@c ** (2) Dublin Core database tables (gwirdcli)
+
+@node Dublin Core database tables (gwirdcli), GPG_Key_Pair database tables (gwirdcli), Privileges_Gwirdcli database table (gwirdcli), gwirdcli Database
+@section Dublin Core database tables
+
+The @code{gwirdcli} database contains the following tables:
+
+@itemize @w{}
+@item @code{Dublin_Core_Metadata}
+
+@item @code{Dublin_Core_Metadata_Sub}
+
+@item @code{Dublin_Core_Attributes}
+
+@item @code{Dublin_Core_Elements}
+
+@item @code{Dublin_Core_Qualifiers}
+
+@item @code{Dublin_Core_Terms}
+@end itemize
+
+@noindent 
+The table definitions are identical to the ones in the @code{gwirdsif} database, with one exception:
+the @code{Dublin_Core_Metadata} table contains one additional column: 
+
+@example 
+retrieved_from_server_timestamp timestamp default 0
+@end example
+
+@noindent 
+@xref{Dublin Core database tables (gwirdsif)}. 
+
+@c ** (2) GPG_Key_Pair database tables (gwirdcli)
+
+@node GPG_Key_Pair database tables (gwirdcli), Pull Response database tables (gwirdcli), Dublin Core database tables (gwirdcli), gwirdcli Database
+@section GPG_Key_Pair database tables
+
+The definitions for the database tables @code{gwirdcli.GPG_Key_Pairs} and 
+@code{gwirdcli.Users_GPG_Key_Pairs} are identical to those for the corresponding tables
+in the @code{gwirdsif} database.
+@xref{GPG_Key_Pair database tables (gwirdsif)}.
+
+@c ** (2) Pull Response database tables (gwirdcli)
+
+@node Pull Response database tables (gwirdcli), , GPG_Key_Pair database tables (gwirdcli), gwirdcli Database
+@section Pull Response database tables
+
+@menu
+* Pull_Servers database table (gwirdcli)::
+* Pull_Responses database table (gwirdcli)::
+* Pull_Paths database table (gwirdcli)::
+@end menu
+
+@c *** (3)
+
+@node Pull_Servers database table (gwirdcli), Pull_Responses database table (gwirdcli), , Pull Response database tables (gwirdcli)
+
+@subsection Pull_Servers
+
+@table @code 
+@item pull_server_id
+@code{int primary key}
+
+@item server_hostname
+@code{varchar(128) not null default ''}    
+
+@item server_ip_address
+@code{varchar(64) not null default ''}
+
+@item server_distinguished_name
+@code{varchar(256) not null default ''}
+
+@item created
+@code{datetime not null default 0}
+
+@item last_modified
+@code{datetime not null default 0}
+@end table 
+
+@c *** (3) Pull_Responses database table (gwirdcli)
+
+@node Pull_Responses database table (gwirdcli), Pull_Paths database table (gwirdcli), Pull_Servers database table (gwirdcli), Pull Response database tables (gwirdcli)
+
+@subsection Pull_Responses
+
+@table @code 
+@item pull_response_id
+@code{int primary key}
+
+@item user_id
+@code{int not null default 0 references Users(user_id})
+
+@item server_hostname
+@code{varchar(128) not null default ''}    
+
+@item server_ip_address
+@code{varchar(64) not null default ''}
+
+@item client_hostname
+@code{varchar(128) not null default ''}    
+
+@item client_ip_address
+@code{varchar(64) not null default ''}
+
+@item pull_interval
+@code{int not null default 0}
+
+@item latest_pull
+@code{datetime not null default 0}
+
+@item created
+@code{datetime not null default 0}
+
+@item last_modified
+@code{datetime not null default 0}
+@end table 
+
+@c *** (3) Pull_Paths database table (gwirdcli)
+
+@node Pull_Paths database table (gwirdcli), , Pull_Responses database table (gwirdcli), Pull Response database tables (gwirdcli)
+
+@subsection Pull_Paths
+
+@table @code 
+@item pull_path_id
+@code{int primary key}
+
+@item pull_response_id
+@code{int references Pull_Responses(pull_response_id})
+
+@item owner_id
+@code{int not null default 0 references Users(user_id})
+
+@item local_path
+@code{varchar(512) not null default ''}
+
+@item remote_path
+@code{varchar(512) not null default ''}
+
+@item checksum_sha224
+@code{varchar(64) not null default ''}
+
+@item created
+@code{datetime not null default 0}
+
+@item last_modified
+@code{datetime not null default 0}
+@end table 
+
+@c *** (3)
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

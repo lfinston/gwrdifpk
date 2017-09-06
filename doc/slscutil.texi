@@ -1,0 +1,94 @@
+@c slscutil.texi
+@c [...]/gwrdifpk/doc/slscutil.texi
+
+@c Created by Laurence D. Finston (LDF) Mon Sep 16 16:17:32 CEST 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) Shellscripts and Utilities
+
+@node Shellscripts and Utilities, Emacs-Lisp files, Auxiliary programs, Top
+@chapter Shellscripts and Utilities
+
+@menu
+* GPG keys (Shellscripts and Utilities)::
+* X.509 certificates (Shellscripts and Utilities)::
+* iRODS passwords (Shellscripts and Utilities)::
+@end menu
+
+@node GPG keys (Shellscripts and Utilities), X.509 certificates (Shellscripts and Utilities), , Shellscripts and Utilities
+
+@section GPG keys
+
+@deffn {shellscript} output_passphrase.sh 
+@end deffn
+
+@deffn {shellscript} start_gwirdsif_with_passphrase.sh
+@end deffn
+
+@c ** (2) Shellscripts and Utilities
+
+@node X.509 certificates (Shellscripts and Utilities), iRODS passwords (Shellscripts and Utilities), GPG keys (Shellscripts and Utilities), Shellscripts and Utilities
+
+@section X.509 certificates
+
+@deffn {shellscript} gen_x509_cert_key_pair.sh USERNAME COMMON_NAME [OPTIONAL ARGUMENTS]
+Optional arguments:
+
+@table @asis
+@item Email address 
+Default:  @email{nobody@@nowhere.de}
+
+@item Country code 
+Default:  DE (Germany)
+
+@item Organization
+Default: GWDG
+
+@item Organizational unit           
+Default: gwrdifpk
+
+@item Locality                      
+Default: Goettingen
+
+@item State or province name        
+Default: Niedersachsen (Lower Saxony)
+
+@item User ID                       
+Default: Highest value retrieved from the @code{gwirdsif.Users}
+database table plus 1.  If this fails, the value 1000 is used instead.
+
+@item Days until expiration
+Default: 1001111 (the maximum number @command{certtool} will accept).
+@end table
+
+@strong{Please note}:  This shellscript is not ``bullet-proof''.
+@end deffn
+
+@node iRODS passwords (Shellscripts and Utilities), , X.509 certificates (Shellscripts and Utilities), Shellscripts and Utilities
+
+@section iRODS passwords (Shellscripts and Utilities)
+
+@deffn {shellscript} update_irods_passwd.sh
+@end deffn
+
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

@@ -1,0 +1,48 @@
+@c gwrdwbap.texi
+@c [...]/gwrdifpk/doc/gwrdwbap.texi
+
+@c Created by Laurence D. Finston (LDF) Thu Oct 10 10:44:51 CEST 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) Web application gwrdwbap
+
+@node Web application gwrdwbap, Auxiliary programs, Profiling and testing, Top
+@chapter Web application gwrdwbap
+
+The web application @command{gwrdwbap} exists, but as of 2013.10.31., it is not 
+functional and is not being developed.  It may be desirable to continue development 
+on it at some future time. 
+
+@noindent 
+Source files:
+
+@itemize @w{}
+@item @file{gwrdwbap.web}
+
+@item @file{ckietype.web}
+
+@item @file{utlwbfcs.web}
+@end itemize
+
+
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

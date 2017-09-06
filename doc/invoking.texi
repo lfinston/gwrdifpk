@@ -1,0 +1,691 @@
+@c invoking.texi
+@c /home/lfinsto/irods_proj/irods_master/Finston/gwrdifpk/doc/invoking.texi
+
+@c Created by Laurence D. Finston (LDF) Thu Mar 14 16:49:25 CET 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) Invoking gwirdsif/gwirdcli
+
+@node Invoking gwirdsif/gwirdcli, Pull archiving, Security considerations, Top
+@chapter Invoking gwirdsif/gwirdcli
+
+@command{gwirdsif} and @command{gwirdcli} share the code for processing 
+their command-line options.  @xref{Process command-line options}.
+
+@menu
+* Command-line arguments::
+* Command-line options::
+@end menu
+
+@c ** (2) Command-line arguments
+
+@node Command-line arguments, Command-line options, , Invoking gwirdsif/gwirdcli
+
+@section Command-line arguments
+
+@table @code
+@item remote-hostname
+For @command{gwirdcli} only.  Required for connections to the server on a remote host, 
+or on the localhost using TLS with or without authentication/authorization with 
+X.509 certificates.  If omitted, @command{gwirdcli} uses a Unix-domain socket
+to connect with an instance of the server program @command{gwirdsif} on the localhost.
+
+For a connection to a server running on the local host, it should be possible on most 
+Unix-like systems to use @samp{localhost} as the @code{remote-hostname} argument, e.g.,
+@samp{gwirdcli localhost}.
+@end table
+
+
+@c ** (2) Command-line options
+
+@node Command-line options, , Command-line arguments, Invoking gwirdsif/gwirdcli
+@section Command-line options
+
+Like @command{setupdbs} (@pxref{Invoking setupdbs}), 
+@command{gwirdsif} and @command{gwirdcli} use the
+@code{getopt_long_only} function from the GNU C library to parse its
+command-line arguments.  This implies that the options to the programs may be
+specified using two hyphens, as in the list below, or with a single hyphen.  In
+addition, any option may be abbreviated, as long as the abbreviation is
+unambiguous.  For example, @option{--version} may be specified as
+@option{-version}, @option{--ver} or even @option{-v}, since there (currently)
+are no other options whose names begin with ``v''.  On the other hand, the
+option @option{--sleep-server-enable} may be abbreviated to @option{--sleep-server-e}
+but not to to @option{--sleep-server}, because the option
+@option{--sleep-server-disable} also begins with this sequence of characters,
+making @option{--sleep-server} ambiguous.  @xref{Getopt Long Options, , , libc, The GNU
+C Library Reference Manual}.
+
+
+@menu
+* Alphabetical list of options::
+* Options for getting information::
+* Configuration options::
+* Connection options::
+* Session options::
+* Signal options::
+* Input/output options::
+* Debugging options::
+* Logging options::
+* Purging options::
+* Options for GPG (GNU Privacy Guard)::
+* Options for X.509 Authentication/Authorization::
+* iRODS options::
+* Handle options::
+* Database options::
+* Pull client options::
+@end menu
+
+@c *** (3) Alphabetical list of options
+
+@node Alphabetical list of options, Options for getting information, , Command-line options
+
+@subsection Alphabetical list of options
+
+@table @code 
+@item --anon-port
+@ref{Connection options}.
+
+@item --anonymous
+@ref{Options for X.509 Authentication/Authorization}.
+
+@item --bison-trace
+@ref{Debugging options}.
+
+@item --ca-filename
+@ref{Options for X.509 Authentication/Authorization}.
+
+@item --cert-filename
+@ref{Options for X.509 Authentication/Authorization}.
+
+@item --cert-format
+@ref{Options for X.509 Authentication/Authorization}.
+
+@item --client-test-disable
+@ref{Debugging options}.
+
+@item --client-test-enable
+@ref{Debugging options}.
+
+@item --commands
+@ref{Input/output options}.
+
+@item --config-directory
+@ref{Configuration options}.
+
+@item --crl-filename
+@ref{Options for X.509 Authentication/Authorization}.
+
+@item --debug-level
+@ref{Debugging options}.
+
+@item --end-server-enable
+@ref{Debugging options}.
+
+@item --error-log-filename
+@ref{Logging options}.
+
+@item --flex-trace
+@ref{Debugging options}.
+
+@item --gpg-key-id
+@ref{Options for GPG (GNU Privacy Guard)}.
+
+@item --gpg-passphrase
+@ref{Options for GPG (GNU Privacy Guard)}.
+
+@item --gpg-homedir
+@ref{Options for GPG (GNU Privacy Guard)}.
+
+@item --help
+@ref{Options for getting information}.
+
+@item --i-commands
+@itemx --icommands
+@ref{iRODS options}.
+
+@item --input-filename
+@ref{Input/output options}.
+
+@item --irods-server-directory
+@ref{iRODS options}.
+
+@item --jargon-core
+@ref{iRODS options}.
+
+@item --jargon-trunk
+@ref{iRODS options}.
+
+@item --key-filename
+@ref{Options for X.509 Authentication/Authorization}.
+
+@item --log-directory
+@ref{Logging options}.
+
+@item --listen-client-port
+@ref{Pull client options}.
+
+@item --log-filename
+@ref{Logging options}.
+
+@item --mysql-password-filename
+@ref{Database options}.
+
+@item --mysql-username
+@ref{Database options}.
+
+@item --no-terminate-on-end-input
+@ref{Debugging options}.
+
+@item --output-filename
+@ref{Input/output options}.
+
+@item --parser-trace
+@ref{Debugging options}.
+
+@item --passphrase-gpg
+@ref{Options for GPG (GNU Privacy Guard)}.
+
+@item --purge-database-interval
+@ref{Purging options}.
+
+@item --purge-database-limit
+@ref{Purging options}.
+
+@item --purge-dc-metadata-interval 
+@ref{Purging options}.
+
+@item --purge-dc-metadata-limit
+@ref{Purging options}.
+
+@item --purge-irods-archive-interval
+@ref{Purging options}.
+
+@item --purge-irods-archive-limit
+@ref{Purging options}.
+
+@item --purge-logs-interval
+@ref{Purging options}.
+
+@item --purge-logs-interval-seconds
+@ref{Purging options}.
+
+@item --purge-logs-limit
+@ref{Purging options}.
+
+@item --remote-hostname
+@ref{Connection options}.
+
+@item --save-temp-files
+@ref{Debugging options}, and @ref{Logging options}.
+
+@item --scanner-trace
+@ref{Debugging options}.
+
+@item --server-test-disable
+@ref{Debugging options}.
+
+@item --server-test-enable
+@ref{Debugging options}.
+
+@item --session-id
+@ref{Session options}.
+
+@item --signal-client-disable
+@ref{Signal options}.
+
+@item --signal-client-enable
+@ref{Signal options}.
+
+@item --signal-server-disable
+@ref{Signal options}.
+
+@item --signal-server-enable
+@ref{Signal options}.
+
+@item --sleep-client-disable
+@ref{Debugging options}.
+
+@item --sleep-client-enable
+@ref{Debugging options}.
+
+@item --sleep-server-disable
+@ref{Debugging options}.
+
+@item --sleep-server-enable
+@ref{Debugging options}.
+
+@item --socket-directory
+@ref{Connection options}.
+
+@item --standalone-handle
+@ref{Handle options}.
+
+@item --suppress-prompt
+@ref{Input/output options}.
+
+@item --terminate-on-end-input
+@ref{Input/output options}.
+
+@item --trace
+@ref{Debugging options}.
+
+@item --version
+@ref{Options for getting information}.
+
+@item --x509-port
+@ref{Options for X.509 Authentication/Authorization}.
+
+@end table 
+
+@c *** (3) Options for getting information
+
+@node Options for getting information, Configuration options, Alphabetical list of options, Command-line options
+
+@subsection Options for getting information
+
+@table @code 
+@item --help
+@ref{Options for getting information}.
+
+@item --version
+@ref{Options for getting information}.
+@end table
+
+
+@c *** (3) Configuration options
+
+@node Configuration options, Connection options, Options for getting information, Command-line options
+
+@subsection Configuration options
+
+@table @code 
+@item --config-directory
+@end table
+
+@c *** (3) Connection options
+
+@node Connection options, Session options, Configuration options, Command-line options
+
+@subsection Connection options
+
+@table @code 
+@item --anon-port
+@ref{Connection options}.
+
+@item --remote-hostname
+@ref{Connection options}.
+
+@item --socket-directory
+@ref{Connection options}.
+
+@end table 
+
+@c *** (3) Session options
+
+@node Session options, Signal options, Connection options, Command-line options
+
+@subsection Session options
+
+@table @code
+@item --session-id
+@ref{Session options}.
+@end table
+
+
+
+@c *** (3) Signal options
+
+@node Signal options, Input/output options, Session options, Command-line options
+
+@subsection Signal options
+
+@table @code
+@item --signal-client-disable
+@ref{Signal options}.
+
+@item --signal-client-enable
+@ref{Signal options}.
+
+@item --signal-server-disable
+@ref{Signal options}.
+
+@item --signal-server-enable
+@ref{Signal options}.
+@end table
+
+
+@c *** (3) Input/output options
+
+@node Input/output options, Debugging options, Signal options, Command-line options
+
+@subsection Input/output options
+
+@table @code 
+@item --commands
+@ref{Input/output options}.
+
+@item --input-filename
+@ref{Input/output options}.
+
+@item --no-terminate-on-end-input
+@ref{Debugging options}, and @ref{Input/output options}.
+
+@item --output-filename
+@ref{Input/output options}.
+
+@item --suppress-prompt
+@ref{Input/output options}.
+
+@item --terminate-on-end-input
+@ref{Input/output options}.
+
+@end table 
+
+
+@c *** (3) Debugging options
+
+@node Debugging options, Logging options, Input/output options, Command-line options
+
+@subsection Debugging options
+
+@table @code 
+@item --bison-trace
+@ref{Debugging options}.
+
+@item --client-test-disable
+@ref{Debugging options}.
+
+@item --client-test-enable
+@ref{Debugging options}.
+
+@item --debug-level
+@ref{Debugging options}.
+
+@item --end-server-enable
+@ref{Debugging options}.
+
+@item --flex-trace
+@ref{Debugging options}.
+
+@item --no-terminate-on-end-input
+@ref{Debugging options}.
+
+@item --parser-trace
+@ref{Debugging options}.
+
+@item --save-temp-files
+@ref{Debugging options}, and @ref{Logging options}.
+
+@item --scanner-trace
+@ref{Debugging options}.
+
+@item --server-test-disable
+@ref{Debugging options}.
+
+@item --server-test-enable
+@ref{Debugging options}.
+
+@item --sleep-client-disable
+@ref{Debugging options}.
+
+@item --sleep-client-enable
+@ref{Debugging options}.
+
+@item --sleep-server-disable
+@ref{Debugging options}.
+
+@item --sleep-server-enable
+@ref{Debugging options}.
+
+@item --trace
+@ref{Debugging options}.
+
+@end table 
+
+@c *** (3) Logging options
+
+@node Logging options, Purging options, Debugging options, Command-line options
+
+@subsection Logging options
+
+@table @code 
+@item --error-log-filename
+@ref{Logging options}.
+
+@item --log-directory
+@ref{Logging options}.
+
+@item --log-filename
+@ref{Logging options}.
+
+@item --save-temp-files
+@ref{Debugging options}, and @ref{Logging options}.
+@end table 
+
+@c *** (3) Purging options
+
+@node Purging options, Options for GPG (GNU Privacy Guard), Logging options, Command-line options
+
+@subsection Purging options
+
+@table @code
+@item --purge-database-interval
+@ref{Purging gwirdsif, Purging gwirdsif, Purging (gwirdsif)}, 
+and @ref{Purging gwirdcli, Purging gwirdcli, Purging (gwirdcli)}
+
+@item --purge-database-limit
+@ref{Purging gwirdsif, Purging gwirdsif, Purging (gwirdsif)}, 
+and @ref{Purging gwirdcli, Purging gwirdcli, Purging (gwirdcli)}
+
+
+@item --purge-irods-archive-interval
+@ref{Purging gwirdsif, Purging gwirdsif, Purging (gwirdsif)}.
+
+@item --purge-irods-archive-limit
+@ref{Purging gwirdsif, Purging gwirdsif, Purging (gwirdsif)}.
+
+@item --purge-logs-interval
+@ref{Purging gwirdsif, Purging gwirdsif, Purging (gwirdsif)}, 
+and @ref{Purging gwirdcli, Purging gwirdcli, Purging (gwirdcli)}
+
+@item --purge-logs-interval-seconds
+@ref{Purging gwirdsif, Purging gwirdsif, Purging (gwirdsif)}, 
+and @ref{Purging gwirdcli, Purging gwirdcli, Purging (gwirdcli)}
+
+@item --purge-logs-limit
+@ref{Purging gwirdsif, Purging gwirdsif, Purging (gwirdsif)}, 
+and @ref{Purging gwirdcli, Purging gwirdcli, Purging (gwirdcli)}
+
+@item --purge-dc-metadata-interval 
+@ref{Purging gwirdsif, Purging gwirdsif, Purging (gwirdsif)}. 
+
+@item --purge-dc-metadata-limit
+@ref{Purging gwirdsif, Purging gwirdsif, Purging (gwirdsif)}. 
+@end table
+
+@c *** (3) Options for GPG (GNU Privacy Guard)
+
+@node Options for GPG (GNU Privacy Guard), Options for X.509 Authentication/Authorization, Purging options, Command-line options 
+
+@subsection Options for GPG (GNU Privacy Guard)
+
+@table @code
+@item --gpg-key-id ARG
+@cindex GPG (GNU Privacy Guard)
+@cindex GNU Privacy Guard (GPG)
+@c
+Required by @command{gwirdsif}.  Not used by other programs, but available in 
+the other programs that link with @code{cmdlnopt.o} 
+(such as @command{gwirdcli} and @command{gwrdwbap}).
+@option{ARG} is the GPG key ID of the key pair used used for encrypting and 
+decrypting the ``scrambled'' iRODS passwords, and possibly for other purposes.
+@xref{Security considerations}.
+
+@item --gpg-passphrase
+@itemx --passphrase-gpg
+These options are synonyms.  No argument.  Currently only used by @command{gwirdsif}, 
+but available in the other programs, as described for @option{--gpg-key-id}, above.
+
+@cindex iRODS passwords
+@cindex passwords, iRODS 
+@c
+@option{--gpg-passphrase} is only used when the GPG key pair used for encrypting and 
+decrypting the ``scrambled'' iRODS passwords has a passphrase.
+@xref{Setting up iRODS users}.
+
+@cindex cron
+@cindex cron job
+@cindex job, cron
+@c
+If this option is used, the user will be prompted for the passphrase.  This is 
+certainly safer than using a GPG key without one, but much less convenient.  
+For one thing, it means that @command{gwirdsif} cannot be started unattended,
+for example, by a @code{cron} job, if it exited for some reason.
+
+@cindex Makefiles
+@cindex GNU Make
+@cindex Make, GNU
+@cindex Makefile.am files
+@cindex files, Makefile.am 
+@cindex Automake, GNU
+@cindex GNU Automake
+@c
+For another thing, this feature causes problems when @command{gwirdsif} is called 
+directly from within a @code{Makefile} (or indirectly from a @code{Makefile.am} file).  
+Therefore, @command{gwrdifpk} includes
+shellscripts which can be called from them instead, when using @option{--gpg-passphrase}.
+@xref{GPG keys (Shellscripts and Utilities)}.
+
+See also @ref{Security considerations}, for more information.
+
+@item --gpg-homedir ARG
+Set the directory containing the GPG configuration files.  
+The default is @file{$HOME/.gnupg}, i.e., the @file{.gnupg/} directory 
+below the user's home directory.
+@end table
+
+
+@c *** (3) Options for X.509 Authentication/Authorization
+
+@node Options for X.509 Authentication/Authorization, iRODS options, Options for GPG (GNU Privacy Guard), Command-line options
+
+@subsection Options for X.509 Authentication/Authorization
+
+@table @code 
+@item --anonymous
+@ref{Options for X.509 Authentication/Authorization}.
+
+@item --ca-filename
+@ref{Options for X.509 Authentication/Authorization}.
+
+@item --cert-filename
+@ref{Options for X.509 Authentication/Authorization}.
+
+@item --cert-format
+@ref{Options for X.509 Authentication/Authorization}.
+
+@item --crl-filename
+@ref{Options for X.509 Authentication/Authorization}.
+
+@item --key-filename
+@ref{Options for X.509 Authentication/Authorization}.
+
+@item --x509-port
+@ref{Options for X.509 Authentication/Authorization}.
+
+@end table 
+
+
+@c *** (3) iRODS options
+
+@node iRODS options, Handle options, Options for X.509 Authentication/Authorization, Command-line options
+
+@subsection iRODS options
+
+@table @code
+@item --i-commands
+@itemx --icommands
+@ref{iRODS options}.
+
+@item --irods-server-directory
+@ref{iRODS options}.
+
+@item --jargon-core
+@ref{iRODS options}.
+
+@item --jargon-trunk
+@ref{iRODS options}.
+@end table
+
+
+@c *** (3) Handle options
+
+@node Handle options, Database options, iRODS options, Command-line options
+
+@subsection Handle options
+
+@table @code
+@item --standalone-handle
+@ref{Handle options}.
+@end table
+
+@c *** (3) Database options
+
+@node Database options, Pull client options, Handle options, Command-line options
+
+@subsection Database options
+
+@table @code
+@item --mysql-username USERNAME
+@option{USERNAME} is the MySQL username used for accessing the databases.
+
+
+@item --mysql-password-filename [FILENAME]
+If specified, @option{FILENAME} is the name of the file containing the 
+encrypted MySQL password for the user specified with 
+the @option{--mysql-username} option (see above).  Otherwise, 
+the value of @code{DEFAULT_MYSQL_PASSWORD_FILENAME}, namely 
+@file{mysql_password.gpg.asc} is used instead.
+@xref{Global constants}.
+@end table
+
+@c *** (3) Pull client options
+
+@node Pull client options, , Database options, Command-line options
+
+@subsection Pull client options
+
+@table @code
+@item --listen-client-port
+@end table
+
+@c *** (3)
+
+
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+
+@c For use in indirect buffers:
+@c
+@c (progn (texinfo-mode) (outline-minor-mode t) (setq outline-regexp "@c *\\*+") (ignore (quote 
+@c )) (set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi"))
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

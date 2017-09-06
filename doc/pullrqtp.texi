@@ -1,0 +1,254 @@
+@c pullrqtp.texi
+@c [...]/gwrdifpk/doc/pullrqtp.texi
+
+@c Created by Laurence D. Finston (LDF) Thu Feb 13 15:39:22 CET 2014
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) class Pull_Request_Type
+
+@node class Pull_Request_Type, class Pull_Response_Type, class GPG_Key_Pair_Type, Top
+@chapter class Pull_Request_Type
+
+@tindex class Pull_Request_Type
+@tindex Pull_Request_Type, class 
+@tindex class Scan_Parse_Parameter_Type
+@tindex Scan_Parse_Parameter_Type, class 
+@c
+@findex yyparse
+@c
+@code{class Scan_Parse_Parameter_Type} and the function @code{yyparse} are
+@code{friend}s of @code{class Pull_Request_Type}.
+
+See also @ref{Pull Request database table (gwirdsif)}.
+
+@menu
+* Pull_Request_Type Data Members::
+* Pull_Request_Type Member Functions::
+@end menu
+
+@c *** (3) Pull_Request_Type Data Members
+
+@node Pull_Request_Type Data Members, Pull_Request_Type Member Functions, , class Pull_Request_Type
+@section Data Members
+
+@noindent 
+Private data members:
+
+@vindex Pull_Request_Type::pull_request_id
+@vindex pull_request_id (Pull_Request_Type)
+@c
+@deftypevar int pull_request_id
+@end deftypevar
+
+@vindex Pull_Request_Type::user_id
+@vindex user_id (Pull_Request_Type)
+@c
+@deftypevar int user_id
+@end deftypevar
+
+@vindex Pull_Request_Type::username
+@vindex username (Pull_Request_Type)
+@c
+@deftypevar string username
+@end deftypevar
+
+@vindex Pull_Request_Type::distinguished_name
+@vindex distinguished_name (Pull_Request_Type)
+@c
+@deftypevar string distinguished_name
+@end deftypevar
+
+@vindex Pull_Request_Type::server_hostname
+@vindex server_hostname (Pull_Request_Type)
+@c
+@deftypevar string server_hostname
+@end deftypevar
+
+@vindex Pull_Request_Type::server_ip_address
+@vindex server_ip_address (Pull_Request_Type)
+@c
+@deftypevar string server_ip_address
+@end deftypevar
+
+@vindex Pull_Request_Type::client_hostname
+@vindex client_hostname (Pull_Request_Type)
+@c
+@deftypevar string client_hostname
+@end deftypevar
+
+@vindex Pull_Request_Type::client_ip_address
+@vindex client_ip_address (Pull_Request_Type)
+@c
+@deftypevar string client_ip_address
+@end deftypevar
+
+@vindex Pull_Request_Type::client_port
+@vindex client_port (Pull_Request_Type)
+@c
+@deftypevar {unsigned int} client_port
+@end deftypevar
+
+@vindex Pull_Request_Type::client_port_str
+@vindex client_port_str (Pull_Request_Type)
+@c
+@deftypevar string client_port_str
+@end deftypevar
+
+@vindex Pull_Request_Type::pull_interval
+@vindex pull_interval (Pull_Request_Type)
+@c
+@deftypevar int pull_interval
+@end deftypevar
+
+@vindex Pull_Request_Type::latest_pull
+@vindex latest_pull (Pull_Request_Type)
+@c
+@deftypevar time_t latest_pull
+@end deftypevar
+
+@vindex Pull_Request_Type::created
+@vindex created (Pull_Request_Type)
+@c
+@deftypevar time_t created
+@end deftypevar
+
+@vindex Pull_Request_Type::last_modified
+@vindex last_modified (Pull_Request_Type)
+@c
+@deftypevar time_t last_modified
+@end deftypevar
+
+@vindex Pull_Request_Type::force_flag
+@vindex force_flag (Pull_Request_Type)
+@c
+@deftypevar bool force_flag
+@end deftypevar
+
+@noindent 
+Public data members:
+
+@vindex Pull_Request_Type::DEFAULT_PULL_INTERVAL
+@vindex DEFAULT_PULL_INTERVAL (Pull_Request_Type)
+@c
+@deftypevar int DEFAULT_PULL_INTERVAL
+Value:  86400 = 1 day in seconds
+@end deftypevar
+
+@cindex bit-field
+@cindex field, bit
+@findex Pull_Request_Type::update_pull_request
+@findex update_pull_request (Pull_Request_Type)
+@c
+The following static constants are used for setting and testing bit-fields.
+In particular, they are used when invoking  the function 
+@code{Pull_Request_Type::update_pull_request}.
+@xref{Pull_Request_Type Member Functions}. 
+
+@vindex Pull_Request_Type::LATEST_PULL
+@vindex LATEST_PULL (Pull_Request_Type)
+@c
+@deftypevr {Static constant} {unsigned int} LATEST_PULL
+Value: 1
+@end deftypevr
+
+@vindex Pull_Request_Type::CREATED
+@vindex CREATED (Pull_Request_Type)
+@c
+@deftypevr {Static constant} {unsigned int} CREATED
+Value: 2
+@end deftypevr
+
+@vindex Pull_Request_Type::LAST_MODIFIED
+@vindex LAST_MODIFIED (Pull_Request_Type)
+@c
+@deftypevr {Static constant} {unsigned int} LAST_MODIFIED
+Value: 4
+@end deftypevr
+
+@c **** (4)
+
+
+@c *** (3) Pull_Request_Type Member Functions
+
+@node Pull_Request_Type Member Functions, , Pull_Request_Type Data Members, class Pull_Request_Type
+@section Member Functions
+
+@deftypefn {Default constructor} @code{void} Pull_Request_Type (@code{void})
+@end deftypefn
+
+@deftypefn {Assignment operator} {const Pull_Request_Type&} operator= (@code{const Pull_Request_Type &}@var{p})
+@end deftypefn
+
+@deftypefun void clear (@code{void})
+@end deftypefun
+
+@deftypefn {const function} void show (@code{string} {@var{s} @code{= ""}})
+@end deftypefn
+
+@deftypefun int write_pull_request_to_database (@code{MYSQL *}@var{mysql_ptr}, @*@
+                                                @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+@deftypefun int get_pull_request_from_database (@code{MYSQL *}@var{mysql_ptr}, @*@
+                                                @code{int &}@var{return_pull_request_id}, @*@
+                                                @code{bool} {@var{id_only} @code{= false}}, @*@
+                                                @code{bool} {@var{lock_tables} @code{= true}}, @*@
+                                                @code{bool} {@var{assign} @code{= false}}, @*@
+                                                @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+@deftypefn {static function}  int get_pull_requests_from_database (@code{MYSQL *}@var{mysql_ptr}, @*@
+                                                          @code{vector<int>} @var{pull_request_id_vector}, @*@
+                                                          @code{vector<int>} @var{user_id_vector}, @*@
+                                                          @code{vector<string>} @var{username_vector}, @*@
+                                                          @code{vector<string>} @var{client_hostname_vector}, @*@
+                                                          @code{vector<string>} @var{client_ip_address_vector}, @*@
+                                                          @code{vector<Pull_Request_Type> &}@var{pull_request_vector}, @*@
+                                                          @code{bool} {@var{expired} @code{= false}}, @*@
+                                                          @code{bool} {@var{id_only} @code{= false}}, @*@
+                                                          @code{bool} {@var{lock_tables} @code{= true}}, @*@
+                                                          @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefn
+
+@deftypefn {static function} int get_expired (@code{MYSQL *}@var{mysql_ptr}, @*@
+                                      @code{vector<Pull_Request_Type> &}@var{pull_request_vector}, @*@
+                                      @code{bool} {@var{lock_tables} @code{= true}}, @*@
+                                      @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefn
+
+@deftypefun int contact_pull_client (@code{MYSQL *&}@var{mysql_ptr}, @*@
+                                     @code{const gnutls_certificate_credentials_t &}@var{xcred}, @*@
+                                     @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+
+@deftypefun int update_pull_request (@code{MYSQL *&}@var{mysql_ptr}, @*@
+                                     @code{unsigned int} @var{fields}, @*@
+                                     @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+
+@c **** (4)
+
+@c *** (3)
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

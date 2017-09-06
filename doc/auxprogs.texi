@@ -1,0 +1,886 @@
+@c auxprogs.texi
+@c [...]/gwrdifpk/doc/auxprogs.texi
+
+@c Created by Laurence D. Finston (LDF) Wed Oct  9 13:24:18 CEST 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) Auxiliary programs
+
+@node Auxiliary programs, Shellscripts and Utilities, Web application gwrdwbap, Top
+@chapter Auxiliary programs
+
+@menu
+* Generate PIDs (genpids)::
+* Generate TANs (gentans)::
+* Process scanner and parser input files (prbsnflx)::
+* Generate Passwords or Passphrases (optpsgen)::
+* Set up databases (setupdbs)::
+* Test signals (sig_test)::
+@end menu
+
+@c ** (2) Generate PIDs (genpids)
+
+@node Generate PIDs (genpids), Generate TANs (gentans), , Auxiliary programs
+@section Generate PIDs (genpids)
+
+@deffn {Command} genpids [@code{OPTION} @dots{}] [@code{TYPE VALUE} @dots{}]
+Create one or more PIDs (handles).  
+
+@command{genpids} is a ``wrapper'' program for the function @code{generate_pids}.
+@xref{Generating PIDs}.  Entries are created in the 
+@code{handlesystem.handles} or @code{handlesystem_standalone.handles} database 
+table and the PIDs are printed to standard output.
+
+Options:
+
+@table @code 
+@item --pid STRING
+@code{STRING} is used for the PID.  If this name (together with the prefix) conflicts
+with an existing handle, an error message is issued and @command{genpids} exists
+unsuccessfully.
+
+@code{STRING} may or may not contain a slash character (@samp{/}).  If it does, 
+the portion of it preceding the slash is taken to be the prefix and the portion 
+following it is the @dfn{handle suffix} 
+
+@item --prefix STRING
+@code{STRING} is used as the prefix.  Otherwise, the default prefix @samp{00001} 
+is used.  If the system is not configured to use the prefix @code{STRING}, an 
+error message is issued and @command{genpids} exists
+unsuccessfully.
+
+@item --suffix-additional STRING
+@c
+@cindex handle suffix
+@cindex suffix, handle
+@cindex handle suffix, additional (user-defined)
+@cindex suffix, handle, additional (user-defined)
+@c
+@cindex handle, local name
+@cindex handle, name, local
+@cindex local name, handle
+@c
+@code{STRING} is an additional, user-defined suffix.  It is appended to the end of the PID,
+i.e., following the @dfn{handle suffix} or @dfn{local name}, and preceded by a hyphen.
+
+@c
+@cindex handle suffix
+@cindex suffix, handle
+@cindex handle suffix, additional (user-defined)
+@cindex suffix, handle, additional (user-defined)
+@c
+@cindex handle, local name
+@cindex handle, name, local
+@cindex local name, handle
+@c
+@strong{Please note}:  This option is ignored if the @option{--pid} option is also specified!  
+In this case, a warning is issued.  Any user-defined suffix may be included in 
+the @code{STRING} argument to the @option{--pid} option, so there's no need to use the two 
+options together.
+
+@item --institute STRING
+@code{STRING}, followed by hyphen, is inserted after the prefix and before the handle suffix or 
+local name.  @code{STRING} must consist of exactly 4 characters.
+
+@strong{Please note}:  This option is ignored if the @option{--pid} option is also specified!  
+In this case, a warning is issued.  Any string for identifying an institute may be included in 
+the @code{STRING} argument to the @option{--pid} option, so there's no need to use the two 
+options together.
+
+@item --suppress-prompt
+Suppress the prompt for the MySQL password.  This option may be used when passing the latter
+to @command{genpids} via a pipe.
+
+@item --number-of-pids INTEGER
+Create @code{INTEGER} PIDs (handles).
+
+@strong{Please note}:  This option is ignored if the @option{--pid} option 
+is also specified!  In this case a warning is issued.
+Specifying  a PID using the @option{--pid} option implies that only 
+one PID should be created.
+
+@item --fifo-pathname PATH
+The function @code{generate_pids} will write the PIDs to the FIFO @code{PATH}.
+This option will generally not be needed.
+@xref{Generating PIDs}.
+
+@item --username STRING
+Create the PID or PIDs for user @code{STRING}.  Otherwise, they are created 
+for the user who invoked the program.  If there is no entry for user @code{STRING} in 
+the @samp{gwirdsif} database, @command{genpids} will issue an error message exit 
+unsuccessfully.
+
+@item --user-id INTEGER
+Specify the user ID.  If this option is used, the database isn't queried for 
+the user ID to be stored in the @code{created_by_user_id} field of the handle 
+or handles.  @strong{Please note}:  This is not bullet-proof!  
+@code{INTEGER} will @emph{always} be used, even if it doesn't correspond with the 
+argument to the @option{--username} option or the username of the user 
+who invoked the program.  It will even be used if there is no entry in 
+the @samp{gwirdsif} database for a user with this ID!
+
+@item --query-database
+After the PID or PIDs are created, an SQL @command{select} statement is passed to 
+the command-line program @command{mysql} and the latter's output is printed to 
+standard output.
+
+@item --help
+@command{genpids} issues a help message and exits.
+
+@item --version
+@command{genpids} prints version information to standard output and exits.
+@end table 
+
+Additional non-option arguments are ``type-value pairs'', where @code{TYPE} and @code{VALUE} 
+are both strings.  The @samp{type} and @code{data} fields of the handle or handles are 
+set to @code{TYPE} and @code{VALUE}, respectively.  If @code{TYPE} is a ``known'' type, 
+i.e., there are entries for it @code{Handle_Value_Type::idx_type_map} and 
+@code{Handle_Value_Type::idx_type_map}, the @code{idx} field is set to the corresponding value, 
+or a value is found according to rules defined within the function 
+@code{Handle_Type::add_values}.  @xref{Handle_Type Member Functions}.
+
+Examples:
+
+@example
+echo "<MySQL password>" | genpids
+
+@result{} 
+
+00001/00012
+
+echo "<MySQL password>" | genpids --suppress --prefix 12345
+
+@result{} 
+
+12345/00013
+
+echo "<MySQL password>" | genpids --suppress --suffix XXX
+
+@result{} 
+
+00001/00014-XXX
+
+echo "<MySQL password>" | genpids --suppress --institute ZZZZ
+
+@result{} 
+
+00001/ZZZZ-00015
+
+echo "<MySQL password>" | genpids --suppress --pid "12345/12AB"
+
+@result{} 
+
+12345/12AB
+
+echo "<MySQL password>" | genpids --suppress --number-of-pids 3
+
+@result{} 
+
+00001/00016
+00001/00017
+00001/00018
+
+echo "<MySQL password>" | genpids --suppress --query \
+   IRODS_OBJECT_TYPE "abc.txt" 
+
+@result{} 
+
+00001/00019
+*************************** 1. row ***************************
+                        handle: 00001/00019
+                           idx: 300
+                          type: HS_ADMIN
+                          data: [binary]
+                      ttl_type: 0
+                           ttl: 86400
+                     timestamp: 1383146594
+                          refs: 
+                    admin_read: 1
+                   admin_write: 1
+                      pub_read: 1
+                     pub_write: 0
+                       created: 2013-10-30 16:23:14
+                 last_modified: 0000-00-00 00:00:00
+            created_by_user_id: 1
+               irods_object_id: 0
+                     handle_id: 124
+               handle_value_id: 221
+           marked_for_deletion: 0
+delete_from_database_timestamp: 0000-00-00 00:00:00
+*************************** 2. row ***************************
+                        handle: 00001/00019
+                           idx: 601
+                          type: IRODS_OBJECT_TYPE
+                          data: abc.txt
+                      ttl_type: 0
+                           ttl: 86400
+                     timestamp: 1383146594
+                          refs: 
+                    admin_read: 1
+                   admin_write: 1
+                      pub_read: 1
+                     pub_write: 0
+                       created: 2013-10-30 16:23:14
+                 last_modified: 0000-00-00 00:00:00
+            created_by_user_id: 1
+               irods_object_id: 0
+                     handle_id: 124
+               handle_value_id: 222
+           marked_for_deletion: 0
+delete_from_database_timestamp: 0000-00-00 00:00:00
+@end example
+@end deffn
+
+@c ** (2) Generate TANs (gentans)
+
+@node Generate TANs (gentans), Process scanner and parser input files (prbsnflx), Generate PIDs (genpids), Auxiliary programs
+
+@section Generate TANs (gentans)
+
+The program @command{gentans} is not currently in use, because @command{gwrdifpk} 
+has not been set up to use TANs.  It exists because it may be desirable to implement 
+this feature in the future.
+
+@c ** (2) Process scanner and parser input files (prbsnflx)
+
+@node Process scanner and parser input files (prbsnflx), Generate Passwords or Passphrases (optpsgen), Generate TANs (gentans), Auxiliary programs
+
+@section Process scanner and parser input files (prbsnflx)
+
+@cindex ctangle output, processing
+@cindex output, ctangle, processing
+@cindex Flex scanner
+@cindex scanner, Flex
+@cindex Flex, input files
+@cindex input files, Flex
+@cindex GNU Bison, input files
+@cindex Bison, GNU, input files
+@cindex input files, GNU Bison
+@cindex wrapper program
+@cindex program, wrapper
+@c
+@command{prbsnflx} is a simple program for processing the output of the @command{ctangle} program, 
+so that it may be passed to Flex or GNU Bison as input.  @command{prbsnflx} is a ``wrapper'' for 
+a Flex scanner.  It removes comments and preprocessor commands which are valid input for C 
+and @cpp{}, but not for Flex or GNU Bison.
+
+@command{prbsnflx} is defined in @file{gwrdifpk-1.0/src/prbsnflx.l++}.
+
+Users will not normally need to invoke @command{prbsnflx}.  It is invoked in the @samp{make} 
+rules in @file{gwrdifpk-1.0/src/Makefile.am} for generating the Flex and Bison input files.
+@xref{Scanning and parsing}.
+
+
+@c ** (2) Generate Passwords or Passphrases (optpsgen)
+@node Generate Passwords or Passphrases (optpsgen), Set up databases (setupdbs), Process scanner and parser input files (prbsnflx), Auxiliary programs
+
+@section Generate Passwords or Passphrases (optpsgen)
+
+@cindex password
+@cindex passphrase
+@cindex checksum
+@cindex md5
+@cindex sha1
+@cindex sha224
+@cindex sha256
+@cindex sha384
+@cindex sha512
+@c
+@code{optpsgen} generates one or more passwords or passphrases from
+randomly chosen characters.  Options control the type of characters
+used, whether whitespace may be included, and other characteristics of
+the passwords or passphrases.  Additionally, checksums may be output,
+using one of several checksum functions, i.e., md5, sha1, sha224,
+sha256, sha384, or sha512.
+
+The files @file{optpsgen.web} and @file{optpsgsb.web} contain the source code.
+
+@menu
+* optpsgen Options::
+* optpsgen Global Variables::
+* optpsgen Functions::
+@end menu
+
+@c *** (3) optpsgen Options
+
+@node optpsgen Options, optpsgen Global Variables, , Generate Passwords or Passphrases (optpsgen)
+
+@subsection Options
+
+@need 2000
+@noindent
+Options:
+@table @option
+@item --help
+Outputs a message explaining usage and listing these options and exits.
+
+@item --debug-level INTEGER
+If INTEGER @math{> 0}, debugging information is output.
+Currently, there is only one ``debugging level'', i.e.,
+the magnitude of INTEGER otherwise makes no difference.
+
+@item --input-filename FILENAME
+For testing or debugging.  The file FILENAME will be used instead of
+@file{/dev/urandom} (the default) or @file{/dev/random} (when the
+@code{--extra-random} option is used).
+
+@item --alpha
+@itemx --alphanum, --alnum
+@itemx --graph
+@itemx --printable
+These options determine what types of characters may appear in the
+passwords or passphrases, i.e., alphabetical, alphanumeric,
+``graphical'', or printable, respectively.
+They correspond to the C functions @code{isalpha}, @code{isalnum},
+@code{isgraph} and @code{isprint}.
+That is, the characters allowed depend on the current locale.  
+
+@item --blank
+@itemx --space
+@itemx --no-tabs
+Intended for use with the options @option{--alpha}, @option{--alphanum} 
+and @option{--alnum}.  If @option{--space} is used, then 
+whitespace characters are also allowed, while if @option{--blank} is used, 
+only the actual space character (ASCII 32) and the tab character (ASCII 9) 
+are allowed.  @option{--no-tabs} causes tabs to be suppressed. 
+@samp{--blank --no-tabs} therefore has the effect of allowing the 
+actual space character, but no other whitespace characters.
+
+These options have no effect if used together with @option{--printable} or 
+@option{--graph}, because @option{--graph} is equivalent 
+to @option{--printable} minus whitespace.  If desired, space characters may be 
+included in passwords or passphrases generated using @option{--graph} 
+(or @option{--printable}) by using the @option{--max-block-size} option (see below).
+
+@item --length INTEGER
+Specifies the length of the password or passphrase.  Default is 8 characters.
+
+@item --extra-random
+@cindex randomness
+@c
+Use @file{/dev/random} instead of @file{/dev/urandom} as the source of characters.
+This improves the quality of the ``randomness'', but may cause the program to block, 
+if not enough entropy is present in the system.  A message to this effect is issued.
+
+@item --min-block-size  [INTEGER] 
+@itemx --max-block-size [INTEGER] (default 8)
+Set the minimum and/or maximum size of ``blocks'' of non-whitespace characters.
+The argument is optional.  The default for the minimum block size is 4, while that for 
+the maximum is 8.  Please note that these defaults only apply 
+@emph{if the corresponding option is specified}.  Otherwise, there is no minimum 
+or maximum block size.
+
+These options have no effect if used with @option{--graph}, because the latter excludes
+whitespace entirely.
+
+@item --no-start-space
+@itemx --no-end-space
+Prevent whitespace from occurring at the beginning or end of the password, respectively.
+
+@item --delimiters [ARG]
+The password or passphrase will be output with a ``delimiter'' at the beginning and end.
+ARG is optional.  If not used, @samp{'} will be used on both sides.
+If present, it should be a character or string.  If it is a character or a string containing 
+only one character, this character will be used on both sides.
+If it is a string containing more than one character, the first character will be used at 
+the beginning and the second at the end.  If there are more than two characters, the remaining ones
+are ignored.
+
+Delimiters can be useful if whitespace may appear at the beginning and/or end of the password 
+or passphrase.
+
+@item --exclude-chars STRING
+STRING argument required.  It is a list of characters which should @emph{not} appear in the 
+password or passphrase.
+
+@item --checksum [ARG]
+Output a checksum for the generated password or passphrase.  
+If ARG is not present, @samp{sha1sum} is used to generate the checksum.
+Valid values for ARG are @samp{md5}, @samp{sha1}, @samp{sha224}, @samp{sha224}, @samp{sha384} 
+or @samp{sha512}.
+
+@item --iterations INTEGER
+The number of passwords or passphrases (and optionally checksums) to generate.
+@end table
+
+@c *** (3) optpsgen Global Variables
+
+@node optpsgen Global Variables, optpsgen Functions, optpsgen Options, Generate Passwords or Passphrases (optpsgen)
+
+@subsection Global Variables
+
+@deftypevr {Constant} {extern const unsigned int} {DEFAULT_PASSWD_LEN = 8}
+Default length of password or passphrase.
+@end deftypevr
+
+@deftypevar {unsigned int} passwd_len  
+Set to @code{DEFAULT_PASSWD_LEN} 
+at the beginning of @code{main}.
+@end deftypevar
+
+@deftypevar int {debug_level = 0}
+Set by the @option{--debug} option.  @xref{optpsgen Options}. 
+@end deftypevar
+
+@deftypevr {Constants} {extern const unsigned int} {ALPHA_TYPE  =   1}  
+@deftypevrx {} {extern const unsigned int} {ALPHANUM_TYPE       =   2}
+@deftypevrx {} {extern const unsigned int} {GRAPH_TYPE          =   4}
+@deftypevrx {} {extern const unsigned int} {PRINTABLE_TYPE      =   8}
+@deftypevrx {} {extern const unsigned int} {BLANK_TYPE          =  16}
+@deftypevrx {} {extern const unsigned int} {SPACE_TYPE          =  32} 
+@deftypevrx {} {extern const unsigned int} {NO_TABS_TYPE        =  64} 
+@deftypevrx {} {extern const unsigned int} {NO_START_SPACE_TYPE = 128}
+@deftypevrx {} {extern const unsigned int} {NO_END_SPACE_TYPE   = 256}
+Constants for controlling what characters may appear in the password or passphrase.
+@end deftypevr
+
+
+@deftypevr {Constants} {extern const unsigned int} {MD5_TYPE    = 1}
+@deftypevrx {} {extern const unsigned int} {SHA1_TYPE   = 2}
+@deftypevrx {} {extern const unsigned int} {SHA224_TYPE = 3}
+@deftypevrx {} {extern const unsigned int} {SHA256_TYPE = 4}
+@deftypevrx {} {extern const unsigned int} {SHA384_TYPE = 5}
+@deftypevrx {} {extern const unsigned int} {SHA512_TYPE = 6}
+@end deftypevr
+
+@deftypevr {Constants} {extern const int} {DEFAULT_MIN_BLOCK_SIZE = 4}
+@deftypevrx {} {extern const int} {DEFAULT_MAX_BLOCK_SIZE = 8}
+@deftypevrx {Variables} int {min_block_size = 0}
+@deftypevrx {} int {max_block_size = 0}
+@deftypevrx {} {unsigned int} {block_ctr = 0}
+@end deftypevr
+
+@deftypevar bool {extra_random = false}
+@end deftypevar
+
+@deftypevr {Variables} string delim_start
+@deftypevrx {} string delim_end
+@end deftypevr
+
+@deftypevar string in_filename
+@end deftypevar
+
+@deftypevar {vector<char>} exclude_char_vector
+@end deftypevar
+
+@deftypevar {unsigned int} {checksum_type = 0}
+@end deftypevar
+
+@deftypevar {unsigned int} {iterations = 1}
+@end deftypevar
+
+@c *** (3) optpsgen Functions
+
+@node optpsgen Functions, , optpsgen Global Variables, Generate Passwords or Passphrases (optpsgen)
+
+@subsection Functions
+
+@deftypefun {int} main (int @var{argc}, char {**@var{argv}})
+@end deftypefun
+
+@deftypefun {int} handle_options (int @var{argc}, char {**@var{argv}})
+@end deftypefun
+
+@c ** (2) Set up databases (setupdbs)
+
+@node Set up databases (setupdbs), Test signals (sig_test), Generate Passwords or Passphrases (optpsgen), Auxiliary programs
+
+@section Set up databases (setupdbs)
+
+@command{setupdbs} can be used to set up the databases needed by @command{gwrdifpk}.
+Invoking it can be as simple as @samp{./setupds}, 
+but it has various options which can be used to control its behavior, as described 
+in the following section.
+
+@menu
+* Invoking setupdbs::
+* Global variables (setupdbs)::
+* Functions (setupdbs)::
+* Source files (setupdbs)::
+@end menu
+
+@c *** (3) Invoking setupdbs
+
+@node Invoking setupdbs, Global variables (setupdbs), , Set up databases (setupdbs)
+
+@subsection Invoking 
+
+@cindex command-line arguments
+@cindex arguments, command-line 
+@cindex program options
+@cindex options, program
+@cindex GNU C library
+@cindex C library, GNU 
+@cindex library, GNU C 
+@c
+@command{setupds} uses the @code{getopt_long_only} function from the GNU C library to 
+parse its command-line arguments.  This implies that the options to @command{setupds} 
+may be specified using two hyphens, as in the list below, or with a single hyphen.  
+In addition, any option may be abbreviated, as long as the abbreviation is unambiguous.
+For example, @option{--version} may be specified as @option{-version}, @option{--ver} 
+or even @option{-v}, since there (currently) are no other options whose names begin 
+with ``v''.   On the other hand, the option @option{--gwirdsif-database-name} may be 
+abbreviated to @option{--gwirds} but not to to @option{--gwird}, because the
+option @option{--gwirdcli-database-name} also begins with this sequence of characters, 
+making @option{--gwird} ambiguous.
+@xref{Getopt Long Options, , , libc, The GNU C Library Reference Manual}.
+
+
+@need 3000
+@noindent 
+Options:
+@c
+@table @asis
+@item @code{--drop}
+If any of the databases exist, they are dropped before being recreated.  
+If any of the databases exist and this option is @emph{not} specified, 
+@command{setupdbs} exits with exit status 2.
+
+
+@item @code{--admin <USERNAME>}
+@itemx @code{--user <USERNAME>}
+For @option{--admin}, the user specified by <@code{USERNAME}> is made an
+administrator, while for @option{--user}, he or she is made a normal user
+without administrative privileges.  The user specified as an argument to the
+first occurrence of the @option{--admin} option is given the user ID 1.  This ID
+is only ever given to an ``admin'', i.e., if the @option{--admin} option is not
+used, but the @option{--user} option is, the user specified by the first
+occurrence of the latter is given user ID 2.
+These options may each be used multiple times.
+
+
+@item @code{--group <STRING>}
+Group <@code{STRING}> will be created.
+This option may be used multiple times.
+
+@item @code{--handles-database-name <STRING>}
+The default value depends on the value of @var{standalone_handle}, which is @code{true} by default and
+set to @code{false} by the @option{--no-standalone} option (see above).  For a registered handle service,
+the default name is @code{handlesystem}, while for a standalone handle service, it is 
+@code{handlesystem_standalone}.
+For testing only.  See below.
+
+@item @code{--server-database-name <STRING>}
+@itemx @code{--gwirdsif-database-name <STRING>}
+Server-side database will be named <@code{STRING}>.
+These two options are synonymous.
+For testing only.  See below.
+
+@item @code{--client-database-name <STRING>}
+@itemx @code{--gwirdcli-database-name <STRING>}
+Client-side database will be named <@code{STRING}>.
+These two options are synonymous.
+For testing only.  See below.
+
+@item @code{--prefix <STRING>}
+The prefix specified by <@code{STRING}> is created.  That is, a row is created for it in the @code{nas} 
+table of the handles database.
+If no prefix is specified, the default prefix @samp{12345} is created.
+This option may be used multiple times.
+
+
+@item @code{--institute <STRING>}
+Database entries for institute <@code{STRING}> will be created.
+This option may be used multiple times.
+
+@item @code{--no-standalone-handle}
+@cindex CNRI (Corporation for National Research Initiatives)
+@cindex Corporation for National Research Initiatives, (CNRI)
+@c
+If used, a database is set up for use by an ``official''  handle service using a prefix 
+or prefixes registered with CNRI.
+@xref{Standalone handle service}.
+
+@item @code{--irods-server-port <STRING>}
+@command{setupdbs} will contact the iRODS server through port <@code{INTEGER}>.
+Default:  1247.
+
+@item @code{--help}
+Prints help message and exits.
+
+@item @code{--version}
+Prints version information and exits.
+@end table
+
+
+The options @option{--handles-database-name}, @option{--server-database-name},
+@option{--gwirdsif-@-database-@-name}, @option{--client-database-name},
+@option{--gwirdcli-database-name} should only be used for testing at the present
+time, because the default names, i.e, @code{handlesystem} or
+@code{handlesystem_standalone}, @code{gwirdsif} and @code{gwirdcli}, are
+currently ``hardwired'' in @command{gwirdsif} and @command{gwirdcli}.  That is,
+these names are used literally to access the databases.  Nor does the author see
+any reason to change this.  However, for testing @command{setupdbs}, it is
+useful to be able to specify different names, in order not to destroy or corrupt
+the existing databases.
+
+@noindent 
+Example:
+@example
+./setupdbs --drop --handles-database-name XXX \
+   --server-database-name YYY --client-database-name ZZZ \
+   --institute "YYYY:GWDG Test Institute 1" \
+   --institute "ZZZZ:GWDG Test Institute 2" \
+   --admin lfinsto --user jdoe --user jsmith \
+   --prefix 12345 --prefix 66666 \
+   --group test_group_1 --group test_group_2 
+@result{} 
+Entering `setupdbs' (`main').
+Databases don't already exist.  Will create.
+Handles database "XXX" doesn't already exist.
+Server-side database "YYY" doesn't already exist.
+Client-side database "ZZZ" doesn't already exist.
+Handles database "XXX" doesn't already exist.  Creating.
+Server-side database "YYY" doesn't already exist.  Creating.
+Client-side database "ZZZ" doesn't already exist.  Creating.
+[setupdbs]  In `main':  `handles_database_created' == `true'.  \
+   Will create tables in `XXX' database.
+[setupdbs]  In `main':  `create_tables_handles' succeeded, returning 0.
+Created tables in `XXX' database successfully.
+[setupdbs]  In `main':  `gwirdsif_database_created' == `true'.  \
+   Will create tables in `YYY' database.
+[setupdbs]  In `main':  `create_tables_gwirdsif' succeeded, returning 0.
+Created tables in `YYY' database successfully.
+[setupdbs]  In `main':  `create_tables_archive' succeeded, returning 0.
+Created tables for archive objects in `YYY' database successfully.
+[setupdbs]  In `main':  `create_tables_dublin_core' succeeded, \
+   returning 0.
+Created tables for archive objects in `YYY' database successfully.
+[setupdbs]  In `main':  `gwirdcli_database_created' == `true'.  \
+   Will create tables in `ZZZ' database.
+[setupdbs]  In `main':  `create_tables_gwirdcli' succeeded, returning 0.
+Created tables in `ZZZ' database successfully.
+Exiting `setupdbs' successfully with exit status 0.
+Showing tables from ZZZ database:
+
+Users
+handles
+nas
+@end example
+
+@c *** (3) Global variables (setupdbs)
+
+@node Global variables (setupdbs), Functions (setupdbs), Invoking setupdbs, Set up databases (setupdbs)
+
+@need 3000
+@subsection Global variables 
+
+
+The following global variables are defined in @file{gwrdifpk-1.0/src/stpclopt.web}:
+
+@vindex handles_database_name (setupdbs)
+@vindex gwirdsif_database_name (setupdbs)
+@vindex gwirdcli_database_name (setupdbs)
+@vindex handles_database_exists (setupdbs)
+@vindex gwirdsif_database_exists (setupdbs)
+@vindex gwirdcli_database_exists (setupdbs)
+@vindex handles_database_created (setupdbs)
+@vindex gwirdsif_database_created (setupdbs)
+@vindex gwirdcli_database_created (setupdbs)
+@vindex drop (setupdbs)
+@vindex prefix_vector (setupdbs)
+@vindex institute_vector (setupdbs)
+@vindex admin_vector (setupdbs)
+@vindex user_vector (setupdbs)
+@vindex group_vector (setupdbs)
+@vindex out_strm (setupdbs)
+@vindex license_strm (setupdbs)
+@vindex irods_server_port (setupdbs)
+@vindex nas_table_create_str (setupdbs)
+@vindex handles_table_create_str (setupdbs)
+@vindex Users_table_create_str (setupdbs)
+@vindex handles_table_alter_str (setupdbs)
+@vindex nas_table_insert_str (setupdbs)
+@vindex Users_table_insert_str (setupdbs)
+@c
+@itemize @w{}
+@item @code{string handles_database_name  = "handlesystem_standalone"}
+
+@item @code{string gwirdsif_database_name = "gwirdsif"}
+
+@item @code{string gwirdcli_database_name = "gwirdcli"}
+
+@item @code{bool handles_database_exists  = false}
+
+@item @code{bool gwirdsif_database_exists = false}
+
+@item @code{bool gwirdcli_database_exists = false}
+
+@item @code{bool handles_database_created  = false}
+
+@item @code{bool gwirdsif_database_created = false}
+
+@item @code{bool gwirdcli_database_created = false}
+
+@item @code{bool drop = false}
+
+@item @code{vector<string> prefix_vector}
+
+@item @code{vector<pair<string, string> > institute_vector}
+
+@item @code{vector<string> admin_vector}
+
+@item @code{vector<string> user_vector}
+
+@item @code{vector<string> group_vector}
+
+@item @code{ofstream out_strm}
+
+@item @code{ifstream license_strm}
+
+@item @code{int irods_server_port = 1247}
+
+@item @code{string nas_table_create_str}
+
+@item @code{string handles_table_create_str}
+
+@item @code{string Users_table_create_str}
+
+@item @code{string handles_table_alter_str[2]}
+
+@item @code{string nas_table_insert_str}
+
+@item @code{string Users_table_insert_str}
+@end itemize
+
+@c *** (3) Functions (setupdbs)
+
+@node Functions (setupdbs), Source files (setupdbs), Global variables (setupdbs), Set up databases (setupdbs)
+
+@subsection Functions 
+
+@c  
+@deftypefn {Main function} int main (@code{int} @var{argc}, @code{char *}{@var{argv}@code{[]}})
+Defined in @file{gwrdifpk-1.0/src/setupdbs.web}.
+@end deftypefn
+
+@deftypefn {Exit handler} void finish (@code{void})
+Defined in @file{gwrdifpk-1.0/src/setupdbs.web}.
+@end deftypefn
+
+@deftypefun int process_command_line_options (@code{int} @var{argc}, @code{char *}{@var{argv}@code{[]}})
+Defined in @file{gwrdifpk-1.0/src/stpclopt.web}.
+@end deftypefun
+
+@deftypefun void delete_and_clear (@code{MYSQL_RES **}@var{result_array}, @*@
+                                   @code{size_t} @var{result_array_size}, @*@
+                                   @code{vector<unsigned int *> &}@var{row_ctr_vector}, @*@
+                                   @code{vector<unsigned int *> &}@var{field_ctr_vector}, @*@
+                                   @code{vector<long int *> &}@var{affected_rows_vector}, @*@
+                                   @code{vector<string> &}@var{query_vector})
+Defined in @file{gwrdifpk-1.0/src/stpclopt.web}.
+@end deftypefun
+
+
+@deftypefun int create_databases (@code{Scan_Parse_Parameter_Type &}@var{param})
+Creates databases.
+
+Defined in @file{gwrdifpk-1.0/src/stpcrdbs.web}.
+@end deftypefun
+
+@deftypefun int create_tables_handles (@code{Scan_Parse_Parameter_Type &}@var{param})
+Create handle database tables.  The default name is @samp{handlesystem}, if the option 
+@option{--no-standalone-handle} is used, otherwise it's @samp{handlesystem_standalone}.
+@xref{Invoking setupdbs}, above.
+
+Defined in @file{gwrdifpk-1.0/src/stpcdhdl.web}.
+@end deftypefun
+
+@deftypefun int create_tables_gwirdsif (@code{Scan_Parse_Parameter_Type &}@var{param})
+Create server-side database tables (default name @samp{gwirdsif}). 
+
+Defined in @file{gwrdifpk-1.0/src/stpcdsif.web}.
+@end deftypefun
+
+@deftypefun int create_tables_archive (@code{Scan_Parse_Parameter_Type &}@var{param})
+Create database tables for archive objects (i.e., iRODS objects) in the server-side
+database (default name @samp{gwirdsif}).
+ 
+Defined in @file{gwrdifpk-1.0/src/stparobj.web}.
+@end deftypefun
+
+@deftypefun int create_tables_dublin_core (@code{Scan_Parse_Parameter_Type &}@var{param})
+Create database tables for Dublin Core metadata in the server-side
+database (default name @samp{gwirdsif}).
+
+Defined in @file{gwrdifpk-1.0/src/stpdblcr.web}.
+@end deftypefun
+
+@deftypefun int create_tables_gwirdcli (@code{Scan_Parse_Parameter_Type &}@var{param})
+Create client-side database tables (default name @samp{gwirdcli}).
+
+Defined in @file{gwrdifpk-1.0/src/stpcdcli.web}.
+@end deftypefun
+
+@c *** (3) Source files (setupdbs)
+
+@node Source files (setupdbs), , Functions (setupdbs), Set up databases (setupdbs)
+
+@subsection Source files 
+
+@need 3000
+@noindent 
+Source files (located in @file{gwrdifpk-1.0/src}:
+@c
+@itemize @w{}
+@item @file{setupdbs.web}
+
+@item @file{stpclopt.web}
+
+@item @file{stparobj.web}
+
+@item @file{stpcdcli.web}
+
+@item @file{stpcdhdl.web}
+
+@item @file{stpcdsif.web}
+
+@item @file{stpcrdbs.web}
+
+@item @file{stpdbcwv.web}
+``Driver'' file for @command{cweave}.  It contains no @cpp{} code.
+@xref{Source code and CWEB}.
+
+@item @file{stpdblcr.web}
+@end itemize
+
+
+
+@c ** (2) Test signals (sig_test)
+
+@node Test signals (sig_test), , Set up databases (setupdbs), Auxiliary programs
+
+@section Test signals (sig_test)
+
+@cindex signals
+@cindex signal handling
+@cindex handling, signal
+@c
+@command{sig_test} is a simple @cpp{} program for testing signals.  The source code
+is located in @file{gwrdifpk-1.0/src/sig_test.c++}.
+@xref{Signal options}, 
+@ref{User commands for raising signals, User commands for raising signals, Raising signals},
+@ref{Signal handling gwirdsif}, and @ref{Signal handlers}. 
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+
+
+

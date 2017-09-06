@@ -1,0 +1,135 @@
+@c [...]/gwrdifpk/doc/gpgkprtp.texi
+
+@c Created by Laurence D. Finston (LDF) Mon Jan 27 15:52:16 CET 2014
+
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) class GPG_Key_Pair_Type
+
+@node class GPG_Key_Pair_Type, class Pull_Request_Type, Dublin Core Metadata Types, Top
+@chapter GPG_Key_Pair_Type
+
+
+@tindex class GPG_Key_Pair_Type
+@tindex GPG_Key_Pair_Type, class
+@c
+@code{class GPG_Key_Pair_Type} is defined in @file{gpgkprtp.web}.  @code{class Scan_Parse_Parameter_Type}
+and the functions @code{yyparse} and @code{verify_gpg_signature} are @code{friends} of 
+@code{GPG_Key_Pair_Type}.
+
+@menu
+* GPG_Key_Pair_Type Data Members::
+* GPG_Key_Pair_Type Member Functions::
+@end menu
+
+@c ** (2) GPG_Key_Pair_Type Data Members
+
+@node GPG_Key_Pair_Type Data Members, GPG_Key_Pair_Type Member Functions, , class GPG_Key_Pair_Type
+
+@section Data Members
+
+@vindex GPG_Key_Pair_Type::gpg_key_pair_id  
+@vindex GPG_Key_Pair_Type::user_id          
+@vindex GPG_Key_Pair_Type::uid              
+@vindex GPG_Key_Pair_Type::fingerprint      
+@vindex GPG_Key_Pair_Type::public_key       
+@vindex GPG_Key_Pair_Type::revoked          
+@vindex GPG_Key_Pair_Type::created          
+@vindex GPG_Key_Pair_Type::created_str      
+@vindex GPG_Key_Pair_Type::last_modified    
+@vindex GPG_Key_Pair_Type::last_modified_str
+@c
+@vindex gpg_key_pair_id (GPG_Key_Pair_Type)  
+@vindex user_id (GPG_Key_Pair_Type)          
+@vindex uid (GPG_Key_Pair_Type)              
+@vindex fingerprint (GPG_Key_Pair_Type)      
+@vindex public_key (GPG_Key_Pair_Type)       
+@vindex revoked (GPG_Key_Pair_Type)          
+@vindex created (GPG_Key_Pair_Type)          
+@vindex created_str (GPG_Key_Pair_Type)      
+@vindex last_modified (GPG_Key_Pair_Type)    
+@vindex last_modified_str (GPG_Key_Pair_Type)
+@c
+@deftypevr {Private variables} {unsigned int} gpg_key_pair_id  
+@deftypevrx {}                  int           user_id          
+@deftypevrx {}                  string        uid              
+@deftypevrx {}                  string        fingerprint      
+@deftypevrx {}                  string        public_key       
+@deftypevrx {}                  bool          revoked          
+@deftypevrx {}                  time_t        created          
+@deftypevrx {}                  string        created_str      
+@deftypevrx {}                  time_t        last_modified    
+@deftypevrx {}                  string        last_modified_str
+@end deftypevr
+
+
+
+@c ** (2) GPG_Key_Pair_Type Member Functions
+
+@node GPG_Key_Pair_Type Member Functions, , GPG_Key_Pair_Type Data Members, class GPG_Key_Pair_Type
+
+@section Member Functions
+
+@findex GPG_Key_Pair_Type (constructor)
+@c
+@deftypefn {Default constructor} GPG_Key_Pair_Type (@code{void})
+@end deftypefn
+
+@findex GPG_Key_Pair_Type (copy constructor)
+@c
+@deftypefn {Copy constructor} GPG_Key_Pair_Type (@code{const GPG_Key_Pair_Type &}@var{g})
+@end deftypefn
+
+@findex ~GPG_Key_Pair_Type (destructor)
+@c
+@deftypefn {Destructor} ~GPG_Key_Pair_Type (@code{void})
+@end deftypefn
+
+@findex GPG_Key_Pair_Type::get_key_id
+@findex get_key_id (GPG_Key_Pair_Type)
+@c
+@deftypefun string get_key_id (@code{void})
+@end deftypefun
+
+@findex GPG_Key_Pair_Type::get_gpg_key_pair_from_database
+@findex get_gpg_key_pair_from_database (GPG_Key_Pair_Type)
+@c
+@deftypefun int get_gpg_key_pair_from_database (@code{MYSQL *}@var{mysql_ptr},@*@
+                                                @code{string} {@var{key_id} @code{= ""}},@*@
+                                                @code{bool} {@var{get_public_key} @code{= false}},@*@
+                                                @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+
+@findex GPG_Key_Pair_Type::clear
+@findex clear (GPG_Key_Pair_Type)
+@c
+@deftypefun void clear (@code{void})
+@end deftypefun
+
+@findex GPG_Key_Pair_Type::show
+@findex show (GPG_Key_Pair_Type)
+@c
+@deftypefn {const function} int show (@code{string} {@var{s} @code{= ""}})
+@end deftypefn
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

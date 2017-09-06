@@ -1,0 +1,513 @@
+%%%% gwrdifpk.texi
+%%%% Created by Laurence D. Finston (LDF) Wed Mar 13 12:57:21 CET 2013
+
+%%%% This file is part of the gwrdifpk User and Reference Manual.
+%%%% Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+%%%% See the section "GNU Free Documentation License" in the file 
+%%%% fdl.texi for copying conditions.
+
+\input texinfo   @c -*-texinfo-*-
+
+@c %**start of header
+@setfilename gwrdifpk.info
+@settitle GWDG Archive Interface User and Reference Manual
+@c %**end of header
+
+@iftex
+@tex
+\input epsf 
+\global\def\epsfsize#1#2{#1}
+
+\newbox\PPbox % symbol for ++
+\global\setbox\PPbox=\hbox{\kern.5pt\raise1pt\hbox{\sevenrm+\kern-1pt+}\kern.5pt}
+\global\def\PP{\copy\PPbox}
+\global\let\mc=\tenrm
+\global\def\CPLUSPLUS{{\mc C\PP\spacefactor1000}}
+@end tex
+@end iftex
+
+@set EDITION 1.0
+@set VERSION 1.0
+@set UPDATED February 27, 2014
+@set UPDATE-MONTH February 2014
+
+@documentlanguage en
+
+@c *********************
+
+@copying
+GWDG Archive Interface User and Reference Manual, edition @value{EDITION}.@*
+The author is Laurence D. Finston.
+
+Copyright @copyright{} 2013, 2014 Gesellschaft f@"{u}r wissenschaftliche
+Datenverarbeitung mbH, G@"{o}ttingen, Germany
+
+@quotation
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.2 or
+any later version published by the Free Software Foundation; with no
+Invariant Sections, with the Front-Cover Texts being 
+``GWDG Archive Interface User and Reference Manual'',
+and no Back-Cover Text.  A copy of the license is included in 
+the section entitled ``GNU Free Documentation License.''
+@end quotation
+@end copying
+
+@c *********************
+
+@dircategory non-GNU packages
+@direntry
+* GWDG Archive Interface: (GWDG).  GWDG Archive Interface
+@end direntry
+
+@c *********************
+
+
+@c @setchapternewpage odd
+@c @setchapternewpage off  @c For saving paper.  LDF 2003.08.20.
+
+@c *********************
+
+@titlepage
+@title GWDG Archive Interface (gwrdifpk)
+@subtitle User and Reference Manual edition @value{EDITION}
+@subtitle Last updated @value{UPDATED}
+@author Laurence D. Finston 
+@sp 1
+@author Gesellschaft f@"ur wissenschaftliche 
+@author Datenverarbeitung mbH G@"ottingen 
+@author (GWDG)
+
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@headings on
+
+@c Comment-out to save paper.
+@shortcontents
+
+@contents
+
+@node Top, , (dir), (dir)
+
+@ifnottex
+@insertcopying
+@end ifnottex
+
+@menu
+* Introduction::    
+* Installation::    
+* Standalone handle service::
+* Getting Started::
+* Security considerations::
+* Invoking gwirdsif/gwirdcli::
+* Pull archiving::
+* User commands::
+* User commands for controlling the client::
+* User and Group Management::
+* Using gwirdsif::
+* Using gwirdcli::
+* Global constants and variables::
+* class Scan_Parse_Parameter_Type::
+* class Response_Type::
+* class User_Info_Type::
+* class Group_Type::
+* iRODS Types::
+* Handle Types::
+* X.509 Certificate Types::
+* Dublin Core Metadata Types::
+* class GPG_Key_Pair_Type::
+* class Pull_Request_Type::
+* class Pull_Response_Type::
+* Miscellaneous Types::
+* Non-class Functions::
+* handlesystem and handlesystem_standalone Databases::            
+* gwirdsif Database::
+* gwirdcli Database::
+* Web application gwrdwbap::
+* Profiling and testing::
+* Auxiliary programs::
+* Shellscripts and Utilities::
+* Emacs-Lisp files::
+* FDL::
+* GPL::
+* Variable Index::              
+* Data Type Index::             
+* Function Index::              
+* Concept Index::               
+
+@detailmenu
+--- The Detailed Node Listing ---
+
+Introduction
+
+* Introduction::
+
+Installation
+
+* Installation::
+
+Standalone handle service
+
+* Standalone handle service::
+
+Getting Started
+
+* Getting Started::
+
+Security considerations
+
+* Security considerations::
+
+Invoking gwirdsif/gwirdcli
+
+* Invoking gwirdsif/gwirdcli::
+
+Pull archiving
+
+* Pull archiving::
+
+User commands
+
+* User commands::
+
+User commands for controlling the client
+
+* User commands for controlling the client::
+
+User and Group Management
+
+* User and Group Management::
+
+Using gwirdsif
+
+* Using gwirdsif::
+
+Using gwirdcli
+
+* Using gwirdcli::
+
+Global constants and variables
+
+* Global constants and variables::
+
+class Scan_Parse_Parameter_Type 
+
+* class Scan_Parse_Parameter_Type::
+
+class Response_Type 
+
+* class Response_Type::
+
+class User_Info_Type
+
+* class User_Info_Type::
+
+class Group_Type
+
+* class Group_Type::
+
+iRODS Types
+
+* iRODS Types::
+
+Handle Types
+
+* Handle Types::
+
+X.509 Certificate Types
+
+* X.509 Certificate Types::
+
+class GPG_Key_Pair_Type
+
+* class GPG_Key_Pair_Type::
+
+Dublin Core Metadata Types
+
+* Dublin Core Metadata Types::
+
+class GPG_Key_Pair_Type
+
+* class GPG_Key_Pair_Type::
+
+class Pull_Request_Type
+
+* class Pull_Request_Type::
+
+class Pull_Response_Type
+
+* class Pull_Response_Type::
+
+Miscellaneous Types
+
+* Miscellaneous Types::
+
+Non-class Functions
+
+* Non-class Functions::
+
+handlesystem and handlesystem_standalone Databases
+
+* handlesystem and handlesystem_standalone Databases::
+
+gwirdsif Database
+
+* gwirdsif Database::
+
+gwirdcli Database
+
+* gwirdcli Database::
+
+Web application gwrdwbap
+
+* Web application gwrdwbap::
+
+Profiling and testing
+
+* Profiling and testing::
+
+Auxiliary programs
+
+* Auxiliary programs::
+
+Shellscripts and Utilities
+
+* Shellscripts and Utilities::
+
+Emacs-Lisp files
+
+* Emacs-Lisp files::
+
+Variable Index
+
+* Variable Index::
+
+Data Type Index
+
+* Data Type Index::
+
+Function Index
+
+* Function Index::
+
+Concept Index
+
+* Concept Index::
+
+@end detailmenu
+
+@end menu
+
+@iftex
+@macro cpp {}
+@tex
+@CPLUSPLUS
+@end tex
+@end macro
+@end iftex
+
+
+@ifnottex
+@macro cpp {}
+C++
+@end macro
+@end ifnottex
+
+
+@iftex
+@tex
+\global\pageno=1
+@end tex
+@end iftex
+
+@c Introduction
+
+@include intro.texi
+
+@c Installation
+
+@include install.texi
+
+@c Standalone handle service
+
+@include sahdlsrv.texi
+
+@c Getting Started
+
+@include getstart.texi
+
+@c Security considerations
+
+@include scrtcnsd.texi
+
+@c Invoking gwirdsif/gwirdcli
+
+@include invoking.texi
+
+@c Pull archiving
+
+@include pullarch.texi
+
+@c User commands
+
+@include usrcmnds.texi
+
+@c User commands for controlling the client
+
+@include usrcmdcl.texi
+
+@c User and Group Management
+
+@include usrgrpmn.texi
+
+@c Using gwirdsif
+
+@include usingsif.texi
+
+@c Using gwirdcli
+
+@include usingcli.texi
+
+@c Global constants and variables
+
+@include glblvrcn.texi
+
+@c class Scan_Parse_Parameter_Type 
+
+@include scprpmtp.texi
+
+@c class Response_Type 
+
+@include rspnstp.texi
+
+@c class User_Info_Type
+
+@include usrinftp.texi
+
+@c class Group_Type
+
+@include grouptp.texi
+
+@c iRODS Types
+
+@include irdstyps.texi
+
+@c Handle Types
+
+@include hndltyps.texi
+
+@c X.509 Certificate Types
+
+@include x509cert.texi
+
+@c Dublin Core Metadata Types
+
+@include dblncrtp.texi
+
+@c class GPG_Key_Pair_Type
+
+@include gpgkprtp.texi
+
+@c class Pull_Request_Type
+
+@include pullrqtp.texi
+
+@c class Pull_Response_Type
+
+@include pullrstp.texi
+
+@c Miscellaneous Types
+
+@include misctyps.texi
+
+@c Non-class Functions 
+
+@include nnclsfnc.texi
+
+@c Databases
+
+@c handlesystem and handlesystem_standalone Databases
+
+@include hndlsdb.texi
+
+@c gwirdsif Database
+
+@include gwrdsfdb.texi
+
+@c gwirdcli Database
+
+@include gwrdcldb.texi
+
+@c Profiling and testing
+
+@include proftest.texi
+
+@c Web application gwrdwbap
+
+@include gwrdwbap.texi
+
+@c Auxiliary programs
+
+@include auxprogs.texi
+
+@c Shellscripts and Utilities
+
+@include slscutil.texi
+
+@c Emacs-Lisp files
+
+@include elispfls.texi
+
+@page
+@node FDL, GPL, Emacs-Lisp files, Top
+@unnumbered GNU Free Documentation License
+@include fdl.texi
+
+@page
+@node GPL, Variable Index, FDL, Top
+@unnumbered GNU General Public License
+@include gpl.texi
+
+@page
+@c Variable Index (v)
+@include varidx.texi 
+
+@page
+@c Data Type Index (t)
+@include dttypidx.texi   
+
+@page
+@c Function Index (f)
+@include funcidx.texi
+
+@page
+@c Concept Index (c)
+@include concidx.texi
+
+
+
+
+@bye
+
+@c * (1)
+
+@c Emacs-Lisp code for use in indirect buffers:
+@c
+@c (progn (texinfo-mode) (outline-minor-mode t) (setq outline-regexp "@c *\\*+"))
+
+@c * (1) Local Variables for Emacs
+
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+
+

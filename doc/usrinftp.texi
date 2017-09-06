@@ -1,0 +1,180 @@
+@c usrinftp.texi
+@c [...]/gwrdifpk/doc/usrinftp.texi
+
+@c Created by Laurence D. Finston (LDF) Fri Oct 25 14:39:18 CEST 2013
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) class User_Info_Type
+
+@node class User_Info_Type, class Group_Type, class Response_Type , Top
+@chapter class User_Info_Type
+
+@code{class User_Info_Type} represents user information within @command{gwrdifpk}.
+See also @ref{Users database table, Users database table, Users (database table)}, 
+and @ref{User_Info database view, User_Info database view, User_Info (database view)}.
+
+@code{class Scan_Parse_Parameter_Type} and the functions @code{client_func}, @code{yyparse}
+@code{distinguished_name_rule_func} and @code{get_user_info_func} are @code{friends}
+of @code{class User_Info_Type}.
+@xref{class Scan_Parse_Parameter_Type}, @ref{Scanning and parsing}, 
+and @ref{Parser rule functions}.
+
+@menu
+* User_Info_Type data members::
+* User_Info_Type member functions::
+* Global non-member variables User_Info_Type::
+@end menu
+
+@c ***  (3) User_Info_Type data members
+
+@node User_Info_Type data members, User_Info_Type member functions, , class User_Info_Type
+
+@section Data members 
+
+@vindex User_Info_Type::user_id
+@vindex User_Info_Type::username  
+@vindex User_Info_Type::distinguished_name
+@vindex User_Info_Type::privileges
+@vindex User_Info_Type::irods_password_encrypted
+@vindex User_Info_Type::irods_password_encrypted_timestamp
+@vindex User_Info_Type::irods_current_dir
+@vindex User_Info_Type::irods_homedir
+@vindex User_Info_Type::irods_zone
+@vindex User_Info_Type::irods_default_resource
+@vindex User_Info_Type::irods_env_filename
+@vindex User_Info_Type::irods_auth_filename
+@vindex User_Info_Type::default_handle_prefix_id
+@vindex User_Info_Type::default_handle_prefix
+@vindex User_Info_Type::default_institute_id
+@vindex User_Info_Type::default_institute_name
+@vindex User_Info_Type::handle_username
+@vindex User_Info_Type::handle_password_encrypted
+@vindex User_Info_Type::certificate                      
+@vindex User_Info_Type::gpg_key_pair_id 
+@vindex User_Info_Type::gpg_key_fingerprint 
+@c
+@vindex user_id (User_Info_Type)
+@vindex username (User_Info_Type)
+@vindex distinguished_name (User_Info_Type)
+@vindex privileges (User_Info_Type)
+@vindex irods_password_encrypted (User_Info_Type)
+@vindex irods_password_encrypted_timestamp (User_Info_Type)
+@vindex irods_current_dir (User_Info_Type)
+@vindex irods_homedir (User_Info_Type)
+@vindex irods_zone (User_Info_Type)
+@vindex irods_default_resource (User_Info_Type)
+@vindex irods_env_filename (User_Info_Type)
+@vindex irods_auth_filename (User_Info_Type)
+@vindex default_handle_prefix_id (User_Info_Type)
+@vindex default_handle_prefix (User_Info_Type)
+@vindex default_institute_id (User_Info_Type)
+@vindex default_institute_name (User_Info_Type)
+@vindex handle_username (User_Info_Type)
+@vindex handle_password_encrypted (User_Info_Type)
+@vindex certificate (User_Info_Type)
+@vindex gpg_key_pair_id (User_Info_Type)
+@vindex gpg_key_fingerprint (User_Info_Type)
+@c
+@deftypevr  {Private variables} int user_id
+@deftypevrx {}                  string username  
+@deftypevrx {}                  Distinguished_Name_Type distinguished_name
+@deftypevrx {}                  {unsigned int} privileges
+@deftypevrx {}                  string irods_password_encrypted
+@deftypevrx {}                  string irods_password_encrypted_timestamp
+@deftypevrx {}                  string irods_current_dir
+@deftypevrx {}                  string irods_homedir
+@deftypevrx {}                  string irods_zone
+@deftypevrx {}                  string irods_default_resource
+@deftypevrx {}                  string irods_env_filename
+@deftypevrx {}                  string irods_auth_filename
+@deftypevrx {}                  {unsigned int} default_handle_prefix_id
+@deftypevrx {}                  string default_handle_prefix
+@deftypevrx {}                  {unsigned int} default_institute_id
+@deftypevrx {}                  string default_institute_name
+@deftypevrx {}                  string handle_username
+@deftypevrx {}                  string handle_password_encrypted
+@deftypevrx {}                  X509_Cert_Type certificate                      
+@deftypevrx {}                  {unsigned int} gpg_key_pair_id
+@deftypevrx {}                  string gpg_key_fingerprint
+@end deftypevr
+
+@deftypevr  {Public variable} string public_key_id
+@end deftypevr
+
+
+@c *** (3) User_Info_Type member functions
+
+@node User_Info_Type member functions, Global non-member variables User_Info_Type, User_Info_Type data members, class User_Info_Type
+
+@section Member functions 
+
+@findex User_Info_Type default constructor
+@findex default constructor, User_Info_Type
+@findex constructor default, User_Info_Type
+@findex User_Info_Type::User_Info_Type
+@c
+@deftypefn {Default constructor} void User_Info_Type (@code{void})
+@end deftypefn
+
+@findex User_Info_Type::clear
+@c
+@deftypefun void clear (@code{void})
+@end deftypefun
+
+@findex User_Info_Type::get_user_id
+@findex User_Info_Type::get_irods_env_filename
+@findex User_Info_Type::get_irods_auth_filename
+@c
+@deftypefn  {Inline functions} int    get_user_id (@code{void})
+@deftypefnx {}                 string get_irods_env_filename (@code{void})
+@deftypefnx {}                 string get_irods_auth_filename (@code{void})
+@end deftypefn
+
+@findex User_Info_Type::show
+@findex show (User_Info_Type)
+@c
+@deftypefn {const function} void show (@code{string} {@var{s} @code{= ""}},@*@
+                                       @code{stringstream *}{@var{strm} @code{= 0}},@*@
+                                       @code{bool} {@var{brief} @code{= false}})
+@end deftypefn
+
+@findex User_Info_Type::get_user_info_from_database
+@findex get_user_info_from_database (User_Info_Type)
+@c
+@deftypefun int get_user_info_from_database (@code{MYSQL *}@var{mysql_ptr},@*@
+                                @code{string} @var{distinguished_name_str},@*@
+                                @code{string} {@var{username_str} @code{= ""}},@*@
+                                @code{string} {@var{thread_str} @code{= ""}})
+@end deftypefun
+
+
+
+@c *** (3) Global non-member variables User_Info_Type
+
+@node Global non-member variables User_Info_Type, , User_Info_Type member functions, class User_Info_Type
+@section Global non-member variables
+
+@deftypevr  {Global variables} {map<int, User_Info_Type>} global_user_info_map
+@deftypevrx {}                 pthread_mutex_t global_user_info_map_mutex
+@end deftypevr
+
+@c ** (2)
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+

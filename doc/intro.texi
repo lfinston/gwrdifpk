@@ -1,0 +1,336 @@
+@c intro.texi, , Top, Top
+@c This file is part of the GWDG Archive Interface
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c * (1) Introduction
+
+@node  Introduction, Installation, , Top
+@chapter Introduction
+
+@command{gwrdifpk} is a package that provides services for long-term archivation of files.
+It comprises the following components:
+
+@table @asis
+@item @strong{gwirdcli/gwrdsif}
+@cindex Handles
+@cindex Handle System, the
+@cindex PIDs
+@cindex metadata
+@c
+A client/server application that provides remote access to an iRODS system and services 
+pertaining to Handles and metadata.
+
+@item @strong{gwirdpcl}
+@dfn{Pull client}.  A @dfn{d@ae{}mon} program that runs on the client side, 
+accepting connections from the server program @command{gwirdsif}.
+@command{gwirdpcl} makes it possible for @command{gwirdsif} to 
+actively request updates of archive objects.
+@xref{Pull archiving}.
+
+@item @strong{gwrdwbap}
+A web application that calls the client function @code{client_func}.  
+@xref{Main (and similar) functions}.  @code{gwrdwbap} is currently not 
+being actively developed.
+
+@item @strong{genpids}
+A standalone program for generating handles a.k.a.@: @dfn{persistent identifiers} 
+or PIDs.
+
+@item @strong{gentans}
+A standalone program for generating @dfn{transaction authentication numbers} or TANs.
+TANs could be used as an extra security measure, however, as of September 9, 2013, 
+this feature, and hence @samp{gentans}, is not actively being developed.
+
+@item Databases for Handles
+
+The Handle System uses a database for storing data.  @command{gwrdifpk} uses 
+two databases for this purpose, one for a ``normal'' Handle server that uses one or more prefixes 
+registered with CNRI, another for a standalone Handle server with arbitrary 
+prefixes.  @xref{Handles}, @ref{Standalone handle service}, and 
+@ref{handlesystem and handlesystem_standalone Databases}.
+
+@item Databases for other data
+The @command{gwirdsif} and @command{gwirdcli} databases contain tables for other data 
+used by the corresponding programs.
+@xref{gwirdsif Database}, and @ref{gwirdcli Database}.
+@end table
+
+
+@menu
+* iRODS::
+* Handles::
+* gwrdifpk::
+* Source code and CWEB::
+@end menu
+
+@c ** (2) iRODS
+
+@node iRODS, Handles, , Introduction
+@section iRODS
+
+@cindex iRODS
+@c
+iRODS provides a unified front-end that can be used for disparate archiving systems.
+See @uref{https://www.irods.org}.
+
+@cindex iRODS
+@cindex icommands
+@cindex Jargon 
+@cindex Jargon Core
+@cindex Jargon Trunk
+@c
+The iRODS server is programmed in C, however, it does not provide a C API.  Instead, it provides 
+two Java APIs, Jargon Core and Jargon Trunk, whereby the developers
+plan to phase out Jargon Trunk in favor of Jargon Core.  In addition,
+it provides @dfn{icommands}, which are short C programs intended to be
+called from a shell.
+
+@cindex icommands
+@cindex iRODS
+@c
+For the purposes of @command{gwrdifpk}, it would be ideal if iRODS
+provided a C (or @cpp{}) API and this is what I would normally expect
+from a package written in C.  It is possible to extract the assignments,
+function calls, etc., from the source code of the icommands and use
+them directly in one's own C (or @cpp{}) code.  This requires a
+few minor changes in the source code of the icommands.  The author has tested this
+and it works.  However, there is certain amount of work involved for
+each icommand, which would in sum be considerable.  In addition, it
+would be necessary to merge the changes into any new release of iRODS
+and test them, whereby there is no guarantee that they would be
+compatible with the new version.
+
+@cindex TODO
+@cindex icommands
+@cindex iRODS
+@c
+Therefore, in the current version of @command{gwrdifpk}, the icommands
+are called in pipes (using @samp{popen}).  Clearly, this is not ideal,
+but I doubt whether calling Java methods via JNI (Java Native Interface) 
+would provide a significant performance advantage.  
+
+
+@c ** (2) Handles
+
+@node Handles, gwrdifpk, iRODS, Introduction
+@section Handles
+
+@c !! TODO: LDF 2013.10.17.  Explain about resolution, in particular, 
+@c querying the Global Handle Registry (GHR) to
+@c get the IP address of the responsible server.
+
+@cindex Corporation for National Research Initiatives (CNRI)
+@cindex CNRI (Corporation for National Research Initiatives)
+@c
+@quotation
+``The Handle System, developed by Corporation for National Research
+Initiatives (CNRI), is an infrastructure on which applications serving many
+different purposes have been built. Among the objects we know of that
+are identified by handles are journal articles, technical reports,
+books, theses and dissertations, government documents, metadata,
+distributed learning content, and data sets. Handles are being used in
+digital watermarking applications, GRID applications, and
+repositories, registries and more.''@*  
+@uref{http://www.handle.net/factsheet.html}
+@end quotation
+
+@cindex global uniqueness
+@cindex globally unique identifier
+@cindex identifier, globally unique
+@cindex handle
+@cindex Handle System
+@cindex PID (persistent identifier)
+@cindex persistent identifier (PID)
+@cindex handle service
+@cindex handle prefix
+@c
+@dfn{Handles} are a form of @dfn{globally unique persistent identifiers} 
+or @dfn{PIDs}.  For example, @samp{0.NA/11858} and 
+@samp{11858/00-ZZZZ-0000-0001-6D1D-0} are handles.  Identifiers can 
+only be unique within a domain.  CNRI administers a decentralized infrastructure 
+that defines the domain within which the handles are unique.  Other
+institutions, such as the GWDG, may apply for @dfn{handle prefixes},
+which are subject to a fee.  In the examples above,  the strings
+preceding the slash are the prefixes, i.e., @samp{0.NA} and
+@samp{11858}.  
+
+@cindex Corporation for National Research Initiatives (CNRI)
+@cindex CNRI (Corporation for National Research Initiatives)
+@cindex handle prefix
+@cindex handle 
+@c
+All handles have a prefix.  The institution assigned a prefix is
+responsible for ensuring that all handles using that prefix are
+unique.  Since no institution may use a prefix assigned to another,
+all handles are guaranteed to be unique with the domain comprising
+CNRI and the institutions to which prefixes have been assigned.
+
+@cindex resolution, handle
+@cindex handle, resolution
+@cindex handle client
+@cindex client, handle
+@cindex handle, value
+@cindex value, handle
+@c
+An important feature of the Handle System is the ability to
+@dfn{resolve} handles.  That is, when a @dfn{handle client} requests
+resolution of a handle by submitting it to a handle server, 
+the latter should return the @dfn{handle values} associated with the
+handle.  If the server is responsible for the handle's prefix, it
+extracts the data from its own @dfn{handle database}.  
+@c
+@c @cindex TODO
+@c !! TODO:  Check this!  It may not be required to pass on the request.  LDF 2013.03.28.
+@c
+Otherwise, it may pass on the request to the handle server responsible for that prefix.
+
+@cindex Corporation for National Research Initiatives (CNRI)
+@cindex CNRI (Corporation for National Research Initiatives)
+@cindex standalone handle server
+@cindex handle server, standalone 
+@c
+However, it is possible to set up a ``standalone'' handle server, i.e., one 
+outside the domain administered by CNRI with arbitrary prefixes that may or 
+may not duplicate ones used by other handle services.  In this case, only 
+``internal'' handles may be resolved.  @xref{Standalone handle service}.
+
+@cindex standalone handle server
+@cindex handle server, standalone 
+@cindex handle databases
+@cindex Corporation for National Research Initiatives (CNRI)
+@cindex CNRI (Corporation for National Research Initiatives)
+@c
+@command{gwrdifpk} includes two handle databases:  @samp{handlesystem} for use with a ``normal'' 
+handle server with an official prefix assigned by CNRI and @samp{handlesystem_standalone} 
+for use with a standalone handle server.
+The table definitions in the two databases are exactly the same.
+@xref{handlesystem and handlesystem_standalone Databases}.
+
+@c *** (3)
+
+@c ** (2) gwrdifpk
+
+@node gwrdifpk, Source code and CWEB, Handles, Introduction
+@section gwrdifpk
+
+@command{gwrdifpk} is a client/server application comprising the client program @command{gwirdcli} 
+and the server program @command{gwirdsif}.  They are written in @cpp{}.
+
+@cindex listen
+@findex listen
+@cindex authentication and authorization
+@cindex authentication/authorization
+@cindex authentication 
+@cindex authorization
+@cindex GnuTLS
+@cindex TLS
+@cindex X.509 certificate
+@cindex certificate, X.509 
+@c
+The server program @command{gwirdsif} runs in the background (in normal use)
+and listens for @dfn{TLS} connections from the client program
+@command{gwirdcli}.  The user calls the client, passing commands to it,
+which it sends to the server after @dfn{authentication and
+authorization} is performed using @dfn{X.509 certificates}.
+
+@cindex response
+@cindex peer
+@c
+The server processes the commands sent by the client and sends back
+responses, which may include commands for the client to execute.  If
+so, a dialogue ensues which continues until both @dfn{peers} are
+finished, at which time the connection is closed.
+
+@xref{Getting Started}, for more information on using @command{gwirdsif}
+and @command{gwirdcli}.
+
+@c *** (3)
+
+@c ** (2) Source code and CWEB
+
+@node Source code and CWEB, , gwrdifpk, Introduction
+@section Source code and CWEB
+
+@cindex literate programming
+@cindex CWEB
+@cindex pretty-printing
+@cindex printing, pretty-
+@cindex DVI (format)
+@cindex PostScript
+@cindex PDF (``Portable Document Format'')
+@cindex Portable Document Format (PDF)
+@cindex formats, document
+@cindex document formats
+@cindex driver files
+@cindex files, driver
+@c
+The source code for @command{gwrdifpk} is written using Donald Knuth and Silvio Levy's 
+@dfn{literate programming} package CWEB.  @xref{Prerequisites}.
+Among other features, the @command{cweave} command from the CWEB package generates 
+a ``@dfn{pretty-printed}'' version of the source code in the form of a @TeX{} file, 
+which can then be further processed to produce output in the formats DVI, PostScript and/or PDF.
+
+Invoking @command{make} or @command{make all} in a shell in the top-level directory
+of the distribution, or @command{make}, @command{make all} or @command{make pdf} in the
+@file{src} subdirectory, will cause @command{cweave} to be called on 
+various ``driver'' files to generated pretty-printed output for the programs included in the 
+@command{gwrdifpk} package.  
+
+@command{cweave} formats source code and comments using @TeX{} and creates section numbers, 
+a table of contents, an index, a listing of named sections and cross-references.
+While it is very nice to have all of these things, for actually reading and working with the 
+source code, it may be better to work with the original source files than with the 
+@command{cweave} output.  For one thing, the default formatting is not ideally suited to 
+@cpp{}, especially with respect to input or output using the operators @code{>>} and @code{<<}.
+CWEB does provide ways to adjust the formatting, but the author has not yet found the time 
+to work on this issue.
+
+However, every effort has been made to ensure that the original source files are readable:
+The code is written in an ``open'' manner with many blank lines between statements and 
+care has been taken with respect to indenting.  In addition, 
+the author uses Emacs' ``@code{outline-minor-mode}'' and the files are divided hierarchically
+into sections with headings of the form
+
+@example
+@@q * (1) @@>
+@@q ** (2) @@>
+@@q *** (3) @@>
+@@q **** (4) @@>
+@end example
+
+@noindent
+and so on.  Readers can then use Emacs' functions for navigating from heading to heading,
+e.g., @command{outline-next-heading}, @command{outline-previous-heading}, 
+@command{outline-up-heading}, etc.
+@xref{Outline Mode, , , emacs, The GNU Emacs Manual}. 
+
+@cindex CWEB mode for GNU Emacs
+@cindex mode, CWEB (for GNU Emacs)
+@cindex Emacs modes
+@cindex modes, Emacs
+@cindex GNU Emacs modes
+@cindex modes, GNU Emacs
+@cindex cweb-mode
+@c
+To make it easier to work with CWEB files, the author has programmed a @dfn{CWEB mode} for 
+GNU Emacs.  The @command{gwrdifpk} distribution includes the necessary files of Emacs-Lisp code
+in the @file{elisp} subdirectory.  @xref{Emacs-Lisp files}.
+
+Please note, however, that GNU Emacs is @emph{not} a prerequisite for working with 
+the source files!  Any plain text editor will do.
+
+@c ** (2)
+
+@c * (1)
+
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c End:

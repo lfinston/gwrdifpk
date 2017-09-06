@@ -1,0 +1,109 @@
+@c usrcmdcl.texi
+@c [...]/gwrdifpk/doc/usrcmdcl.texi
+
+@c Created by Laurence D. Finston (LDF) Thu Feb 27 10:43:01 CET 2014
+
+@c This file is part of the gwrdifpk User and Reference Manual.
+@c Copyright (C) 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
+@c See the section "GNU Free Documentation License" in the file 
+@c fdl.texi for copying conditions.
+
+@c Author:  Laurence D. Finston (LDF)
+
+@c * (1) User commands for controlling the client
+
+@node User commands for controlling the client, User and Group Management, User commands, Top
+@chapter User commands for controlling the client
+
+The commands described in the previous chapter, @ref{User commands}, 
+are entered on the client-side, but passed by the client directly 
+to the server without being processed by the client in any way.  
+The commands described in this chapter, on the other hand, are 
+processed by the client, but separately from the commands sent 
+to the client by the server.  That is, whereas @command{gwirdcli} 
+processes the commands sent from the server by means of the scanner/parser pair
+@code{zzlex/zzparse}, the client-side commands described in this chapter are 
+processed by means of the scanner/parser pair @code{xxlex/xxparse}.
+@xref{Scanning and parsing}.
+
+
+@menu
+* User commands for pull responses::
+@end menu
+
+@node User commands for pull responses, , , User commands for controlling the client
+@section Pull responses
+
+@deffn Commands {add pull path}  [OPTION @dots{}] <@var{local path}> <@var{remote path}> [ @dots{}]
+@deffnx {}      {add pull paths} [OPTION @dots{}] <@var{local path}> <@var{remote path}> @*@
+                                    [<@var{local path}> <@var{remote path}> @dots{}]
+
+
+Add one or more @dfn{pull paths} to a pull response.  
+If a corresponding pull response doesn't already exist, create it.
+These commands are synonymous; @samp{add pull paths} can be used for a single pair of paths, while
+@samp{add pull path} can be used for multiple pairs.
+
+These commands insert rows into the client-side database tables @samp{gwirdcli.Pull_Responses} and 
+@samp{gwirdcli.Pull_Paths}.
+
+@noindent 
+Options:
+@table @asis
+@item @code{user_id} @var{INTEGER}
+@itemx @code{username} @var{STRING}
+@itemx @code{distinguished_name} @var{STRING}
+!! TODO:  Check how these are used!  LDF 2014.02.27.
+@b{Please note}:  Creating a pull response or adding a pull path for a different user requires
+the @samp{pull_response_group} or @samp{pull_response_all} privilege.
+@xref{Privileges_Gwirdcli database table (gwirdcli)}.
+
+@item @code{server_ip_address} @var{STRING}
+Required.  The IP address of the server which will be sending the @dfn{pull request}.
+
+@item @code{server_hostname} @var{STRING}
+Optional. The hostname of the server which will be sending the @dfn{pull request}.
+
+@item @code{client_ip_address} @var{STRING}
+The IP address of the pull client.  The default is the IP address of the computer 
+on which @command{gwirdcli} is running.
+
+@item @code{client_hostname} @var{STRING}
+The hostname of the pull client.  The default is the hostname of the computer 
+on which @command{gwirdcli} is running.
+
+@item @code{force}
+Add the pull paths, even if corresponding ones exist.
+
+@item @code{interval} @var{INTEGER}
+Set the pull interval.
+Default:  86400, i.e., one day in seconds.
+@end table
+
+See also @ref{Pull archiving}, and @ref{Pull Response database tables (gwirdcli)}.
+
+@end deffn
+
+
+
+
+@c ** (2)
+
+@c * (1) Emacs-Lisp code for use in indirect buffers
+
+@c (progn (ignore (quote
+@c    ))  (texinfo-mode) (abbrev-mode t) (outline-minor-mode t) (ignore (quote
+@c    )) (setq outline-regexp "@c *\\*+") (setq fill-column 80))
+
+@c * (1) Local Variables for Emacs
+  
+@c Local Variables:
+@c mode:Texinfo
+@c abbrev-mode:t
+@c eval:(outline-minor-mode t)
+@c outline-regexp:"@c *\\*+"
+@c eval:(set (make-local-variable 'run-texi2dvi-on-file) "gwrdifpk.texi")
+@c fill-column:80
+@c End:
+
+
