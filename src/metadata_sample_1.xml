@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+
+<metadata
+  xmlns="http://example.org/myapp/"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://example.org/myapp/ http://example.org/myapp/schema.xsd"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:dcterms="http://purl.org/dc/terms/">
+
+  <dc:title xsi:type="title attribute" xsi:typex="title attribute 2">
+    Sample Dublin Core Metadata (Title)
+  </dc:title>
+  <dc:creator>
+    Laurence D. Finston (Creator)
+  </dc:creator>
+  <dc:subject>
+    Sample Dublin Core Metadata 1 (Subject)
+  </dc:subject>
+  <dc:description>
+    Sample Dublin Core Metadata 1 (Description)
+  </dc:description>
+  <dc:publisher>
+    GWDG 1 (Publisher)
+  </dc:publisher>
+  <dc:contributor>
+    Sample contributor 1
+  </dc:contributor>
+  <dc:date>
+    2012-12-06 12:11:26
+  </dc:date>
+  <dc:type>
+    iRODS object (Type)
+  </dc:type>
+  <dc:format>
+    ASCII (Format)
+  </dc:format>
+  <dc:identifier>
+    XXX (Identifier)
+  </dc:identifier>
+  <dc:source>
+    GWDG (Source)
+  </dc:source>
+  <dc:language>
+    English (Language)
+  </dc:language>
+  <dc:relation>
+    Not applicable (Relation)
+  </dc:relation>
+  <dc:coverage>
+    Not applicable (Coverage)
+  </dc:coverage>
+  <dc:rights>
+    All rights reserved (Rights)
+  </dc:rights>
+  <dcterms:abstract>
+    Sample Abstract
+  </dcterms:abstract>
+</metadata>
+
+
+
