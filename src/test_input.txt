@@ -1,0 +1,594 @@
+#### test_input.txt
+#### [...]/gwrdifpk/src/test_input.txt
+
+#### Created by Laurence D. Finston (LDF) Tue Jul  3 10:07:14 CEST 2012
+
+#### * (1) Top
+
+#### * (1) Copyright and License.
+
+#### This file is part of gwrdifpk, a package for long-term archiving.  
+#### Copyright (C) 2013, 2014, 2015, 2016, 2017 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  
+
+#### gwrdifpk is free software; you can redistribute it and/or modify 
+#### it under the terms of the GNU General Public License as published by 
+#### the Free Software Foundation; either version 3 of the License, or 
+#### (at your option) any later version.  
+
+#### gwrdifpk is distributed in the hope that it will be useful, 
+#### but WITHOUT ANY WARRANTY; without even the implied warranty of 
+#### MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+#### GNU General Public License for more details.  
+
+#### You should have received a copy of the GNU General Public License 
+#### along with gwrdifpk; if not, write to the Free Software 
+#### Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+
+#### gwrdifpk is available for downloading via Git from 
+#### https://github.com/gwdg/gwrdifpk.git.
+
+#### Please send bug reports to Laurence.Finston@gwdg.de
+
+#### The author can be contacted at: 
+
+#### Laurence D. Finston 		   
+#### Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen 
+#### Am Fassberg 11 	   
+#### 37077 Goettingen  	   
+#### Germany                                
+
+#### Laurence.Finston@gwdg.de
+
+#### The "DISTINGUISHED_NAME" doesn't need to be used if a connection using 
+#### X.509 authentication is used.  Otherwise, it does.  Other forms of connection
+#### are _only_ for testing purposes!
+#### LDF 2013.05.10.
+
+#### * (1) Code
+
+#DISTINGUISHED_NAME "/C=DE/ST=Germany/L=Goettingen/O=GWDG/OU=gwrdifpk/CN=Laurence Finston"
+#DISTINGUISHED_NAME "/C=DE/ST=Niedersachsen/L=Goettingen/O=GWDG/OU=gwrdifpk/CN=Jane Smith"
+
+show groups all
+
+#whoami
+
+end
+
+register pull force hostname pcfinston.gwdg.de ip_address 134.76.5.25 port 5560
+distinguished_name "/C=DE/O=GWDG/OU=gwrdifpk/L=Goettingen/ST=Germany/CN=Laurence Finston"
+interval :2::1 abc.txt def.txt
+
+end
+
+# /* (+ (* 60 60 24) (* 60 60 2))  */
+
+#put -f +pid +gen def.txt
+
+put -f abc.txt
+
+
+
+
+#get -f --expand "ghi.txt.gz" # -f 
+
+#get --expand "def.tar.gz" # -f 
+
+#distinguished_name "/C=DE/ST=Germany/L=Goettingen/O=GWDG/OU=gwrdifpk/CN=Laurence Finston"
+#distinguished_name "/C=DE/ST=Niedersachsen/L=Goettingen/O=GWDG/OU=gwrdifpk/CN=Jane Smith"
+#"lfinsto"
+#jsmith
+
+# --force 
+
+
+end
+
+#whoami
+
+#get --expand --decrypt "jkl.txt.gz.gpg"
+
+end
+
+#get -f --expand "abc.txt"
+
+
+
+#get --expand "ghi.txt.gz"  # -f 
+
+#put -f +pid +gen abc.txt
+
+#put -f +pid +gen --compress bzip2 jkl.txt
+
+#put -f +pid +gen --compress ghi.txt
+
+#put -f +pid +gen --compress def/
+
+#put -f +pid +gen --compress --encrypt jkl.txt
+
+
+
+
+
+#get -f --expand --decrypt "abc.txt"
+
+#get -f --expand "def.tar.gz" 
+
+end
+
+#store public_key
+
+#get -f --verify --store-signature "abc.txt.gpg" 
+#get -f --verify "def.txt.gpg" 
+
+
+#whoami
+
+#### !! TODO:  LDF 2014.01.10.  Add PIDs if encrypting, signing, etc.
+
+#checksum "abc.txt" sha1 # check # sha512 # no-handle
+
+#verify checksum "abc.txt" e93c8d1836fff1917f4f767ad5d92058bf3c7d5a sha1 check
+
+end
+
+#ls
+
+#put -f +pid +gen --encrypt --sign --verify "abc.txt" # --encrypt --clearsign --sign
+
+#put -f +pid +gen --encrypt --sign --detach --verify "abc.txt" # --encrypt --clearsign --sign 
+#put -f +pid +gen --clearsign "abc.txt" # --clearsign --encrypt --sign --verify 
+
+#mv abc.txt.gpg def.txt.gpg
+
+#get metadata abc.txt.gpg show output
+
+end
+
+
+#add metadata metadata_sample_1.xml abc.txt store
+
+#### The `save_db_entry' is an option that will only be needed in special cases:
+#### It ensures that the entry in the `Irods_Objects' database table will not be 
+#### deleted.  
+#### LDF 2013.11.27.
+
+#mv abc.txt def.txt
+
+#mv -V def.txt abc.txt 
+
+#whoami
+
+
+
+#checksum "abc.txt" sha1 # check # sha512 # no-handle
+
+#verify checksum "abc.txt" 0bee89b07a248e27c83fc3d5951213c2  # Incorrect
+#verify checksum "abc.txt" 0bee89b07a248e27c83fc3d5951213c1  # Correct
+
+#verify checksum "abc.txt" 03cfd743661f07975fa2f1220c5194cbaff48451 sha1 check
+
+
+
+#get handle pid "12345/00001" # --no-store
+
+
+# get metadata abc.txt show output
+
+#show metadata 1 2 full # store
+
+#delete metadata abc.txt # file force # immediate # file file_only  
+
+get metadata 1 2 store show 
+
+end
+
+#add metadata "metadata_sample_2.xml" "abc.txt" store
+
+#delete metadata abc.txt file force # immediate # file file_only  
+
+#undelete metadata abc.txt 
+
+#show metadata 1 2 # full
+
+# force file 
+#undelete metadata abc.txt 
+
+#ls -l abc.txt
+
+
+
+end 
+
+add metadata "metadata_sample_2.xml" "abc.txt" store
+
+end
+
+delete metadata abc.txt file immediate # file file_only  force
+
+#add metadata "metadata_sample_1.xml" "abc.txt" store
+
+end
+
+
+
+
+
+
+
+#add metadata metadata_sample_2.xml abc.txt store
+
+end
+
+
+
+#undelete metadata abc.txt 
+
+#get metadata abc.txt output
+
+end
+
+
+
+#get metadata pid 12345/00001 output
+
+#show groups all
+
+create handle
+create handle
+create handle
+create handle
+create handle
+create handle
+create handle
+create handle
+
+end
+
+
+#put -f +pid +gen "abc.txt" remote_filename "subdir_1/" 
+
+#put +pid +gen "abc.txt" 
+
+#get -f "abc.txt"
+
+#get -f "abc.txt"
+
+
+
+end
+
+whoami
+
+get_user_info jsmith
+
+
+
+#DISTINGUISHED_NAME "/C=DE/ST=Niedersachsen/L=Goettingen/O=GWDG/OU=gwrdifpk/CN=John Doe"
+#DISTINGUISHED_NAME "/C=DE/ST=Niedersachsen/L=Goettingen/O=GWDG/OU=gwrdifpk/CN=Jane Smith"
+#DISTINGUISHED_NAME "/C=DE/ST=Germany/L=Goettingen/O=GWDG/OU=gwrdifpk/CN=Laurence Finston"
+
+#delete handle_value --immediate 12345/00001:IRODS_OBJECT 
+
+#delete handle --delay 7: "12345/00001" 
+#undelete handle "12345/00001" 
+
+#put -f +pid +gen abc.txt
+
+
+get handle pid "12345/00001"
+
+end
+
+#ls
+
+
+
+
+end
+
+#add handle_value "12345/00001" idx 301 type "IRODS_OBJECT" data "abc"
+#end
+
+#put -f +pid +gen abc.txt 
+undelete handle_value 12345/00001:IRODS_OBJECT
+
+end
+
+
+
+
+
+
+
+end
+
+
+
+#put -f +pid +gen abc.txt 
+
+
+#undelete handle_value 12345/00001:IRODS_OBJECT 
+#delete handle_value 12345/00001:IRODS_OBJECT immediate
+
+
+end
+
+# delete handle_value 12345/00001:IRODS_OBJECT immediate
+# delete handle_value 12345/00001:211 
+# delete handle_value 12345/00001:300 delay 7:
+
+
+#delete handle_value 00001/12345:IRODS_OBJECT
+#delete handle_value "00001/12345:IRODS_OBJECT"
+
+put -f +pid +gen abc.txt 
+add metadata metadata_sample_1.xml abc.txt store
+
+end
+
+# add metadata metadata_sample_1.xml abc.txt store
+#rm abc.txt
+#undelete abc.txt
+end
+
+end
+
+whoami
+end
+
+
+
+#undelete handle "12345/00001"
+#get handle pid "12345/00001" 
+
+
+undelete handle "12345/00001"
+delete handle "12345/00001" delay=1
+#get handle pid "12345/00001"
+
+end
+
+#undelete handle "12345/00001" 
+#delete handle "12345/00001" delay=1:2: immediate
+
+#get handle pid "12345/00001"
+
+end
+
+#undelete handle 12345/00001 
+
+end
+
+#delete handle "12345/00001" 
+
+undelete handle "12345/00001" 
+
+end
+
+get handle pid "12345/00001"
+get handle pid "12345/00002"
+get handle pid "12345/00003"
+
+end
+
+put +pid +gen abc.txt 
+add metadata metadata_sample_1.xml abc.txt store
+
+end
+
+
+
+# rm delay abc.txt
+# rm delay database-only metadata_sample_1.xml
+
+# end
+
+#rm delay abc.txt 
+
+undelete abc.txt 
+undelete database-only metadata_sample_1.xml
+
+
+end
+
+#put +pid +gen  abc.txt 
+#add metadata metadata_sample_1.xml abc.txt store
+
+#rm delay abc.txt
+r#m delay database-only metadata_sample_1.xml
+
+end
+
+
+end
+
+rm delay database abc.txt
+
+end
+
+put abc.txt
+
+
+end
+
+rm delay database-only abc.txt 
+
+end
+
+#put "abc.txt" # -f +pid +gen 
+#rm delay abc.txt 
+
+
+
+end
+
+#put -f +pid +gen "abc.txt" 
+#rm delay abc.txt 
+
+#undelete database "abc.txt" 
+
+end
+
+
+# add metadata "metadata_sample_1.xml" "abc.txt" store
+# rm abc.txt metadata_sample_1.xml
+# undelete database "abc.txt" "metadata_sample_1.xml"
+
+end
+
+
+
+
+
+#rm database "metadata_sample_1.xml"
+
+end
+
+#rm database "abc.txt" 
+# "metadata_sample_1.xml"
+# 
+# delay=2 
+
+end
+
+#get handle pid "12345/00003"
+
+end
+
+#### LDF 2013.08.12.
+#### rm [no-delay] "abc.txt"             # rm 
+
+#### rm delay "abc.txt"                  # mark
+#### rm database no-delay "abc.txt" 
+#### rm database-only no-delay "abc.txt" 
+#### rm database delay "abc.txt" 
+#### rm database-only delay "abc.txt" 
+
+put -f +pid +gen "abc.txt" 
+
+rm no-delay database "abc.txt" # Testing.  Not finished.  LDF 2013.08.12.
+                               # Must set `delete_from_gwirdsif_db_timestamp'
+                               # to a value that will ensure immediate deletion.
+                               # I must also add a cond. variable/mutex pair
+                               # and write code for waking up the "purge" thread.
+
+end
+
+
+#rm no-delay "abc.txt" #### archive only.  This works.  LDF 2013.08.12.
+#rm delay database-only "abc.txt" ### database only.  This works.  LDF 2013.08.12.
+#rm delay database "abc.txt" # archive and database.  This works.  LDF 2013.08.12.
+#rm no-delay "abc.txt" #### archive only.  This works.  LDF 2013.08.12.
+
+end
+
+#add metadata "metadata_sample_1.xml" "abc.txt" store
+
+#get metadata "abc.txt"
+
+
+
+#delete handle "12345/00001" immediate
+
+get handle pid "12345/00001"
+
+end
+
+
+get metadata "abc.txt"
+
+
+
+ls
+
+end
+
+
+#add metadata "metadata_sample_1.xml" "abc.txt" store
+
+
+#delete handle "12345/00001" # immediate
+
+#delete handle "12345/00002" immediate
+#delete handle "12345/00003" immediate
+
+end
+
+
+
+
+
+#
+
+
+end
+
+put -f +pid +gen "def.txt" 
+delete handle "12345/00002"
+
+rm "abc.txt" "def.txt"
+end
+
+
+#add metadata "metadata_sample_1.xml" "abc.txt" 
+
+#end
+
+#put -f +pid +gen "def.txt" 
+
+#rm "abc.txt"
+
+#delete handle "12345/00001"
+delete handle "12345/00002"
+
+end
+
+end
+
+
+#delete handle "12345/00001"
+
+#delete handle "12345/00002"
+
+end 
+
+put -f +pid +gen "abc.txt"
+delete handle "12345/00001" 
+
+end
+
+#delete handle_value 12345/00001:300
+
+
+
+
+
+
+end
+
+
+delete handle "12345/00002" 
+
+
+
+end
+
+# immediate  
+
+
+
+#get handle pid "12345/00001" 
+
+end
+
+#### * (1) Local variables for Emacs
+
+#### Local Variables:
+#### mode:Text
+#### abbrev-mode:t
+#### eval:(read-abbrev-file)
+#### eval:(outline-minor-mode t)
+#### comment-start:"#"
+#### outline-regexp:"#### [*\\f]+[ \\t]+([0-9]+)"
+#### End:
