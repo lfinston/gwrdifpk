@@ -1,0 +1,244 @@
+/* prbsnflx.l++                                             */
+/* flex input file for processing CWEB files that  */
+/* produce Bison and Flex input files. */
+/* Created by Laurence Finston Tue Feb 10 14:25:51 MET 2004 */
+
+/* * (1) Copyright and License.
+
+This file is part of GNU 3DLDF, a package for three-dimensional drawing.  
+Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017 The Free Software Foundation  
+
+GNU 3DLDF is free software; you can redistribute it and/or modify 
+it under the terms of the GNU General Public License as published by 
+the Free Software Foundation; either version 3 of the License, or 
+(at your option) any later version.  
+
+GNU 3DLDF is distributed in the hope that it will be useful, 
+but WITHOUT ANY WARRANTY; without even the implied warranty of 
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+GNU General Public License for more details.  
+
+You should have received a copy of the GNU General Public License 
+along with GNU 3DLDF; if not, write to the Free Software 
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+
+GNU 3DLDF is a GNU package.  
+It is part of the GNU Project of the  
+Free Software Foundation 
+and is published under the GNU General Public License. 
+See the website http://www.gnu.org 
+for more information.   
+GNU 3DLDF is available for downloading from 
+http://www.gnu.org/software/3dldf/LDF.html.
+It is also available from 
+http://www.dante.de/software/ctan/, the Dante www-server  
+and from http://wwwuser.gwdg.de/~lfinsto1, 
+the author's website.  
+
+Please send bug reports to lfinsto1@gwdg.de
+The mailing list help-3dldf@gnu.org is available for people to 
+ask other users for help.  
+The mailing list info-3dldf@gnu.org is for sending 
+announcements to users. To subscribe to these mailing lists, send an 
+email with ``subscribe <email-address>'' as the subject.  
+
+The author can be contacted at: 
+
+Laurence D. Finston 
+c/o Free Software Foundation, Inc. 
+51 Franklin St, Fifth Floor 
+Boston, MA  02110-1301  
+USA
+
+lfinsto1@gwdg.de 
+s246794@stud.uni-goettingen.de 
+*/
+
+/* % Scanner. */
+
+/* %% Declarations and Definitions.   */
+
+/* %%% Include files.   */
+%{
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdarg.h>
+
+#include <fstream>
+#include <getopt.h> 
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <iterator>
+#include <new>
+#include <string>
+#include <ctype.h>
+#include <time.h>
+#include <math.h>
+#include <sstream>   
+#include <stdarg.h>
+#include <stdexcept>
+
+using namespace std;
+
+%}
+/* %%% File_Node.   */
+%{
+struct
+File_Node
+  {
+      YY_BUFFER_STATE buffer;
+      string in_filename;
+  };
+struct File_Node* file_node_ptr = 0;
+
+string out_stream_name;
+ofstream out_stream;
+const unsigned short MAX_FILENAME = 128;
+%}
+
+/* %%% Static variable and constant declarations.   */
+%{
+%}
+
+/* %%% Start conditions.   */
+
+
+/* %% Rules.   */
+%%
+   
+%{
+/* %%% Local variables for scanning routine.  */
+char temp_string[64];
+signed int temp_ctr;
+bool DEBUG_SCANNER = false; /* |true| */
+%}
+
+%{
+/* %%% Assignments for scanning routine.  */
+%}
+
+%{
+/* %%% The rules proper.  */
+%}
+
+%{
+/* %%%% Preprocessor line commands. */
+%}
+#line.* {/* Don't copy to output.  */}
+
+%{
+/* %%%% Section number comments. */
+%}
+^\/\*:?[0-9]+:?\*\/.* {/* Don't copy to output. */ }
+
+%{
+/* %%%% Returns. */
+%}
+
+\n {
+  out_stream << yytext;
+}
+
+
+%{
+/* %%%% Other chars. */
+%}
+
+. {
+  out_stream << yytext;
+}
+
+%{
+/* %%%% End-of-file */
+%}
+<<EOF>>           { 
+    if (DEBUG_SCANNER)
+      printf("** Scanning End of file**\n");
+
+      yy_delete_buffer(YY_CURRENT_BUFFER);
+      delete file_node_ptr;
+ 
+      return (0);
+}
+
+
+
+%{
+/* %% User Code.  */
+%}
+%%
+
+int
+main (int argc, char** argv)
+{
+  bool DEBUG = false; /* |true| */ 
+  if (argc != 3)
+    {
+      cerr << "ERROR! " << argv[0] << " must be called as follows:\n"
+           << argv[0] << " <input filename> <output filename>" 
+           << endl << "Exiting with return value 1."
+           << endl << flush;
+      return 1;
+    }
+
+  if (   strlen(argv[1]) > MAX_FILENAME
+      || strlen(argv[2]) > MAX_FILENAME)
+    {
+      cerr << "ERROR! Filename argument to " << argv[0] 
+           << " is too long!\n"
+           << endl << "Exiting with return value 1."
+           << endl << flush;
+      return 1;
+    }
+
+  file_node_ptr = new File_Node;
+  file_node_ptr->in_filename = argv[1];
+
+  if (DEBUG) 
+    cout << "file_node_ptr->in_filename == "
+         << file_node_ptr->in_filename << endl << flush;
+
+
+  yyin = fopen(file_node_ptr->in_filename.c_str(), "r");
+
+  out_stream_name = argv[2];
+
+  if (DEBUG) 
+    cout << "out_stream_name == " << out_stream_name << endl << flush;
+
+  out_stream.open(out_stream_name.c_str());
+
+  yy_switch_to_buffer( yy_create_buffer( yyin, YY_BUF_SIZE));
+  yylex();
+
+}
+
+
+int
+yywrap(void)
+{
+    return 1;
+}
+
+int
+yyerror(void)
+{
+    return 0;
+}
+
+/* 
+ For use in indirect buffers.
+(progn
+ (outline-minor-mode t)
+ (setq outline-regexp "/\\* *%+")
+ )
+
+*/
+
+/* Local Variables: */
+/* mode:CWEB  */
+/* outline-minor-mode:t  */
+/* outline-regexp:"/\\* *%+" */
+/* End: */
+
