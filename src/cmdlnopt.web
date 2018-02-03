@@ -1115,17 +1115,17 @@ Added this section.
                     perror("strtol error");
                 }
 
-                cerr << "Setting `trace_value' to 0 and continuing."
+                cerr << "Setting `trace_value' to 0L and continuing."
                      << endl;
                 unlock_cerr_mutex(); 
 
-                trace_value = 0;
+                trace_value = 0L;
             
             }  /* |if|  */
 
 
             if (!optarg)
-                trace_value = 1;
+                trace_value = 1L;
 
 #if DEBUG_COMPILE
             if (DEBUG)

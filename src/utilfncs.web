@@ -2006,7 +2006,7 @@ initialize_signal_maps(void)
 Added this function.  Copied from \.{dbsrvcli} (OptiNum-Grid).
 
 \initials{LDF 2013.07.25.}
-Now using |int global_debug_level| instead of |int trace_value|.  Both of these
+Now using |int global_debug_level| instead of |long int trace_value|.  Both of these
 are global variables, declared in \filename{glblvrbl.web}.  |trace_value| is currently
 not used for anything.
 

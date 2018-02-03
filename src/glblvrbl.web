@@ -355,7 +355,7 @@ Added |string gwirdcli_hostname| and |string gwirdcli_ip_address|.
     string log_filename;
     string err_log_filename;
 
-    int trace_value = 0;
+    long int trace_value = 0L;
 
     bool scanner_trace = false;
     bool parser_trace  = false;
@@ -613,7 +613,7 @@ Added |bool is_gwirdpcl|.
 
    extern string session_id; 
 
-   extern int trace_value;
+   extern long int trace_value;
 
    extern bool scanner_trace;
    extern bool parser_trace;
