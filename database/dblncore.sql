@@ -6,7 +6,7 @@
 /* * (1) Copyright and License.
 
 This file is part of gwrdifpk, a package for long-term archiving.  
-Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  
+Copyright (C) 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  
 
 gwrdifpk is free software; you can redistribute it and/or modify 
 it under the terms of the GNU General Public License as published by 
@@ -30,12 +30,12 @@ Please send bug reports to Laurence.Finston@gwdg.de
 The author can be contacted at: 
 
 Laurence D. Finston 
-Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen 
-Am Fassberg 11 
-37077 Goettingen  
+Kreuzbergring 41
+37075 Goettingen  
 Germany
 
-Laurence.Finston@gwdg.de 
+Laurence.Finston@gmx.de
+
 */
 
 

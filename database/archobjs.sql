@@ -8,7 +8,7 @@
 /* * (1) Copyright and License.
 
 This file is part of gwrdifpk, a package for long-term archiving.  
-Copyright (C) 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2012,Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  
+Copyright (C) 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen
 
 gwrdifpk is free software; you can redistribute it and/or modify 
 it under the terms of the GNU General Public License as published by 
@@ -38,7 +38,6 @@ Germany
 
 Laurence.Finston@gmx.de
 */
-
 
 
 /* ** (2)  Emacs Commands:   */ 
