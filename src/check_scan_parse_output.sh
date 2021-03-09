@@ -32,9 +32,8 @@
 #### The author can be contacted at: 
 
 #### Laurence D. Finston 		   
-#### Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen 
-#### Am Fassberg 11 	   
-#### 37077 Goettingen  	   
+#### Kreuzbergring 41 	   
+#### 37075 Goettingen  	   
 #### Germany                                
 
 #### Laurence.Finston@gwdg.de

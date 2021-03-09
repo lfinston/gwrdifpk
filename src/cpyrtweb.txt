@@ -25,9 +25,8 @@
 @q Please send bug reports to Laurence.Finston@@gwdg.de@>
 
 @q Laurence D. Finston                                                   @>
-@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
-@q Am Fassberg 11         					         @>
-@q 37077 Goettingen              					 @>
+@q Kreuzbergring 41         					         @>
+@q 37075 Goettingen              					 @>
 @q Germany                           					 @>                                
 
 @q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
