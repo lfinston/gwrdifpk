@@ -4,7 +4,7 @@
 @q * (1) Copyright and License.@>
 
 @q This file is part of gwrdifpk, a package for long-term archiving.  @>
-@q Copyright (C) 2013, 2014 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
+@q Copyright (C) 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021 Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen @>
 
 @q gwrdifpk is free software; you can redistribute it and/or modify @>
 @q it under the terms of the GNU General Public License as published by @>
@@ -25,15 +25,14 @@
 
 @q ("@@" stands for a single at-sign in the following paragraph.) @>
 
-@q Please send bug reports to Laurence.Finston@@gwdg.de@>
+@q Please send bug reports to Laurence.Finston@@gmx.de@>
 
 @q Laurence D. Finston                                                   @>
-@q Gesellschaft fuer wissenschaftliche Datenverarbeitung mbH Goettingen  @>
-@q Am Fassberg 11         					         @>
-@q 37077 Goettingen              					 @>
+@q Kreuzbergring 41         					         @>
+@q 37075 Goettingen              					 @>
 @q Germany                           					 @>                                
 
-@q Laurence.Finston@@gwdg.de (@@ stands for a single "at" sign.)@>
+@q Laurence.Finston@@gmx.de (@@ stands for a single "at" sign.)@>
 
 @q ** (2) spptfnc1.web  @>
 @* {\bf Scan\_Parse\_Parameter\_Type} function definitions 1.
