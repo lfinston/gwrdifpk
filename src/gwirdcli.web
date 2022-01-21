@@ -683,7 +683,7 @@ Added this section.
             lock_cerr_mutex(); 
             cerr << "ERROR!  In `main':"
                  << endl 
-                 << "`mkstemp' failed, returning 0:"
+                 << "`mkstemp' failed, returning -1:"
                  << endl
                  << strerror(errno)
                  << endl 
